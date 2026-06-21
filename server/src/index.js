@@ -24,9 +24,9 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', app: 'Pinlooply' })
 })
 
-// Routes (add as features are built)
-// import authRoutes from './routes/auth.js'
-// app.use('/api/auth', authRoutes)
+// Routes
+import discussionsRouter from './routes/discussions.js'
+app.use('/api/discussions', discussionsRouter)
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)

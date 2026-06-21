@@ -195,13 +195,14 @@ function PriorityTask({ task, onToggle }) {
 // ── Dashboard ─────────────────────────────────────────────────
 export default function Dashboard() {
   const { user } = useAuth()
-  const { projects, loading: projectsLoading } = useProjectStore()
+  const { projects, loading: projectsLoading, fetchProjects } = useProjectStore()
   const { tasks, fetchAllTasks, updateTaskStatus } = useTaskStore()
   const [userName, setUserName] = useState('')
 
   useEffect(() => {
     if (!user) return
     fetchAllTasks(user.id)
+    fetchProjects(user.id)
     supabase.from('users').select('name').eq('id', user.id).single()
       .then(({ data }) => setUserName(
         data?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'

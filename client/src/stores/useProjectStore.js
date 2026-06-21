@@ -14,7 +14,11 @@ export const useProjectStore = create((set, get) => ({
       .eq('user_id', userId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
-    if (!error) set({ projects: data ?? [] })
+    if (error) {
+      console.error('[fetchProjects] error:', error.message, error)
+    } else {
+      set({ projects: data ?? [] })
+    }
     set({ loading: false })
   },
 

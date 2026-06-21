@@ -12,6 +12,8 @@ import ForgotPassword from './pages/auth/ForgotPassword'
 // App pages
 import Dashboard from './pages/Dashboard'
 import Onboarding from './pages/Onboarding'
+import LogDiscussion from './pages/LogDiscussion'
+import AIConfirm from './pages/AIConfirm'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -48,7 +50,12 @@ function AppRoutes() {
       } />
       <Route path="/log" element={
         <ProtectedRoute>
-          <AppLayout><Placeholder title="Log Discussion" /></AppLayout>
+          <AppLayout><LogDiscussion /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/log/confirm" element={
+        <ProtectedRoute>
+          <AppLayout><AIConfirm /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/log/:id" element={
