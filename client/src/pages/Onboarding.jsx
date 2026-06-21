@@ -383,8 +383,8 @@ export default function Onboarding() {
   async function handleFinish() {
     setLoading(true)
     await save({ onboarding_complete: true })
-    setLoading(false)
-    navigate('/dashboard')
+    // Full reload so ProtectedRoute re-fetches onboarding_complete fresh
+    window.location.replace('/dashboard')
   }
 
   function goBack() {
