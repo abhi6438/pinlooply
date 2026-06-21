@@ -5,20 +5,10 @@
 
 -- ============================================================
 -- TABLES
--- Note: groups must be created before projects (FK dependency)
+-- Order: users → groups → projects → everything else
 -- ============================================================
 
--- GROUPS (created before projects due to FK)
-create table if not exists public.groups (
-  id          uuid default gen_random_uuid() primary key,
-  name        text not null,
-  owner_id    uuid references public.users(id),
-  plan        text default 'free',
-  invite_code text unique default substr(md5(random()::text), 1, 10),
-  created_at  timestamptz default now()
-);
-
--- USERS (extends Supabase auth.users)
+-- USERS (extends Supabase auth.users — must come first)
 create table if not exists public.users (
   id         uuid references auth.users(id) on delete cascade primary key,
   email      text unique not null,
@@ -29,11 +19,15 @@ create table if not exists public.users (
   created_at timestamptz default now()
 );
 
--- Fix groups.owner_id FK now that users exists
-alter table public.groups
-  add constraint groups_owner_id_fkey
-  foreign key (owner_id) references public.users(id)
-  not valid;  -- "not valid" skips checking existing rows (safe for fresh tables)
+-- GROUPS (references users)
+create table if not exists public.groups (
+  id          uuid default gen_random_uuid() primary key,
+  name        text not null,
+  owner_id    uuid references public.users(id) on delete set null,
+  plan        text default 'free',
+  invite_code text unique default substr(md5(random()::text), 1, 10),
+  created_at  timestamptz default now()
+);
 
 -- PROJECTS
 create table if not exists public.projects (
