@@ -14,6 +14,20 @@ api.interceptors.request.use(async (config) => {
   return config
 })
 
+export const topicsApi = {
+  list: (projectId) =>
+    api.get(`/api/topics/${projectId}`),
+
+  detail: (topicId) =>
+    api.get(`/api/topics/detail/${topicId}`),
+
+  updateStatus: (topicId, status) =>
+    api.patch(`/api/topics/${topicId}/status`, { status }),
+
+  versions: (topicId) =>
+    api.get(`/api/topics/${topicId}/versions`),
+}
+
 export const discussionsApi = {
   process: (rawText, projectId, source) =>
     api.post('/api/discussions/process', { rawText, projectId, source }),

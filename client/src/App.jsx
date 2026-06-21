@@ -14,6 +14,8 @@ import Dashboard from './pages/Dashboard'
 import Onboarding from './pages/Onboarding'
 import LogDiscussion from './pages/LogDiscussion'
 import AIConfirm from './pages/AIConfirm'
+import Topics from './pages/Topics'
+import TopicDetail from './pages/TopicDetail'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -71,6 +73,16 @@ function AppRoutes() {
       <Route path="/projects/:id" element={
         <ProtectedRoute>
           <AppLayout><Placeholder title="Project Detail" /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/topics" element={
+        <ProtectedRoute>
+          <AppLayout><Topics /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/topics/:topicId" element={
+        <ProtectedRoute>
+          <AppLayout><TopicDetail /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/lists" element={

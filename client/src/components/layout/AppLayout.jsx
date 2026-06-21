@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { supabase } from '../../config/supabase'
 import {
   LayoutDashboard, MessageSquarePlus, FolderOpen, ListChecks,
-  CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft,
+  CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
 } from 'lucide-react'
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -14,6 +14,7 @@ function getNavItems(mode) {
   const items = [
     { to: '/dashboard',  icon: LayoutDashboard,  label: 'Dashboard' },
     { to: '/log',        icon: MessageSquarePlus, label: 'Log Discussion' },
+    { to: '/topics',     icon: Tag,               label: 'Topics' },
     { to: '/projects',   icon: FolderOpen,        label: 'Projects' },
     { to: '/lists',      icon: ListChecks,        label: 'Lists' },
     { to: '/timeline',   icon: CalendarDays,      label: 'Timeline' },

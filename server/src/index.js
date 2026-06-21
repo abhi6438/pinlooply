@@ -26,7 +26,9 @@ app.get('/api/health', (req, res) => {
 
 // Routes
 import discussionsRouter from './routes/discussions.js'
+import topicsRouter from './routes/topics.js'
 app.use('/api/discussions', discussionsRouter)
+app.use('/api/topics', topicsRouter)
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
