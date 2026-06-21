@@ -14,6 +14,25 @@ api.interceptors.request.use(async (config) => {
   return config
 })
 
+export const tasksApi = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return api.get(`/api/tasks${qs ? `?${qs}` : ''}`)
+  },
+
+  create: (payload) =>
+    api.post('/api/tasks', payload),
+
+  update: (taskId, payload) =>
+    api.patch(`/api/tasks/${taskId}`, payload),
+
+  delete: (taskId) =>
+    api.delete(`/api/tasks/${taskId}`),
+
+  bulk: (payload) =>
+    api.patch('/api/tasks/bulk', payload),
+}
+
 export const topicsApi = {
   list: (projectId) =>
     api.get(`/api/topics/${projectId}`),

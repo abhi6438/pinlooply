@@ -16,6 +16,7 @@ import LogDiscussion from './pages/LogDiscussion'
 import AIConfirm from './pages/AIConfirm'
 import Topics from './pages/Topics'
 import TopicDetail from './pages/TopicDetail'
+import Lists from './pages/Lists'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -87,7 +88,7 @@ function AppRoutes() {
       } />
       <Route path="/lists" element={
         <ProtectedRoute>
-          <AppLayout><Placeholder title="Lists" /></AppLayout>
+          <AppLayout><Lists /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/timeline" element={
