@@ -28,9 +28,11 @@ app.get('/api/health', (req, res) => {
 import discussionsRouter from './routes/discussions.js'
 import topicsRouter from './routes/topics.js'
 import tasksRouter from './routes/tasks.js'
+import timelineRouter from './routes/timeline.js'
 app.use('/api/discussions', discussionsRouter)
 app.use('/api/topics', topicsRouter)
 app.use('/api/tasks', tasksRouter)
+app.use('/api/timeline', timelineRouter)
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)

@@ -14,6 +14,13 @@ api.interceptors.request.use(async (config) => {
   return config
 })
 
+export const timelineApi = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return api.get(`/api/timeline${qs ? `?${qs}` : ''}`)
+  },
+}
+
 export const tasksApi = {
   list: (params = {}) => {
     const qs = new URLSearchParams(params).toString()
