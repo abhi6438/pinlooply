@@ -170,8 +170,21 @@ export async function saveDiscussion({ rawText, projectId, userId, source, aiRes
       .upsert({ discussion_id: discussion.id, topic_id: topicId }, { onConflict: 'discussion_id,topic_id' })
   }
 
-  // 4. Create tasks
+  // 4. Create tasks (with optional assignee resolution)
   for (const task of aiResult.tasks || []) {
+    // Try to resolve assigned_to_name → user UUID via public.users within the project's group
+    let assignedTo = null
+    if (task.assigned_to_name) {
+      const nameLower = task.assigned_to_name.toLowerCase().trim()
+      const { data: matched } = await supabaseAdmin
+        .from('users')
+        .select('id, name')
+        .ilike('name', `%${nameLower}%`)
+        .limit(5)
+      // Pick the first match (fuzzy by first name)
+      if (matched?.length) assignedTo = matched[0].id
+    }
+
     await supabaseAdmin.from('tasks').insert({
       project_id: projectId,
       discussion_id: discussion.id,
@@ -180,6 +193,8 @@ export async function saveDiscussion({ rawText, projectId, userId, source, aiRes
       type: task.type || 'task',
       priority: task.priority || 'medium',
       due_date: task.due_date || null,
+      assigned_to_name: task.assigned_to_name || null,
+      assigned_to: assignedTo,
       assigned_by: userId,
     })
   }

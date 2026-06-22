@@ -52,12 +52,14 @@ import tasksRouter from './routes/tasks.js'
 import timelineRouter from './routes/timeline.js'
 import projectsRouter from './routes/projects.js'
 import groupsRouter from './routes/groups.js'
+import notificationsRouter from './routes/notifications.js'
 app.use('/api/discussions', discussionsRouter)
 app.use('/api/topics', topicsRouter)
 app.use('/api/tasks', tasksRouter)
 app.use('/api/timeline', timelineRouter)
 app.use('/api/projects', projectsRouter)
 app.use('/api/groups', groupsRouter)
+app.use('/api/notifications', notificationsRouter)
 
 // ── Global JSON error handler — MUST be last ─────────────────────────
 // Catches errors from middleware (e.g. CORS, body-parser) and returns JSON

@@ -22,6 +22,7 @@ export const groupsApi = {
   validateInvite: (inviteCode) => api.get(`/api/groups/invite/${inviteCode}`),
   join: (groupId, invite_code) => api.post(`/api/groups/${groupId}/join`, { invite_code }),
   inviteMember: (groupId, email) => api.post(`/api/groups/${groupId}/members`, { email }),
+  getGroupMembers: (groupId) => api.get(`/api/groups/${groupId}`),
   updateRole: (groupId, memberId, role) => api.patch(`/api/groups/${groupId}/members/${memberId}`, { role }),
   removeMember: (groupId, memberId) => api.delete(`/api/groups/${groupId}/members/${memberId}`),
 }
@@ -58,6 +59,9 @@ export const tasksApi = {
 
   bulk: (payload) =>
     api.patch('/api/tasks/bulk', payload),
+
+  assign: (taskId, assignedTo) =>
+    api.patch(`/api/tasks/${taskId}/assign`, { assigned_to: assignedTo }),
 }
 
 export const topicsApi = {
@@ -86,3 +90,9 @@ export const discussionsApi = {
 }
 
 export default api
+
+export const notificationsApi = {
+  list: () => api.get('/api/notifications'),
+  markRead: (id) => api.patch(`/api/notifications/${id}/read`),
+  markAllRead: () => api.patch('/api/notifications/read-all'),
+}
