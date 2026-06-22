@@ -6,6 +6,7 @@ import {
   ExternalLink, Star, ChevronRight, AlertCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageShell, PageHeader } from '../../components/ui'
 
 // ── Plan definitions (mirrors server constants) ───────────────
 const PLANS = [
@@ -231,12 +232,11 @@ export default function Plan() {
   const currentPlanKey = info?.planKey || 'personal_free'
 
   return (
-    <div className="px-6 py-6 animate-fade-in">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-warm-900">Plan & Billing 💳</h1>
-        <p className="text-sm text-warm-500 mt-1">Manage your plan and see what's included.</p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Plan & Billing"
+        subtitle="Manage your plan and see what's included."
+      />
 
       {/* Current plan summary */}
       {info && (
@@ -295,6 +295,6 @@ export default function Plan() {
           Contact us
         </a> after donating.
       </div>
-    </div>
+    </PageShell>
   )
 }

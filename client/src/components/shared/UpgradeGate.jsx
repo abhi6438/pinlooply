@@ -24,7 +24,7 @@ const PLAN_LABELS = {
 }
 
 const PLAN_COLORS = {
-  group_free: { bg: 'bg-indigo-50',  border: 'border-indigo-200', btn: 'bg-indigo-600 hover:bg-indigo-700', text: 'text-indigo-700', icon: 'text-indigo-500' },
+  group_free: { bg: 'bg-primary-50',  border: 'border-primary-200', btn: 'bg-primary-600 hover:bg-primary-700', text: 'text-primary-700', icon: 'text-primary-500' },
   team_paid:  { bg: 'bg-violet-50',  border: 'border-violet-200', btn: 'bg-violet-600 hover:bg-violet-700', text: 'text-violet-700', icon: 'text-violet-500' },
   org_paid:   { bg: 'bg-amber-50',   border: 'border-amber-200',  btn: 'bg-amber-500  hover:bg-amber-600',  text: 'text-amber-700',  icon: 'text-amber-500'  },
 }

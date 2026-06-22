@@ -5,6 +5,7 @@ import { useProjectStore } from '../stores/useProjectStore'
 import { discussionsApi } from '../services/api'
 import { CheckCircle2, Loader2, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageShell, PageHeader } from '../components/ui'
 
 const SOURCES = [
   { value: 'manual',          label: 'Manual entry' },
@@ -142,12 +143,11 @@ export default function LogDiscussion() {
     <>
       {processing && <ProcessingOverlay currentStep={step} />}
 
-      <div className="px-6 py-8 animate-fade-in">
-        {/* Header */}
-        <div className="mb-7">
-          <h1 className="text-2xl font-bold text-warm-900">Log Discussion 💬</h1>
-          <p className="text-warm-500 mt-1 text-sm">Tell Pinloop what happened — AI will handle the rest.</p>
-        </div>
+      <PageShell>
+        <PageHeader
+          title="Log Discussion"
+          subtitle="Tell Pinloop what happened — AI will handle the rest."
+        />
 
         <div className="card space-y-5">
           {/* Source pill toggle */}
@@ -229,7 +229,7 @@ export default function LogDiscussion() {
             <li>• Paste full Slack threads or meeting notes for richer extraction</li>
           </ul>
         </div>
-      </div>
+      </PageShell>
     </>
   )
 }

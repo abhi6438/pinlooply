@@ -9,6 +9,7 @@ import {
   UserCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageShell, PageHeader } from '../components/ui'
 
 const TASK_TYPES = {
   task:             { label: 'Task',          color: 'bg-blue-100 text-blue-700' },
@@ -221,22 +222,21 @@ export default function AIConfirm() {
   const selectedCount = topics.length + tasks.length
 
   return (
-    <div className="px-6 py-8 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-warm-900">Review AI Results ✨</h1>
-          <p className="text-sm text-warm-500 mt-1">Select what you want to save to your project.</p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs bg-primary-100 text-primary-700 font-semibold px-3 py-1.5 rounded-full">
-            {topics.length} topic{topics.length !== 1 ? 's' : ''} · {tasks.length} task{tasks.length !== 1 ? 's' : ''} selected
-          </span>
-          <span className="text-xs text-warm-400 bg-warm-100 px-2.5 py-1.5 rounded-full border border-warm-200">
-            via {aiResult.provider || 'AI'}
-          </span>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Review AI Results"
+        subtitle="Select what you want to save to your project."
+        actions={
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs bg-primary-100 text-primary-700 font-semibold px-3 py-1.5 rounded-full">
+              {topics.length} topic{topics.length !== 1 ? 's' : ''} · {tasks.length} task{tasks.length !== 1 ? 's' : ''} selected
+            </span>
+            <span className="text-xs text-warm-400 bg-warm-100 px-2.5 py-1.5 rounded-full border border-warm-200">
+              via {aiResult.provider || 'AI'}
+            </span>
+          </div>
+        }
+      />
 
       {unresolvedCount > 0 && (
         <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-2.5 text-sm text-amber-800">
@@ -341,6 +341,6 @@ export default function AIConfirm() {
           {saving ? 'Saving...' : `Save Selected (${selectedCount} item${selectedCount !== 1 ? 's' : ''})`}
         </button>
       </div>
-    </div>
+    </PageShell>
   )
 }
