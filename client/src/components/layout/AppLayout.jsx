@@ -8,7 +8,7 @@ import { notificationsApi } from '../../services/api'
 import {
   LayoutDashboard, MessageSquarePlus, FolderOpen, ListChecks,
   CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
-  Bell, CheckCheck, ClipboardList, BarChart3,
+  Bell, CheckCheck, ClipboardList, BarChart3, Shield,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -161,6 +161,11 @@ function Sidebar({ user, userProfile, bellProps, onLogout }) {
       </nav>
 
       <div className={`border-t border-gray-100 p-3 space-y-2 ${collapsed ? 'flex flex-col items-center' : ''}`}>
+        {/* Admin link — only visible to admin */}
+        {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
+          <SideNavLink to="/admin" icon={Shield} label="Admin" collapsed={collapsed} />
+        )}
+
         {/* Bell — desktop sidebar */}
         {collapsed ? (
           <NotificationBell {...bellProps} />

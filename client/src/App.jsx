@@ -25,6 +25,7 @@ import GroupMembers from './pages/GroupMembers'
 import Standup from './pages/Standup'
 import WeeklySummary from './pages/WeeklySummary'
 import Plan from './pages/settings/Plan'
+import AdminPanel from './pages/admin/AdminPanel'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -130,6 +131,11 @@ function AppRoutes() {
       <Route path="/settings/plan" element={
         <ProtectedRoute>
           <AppLayout><Plan /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/admin" element={
+        <ProtectedRoute>
+          <AppLayout><AdminPanel /></AppLayout>
         </ProtectedRoute>
       } />
     </Routes>

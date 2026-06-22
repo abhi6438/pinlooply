@@ -109,3 +109,11 @@ export const planApi = {
   get:     () => api.get('/api/plan'),
   upgrade: (mode) => api.post('/api/plan/upgrade', { mode }),
 }
+
+export const adminApi = {
+  getAiConfig:    ()             => api.get('/api/admin/ai-config'),
+  saveAiConfig:   (configs)      => api.put('/api/admin/ai-config', { configs }),
+  getStats:       ()             => api.get('/api/admin/stats'),
+  getUsers:       (search = '')  => api.get(`/api/admin/users${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  updateUserPlan: (userId, body) => api.patch(`/api/admin/users/${userId}/plan`, body),
+}

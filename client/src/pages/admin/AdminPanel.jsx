@@ -1,0 +1,569 @@
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { adminApi } from '../../services/api'
+import {
+  Settings, Users, BarChart3, Shield, Loader2,
+  Save, CheckCheck, Search, ChevronDown, AlertCircle,
+  Cpu, Crown, RefreshCw, TrendingUp, FolderOpen,
+  MessageSquare, CheckSquare2, GitBranch,
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+import { format, parseISO } from 'date-fns'
+
+// ── Admin email (must match server ADMIN_EMAIL) ────────────────
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || ''
+
+// ── Tab navigation ─────────────────────────────────────────────
+const TABS = [
+  { id: 'ai',    label: 'AI Config',       icon: Cpu      },
+  { id: 'users', label: 'User Stats',      icon: Users    },
+  { id: 'usage', label: 'Usage Stats',     icon: BarChart3},
+  { id: 'plans', label: 'Plan Management', icon: Crown    },
+]
+
+// ── Stat card ─────────────────────────────────────────────────
+function StatCard({ label, value, sub, color = 'indigo', icon: Icon }) {
+  const colors = {
+    indigo: 'bg-indigo-50 text-indigo-700',
+    emerald:'bg-emerald-50 text-emerald-700',
+    violet: 'bg-violet-50 text-violet-700',
+    amber:  'bg-amber-50 text-amber-700',
+    gray:   'bg-gray-50 text-gray-700',
+    red:    'bg-red-50 text-red-700',
+  }
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className={`w-8 h-8 rounded-lg ${colors[color]} flex items-center justify-center mb-3`}>
+        <Icon className="w-4 h-4" />
+      </div>
+      <p className="text-2xl font-bold text-gray-900">{value}</p>
+      <p className="text-xs font-medium text-gray-700 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+// ── Tab 1: AI Config ──────────────────────────────────────────
+function AIConfigTab() {
+  const [data,    setData]    = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+  const [configs, setConfigs] = useState({ free: {}, paid: {} })
+
+  useEffect(() => {
+    adminApi.getAiConfig().then(res => {
+      const d = res.data.data
+      setData(d)
+      const cfgMap = {}
+      for (const c of d.configs || []) cfgMap[c.plan_type] = c
+      setConfigs({
+        free: { provider: cfgMap.free?.provider || 'groq', model_name: cfgMap.free?.model_name || '' },
+        paid: { provider: cfgMap.paid?.provider || 'claude', model_name: cfgMap.paid?.model_name || '' },
+      })
+    }).catch(() => toast.error('Failed to load AI config'))
+    .finally(() => setLoading(false))
+  }, [])
+
+  function setField(plan, field, value) {
+    setConfigs(c => ({ ...c, [plan]: { ...c[plan], [field]: value } }))
+  }
+
+  // Auto-set model to first option when provider changes
+  function setProvider(plan, provider) {
+    const firstModel = data?.providers?.[provider]?.models?.[0] || ''
+    setConfigs(c => ({ ...c, [plan]: { provider, model_name: firstModel } }))
+  }
+
+  async function save() {
+    setSaving(true)
+    try {
+      await adminApi.saveAiConfig([
+        { plan_type: 'free', ...configs.free },
+        { plan_type: 'paid', ...configs.paid },
+      ])
+      setSaved(true)
+      toast.success('AI config saved!')
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Save failed')
+    } finally { setSaving(false) }
+  }
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-indigo-400 animate-spin" /></div>
+
+  const providers = Object.entries(data?.providers || {})
+
+  return (
+    <div className="space-y-6">
+      {/* Plan rows */}
+      {[
+        { key: 'free', label: 'Free Plan',  badge: 'bg-gray-100 text-gray-600' },
+        { key: 'paid', label: 'Paid Plan',  badge: 'bg-amber-100 text-amber-700' },
+      ].map(({ key, label, badge }) => {
+        const cfg = configs[key]
+        const models = data?.providers?.[cfg.provider]?.models || []
+        return (
+          <div key={key} className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${badge}`}>{label}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">AI Provider</label>
+                <div className="relative">
+                  <select
+                    value={cfg.provider}
+                    onChange={e => setProvider(key, e.target.value)}
+                    className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8"
+                  >
+                    {providers.map(([pk, pv]) => (
+                      <option key={pk} value={pk}>{pv.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3 pointer-events-none" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Model</label>
+                <div className="relative">
+                  <select
+                    value={cfg.model_name}
+                    onChange={e => setField(key, 'model_name', e.target.value)}
+                    className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8"
+                  >
+                    {models.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Provider overview */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Available Providers</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {providers.map(([pk, pv]) => {
+            const inUse = configs.free.provider === pk || configs.paid.provider === pk
+            return (
+              <div key={pk} className={`rounded-xl border p-3 ${inUse ? 'border-indigo-200 bg-indigo-50' : 'border-gray-200 bg-gray-50'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`w-2 h-2 rounded-full ${inUse ? 'bg-indigo-500' : 'bg-gray-300'}`} />
+                  <span className="text-xs font-semibold text-gray-800">{pv.label}</span>
+                </div>
+                <div className="space-y-0.5">
+                  {pv.models.map(m => (
+                    <p key={m} className="text-[11px] text-gray-500 truncate">{m}</p>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Save button */}
+      <button
+        onClick={save}
+        disabled={saving}
+        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+          saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+        } disabled:opacity-50`}
+      >
+        {saving   ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+        : saved   ? <><CheckCheck className="w-4 h-4" /> Saved!</>
+        : <><Save className="w-4 h-4" /> Save Changes</>}
+      </button>
+    </div>
+  )
+}
+
+// ── Tab 2: User Stats ─────────────────────────────────────────
+function UserStatsTab({ stats }) {
+  if (!stats) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-indigo-400 animate-spin" /></div>
+
+  const { users } = stats
+  const modeRows = Object.entries(users.byMode || {}).filter(([, v]) => v > 0)
+
+  return (
+    <div className="space-y-6">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total Users"     value={users.total}        icon={Users}      color="indigo" />
+        <StatCard label="New This Week"   value={users.newThisWeek}  icon={TrendingUp} color="emerald" />
+        <StatCard label="Free"            value={users.byPlan?.free || 0} icon={Shield} color="gray" />
+        <StatCard label="Paid"            value={users.byPlan?.paid || 0} icon={Crown}  color="amber" />
+      </div>
+
+      {/* Mode breakdown */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Users by Mode</h3>
+        <div className="space-y-3">
+          {[
+            { key: 'personal', label: '👤 Personal', color: 'bg-gray-400' },
+            { key: 'group',    label: '👥 Group',    color: 'bg-indigo-500' },
+            { key: 'team',     label: '🏢 Team',     color: 'bg-violet-500' },
+            { key: 'org',      label: '🏗️ Org',      color: 'bg-amber-500'  },
+          ].map(({ key, label, color }) => {
+            const count = users.byMode?.[key] || 0
+            const pct = users.total > 0 ? Math.round((count / users.total) * 100) : 0
+            return (
+              <div key={key}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-700">{label}</span>
+                  <span className="text-xs font-semibold text-gray-900">{count} <span className="text-gray-400 font-normal">({pct}%)</span></span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Recent signups */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-900">Recent Signups</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50">
+              <tr>
+                {['Email', 'Name', 'Mode', 'Plan', 'Joined'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {(users.recent || []).map(u => (
+                <tr key={u.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 text-gray-800 font-medium">{u.email}</td>
+                  <td className="px-4 py-2.5 text-gray-600">{u.name || '—'}</td>
+                  <td className="px-4 py-2.5">
+                    <span className="capitalize px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-[11px] font-medium">{u.mode}</span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className={`capitalize px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                      u.plan === 'paid' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-600'
+                    }`}>{u.plan}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-400">
+                    {u.created_at ? format(parseISO(u.created_at), 'MMM d, yyyy') : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Tab 3: Usage Stats ────────────────────────────────────────
+function UsageStatsTab({ stats }) {
+  if (!stats) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-indigo-400 animate-spin" /></div>
+
+  const { content, users } = stats
+
+  // Rough AI cost estimate: groq free ≈ $0, claude ≈ $0.003/1k tokens, avg 2k tokens/call
+  const paidUsers = users?.byPlan?.paid || 0
+  const freeUsers = (users?.total || 0) - paidUsers
+  // Estimate calls: discussions processed per user per week
+  const estPaidCalls = paidUsers * 10
+  const estFreeCalls = freeUsers * 10
+  const estCostUSD   = (estPaidCalls * 2 * 0.003).toFixed(2)
+
+  return (
+    <div className="space-y-6">
+      {/* Content stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatCard label="Discussions"  value={content.discussions || 0} icon={MessageSquare} color="indigo" />
+        <StatCard label="Tasks"        value={content.tasks        || 0} icon={CheckSquare2}  color="emerald" />
+        <StatCard label="Topics"       value={content.topics       || 0} icon={GitBranch}     color="violet" />
+        <StatCard label="Projects"     value={content.projects     || 0} icon={FolderOpen}    color="gray" />
+        <StatCard label="Conflicts"    value={content.conflicts    || 0} icon={AlertCircle}   color="red" />
+      </div>
+
+      {/* AI usage estimate */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">AI Usage Estimate (This Month)</h3>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center p-3 bg-gray-50 rounded-xl">
+            <p className="text-xl font-bold text-gray-900">{estFreeCalls}</p>
+            <p className="text-xs text-gray-500 mt-1">Est. Groq calls</p>
+            <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Free tier</p>
+          </div>
+          <div className="text-center p-3 bg-amber-50 rounded-xl">
+            <p className="text-xl font-bold text-gray-900">{estPaidCalls}</p>
+            <p className="text-xs text-gray-500 mt-1">Est. Claude calls</p>
+            <p className="text-[11px] text-amber-600 font-medium mt-0.5">Paid tier</p>
+          </div>
+          <div className="text-center p-3 bg-indigo-50 rounded-xl">
+            <p className="text-xl font-bold text-gray-900">${estCostUSD}</p>
+            <p className="text-xs text-gray-500 mt-1">Est. AI cost</p>
+            <p className="text-[11px] text-indigo-600 font-medium mt-0.5">This month</p>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400">
+          Estimates based on {users?.total || 0} users × ~10 AI calls/week × ~2k tokens/call. Actual costs depend on real usage.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Tab 4: Plan Management ────────────────────────────────────
+function PlanManagementTab() {
+  const [search,   setSearch]   = useState('')
+  const [users,    setUsers]    = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [updating, setUpdating] = useState(null) // userId being updated
+
+  const load = useCallback(async (q = '') => {
+    setLoading(true)
+    try {
+      const res = await adminApi.getUsers(q)
+      setUsers(res.data.data || [])
+    } catch { toast.error('Failed to load users') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function updatePlan(userId, plan, mode) {
+    setUpdating(userId)
+    try {
+      await adminApi.updateUserPlan(userId, { plan, mode })
+      toast.success('Plan updated')
+      load(search)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Update failed')
+    } finally { setUpdating(null) }
+  }
+
+  function handleSearch(e) {
+    e.preventDefault()
+    load(search)
+  }
+
+  const MODE_OPTIONS = ['personal', 'group', 'team', 'org']
+
+  return (
+    <div className="space-y-4">
+      {/* Search */}
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by email…"
+            className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+          />
+        </div>
+        <button
+          type="submit"
+          className="px-4 py-2.5 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 transition-colors"
+        >
+          Search
+        </button>
+        <button
+          type="button"
+          onClick={() => { setSearch(''); load('') }}
+          className="px-3 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
+          title="Refresh"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </form>
+
+      {/* User table */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr>
+                  {['Email', 'Name', 'Mode', 'Plan', 'Joined', 'Actions'].map(h => (
+                    <th key={h} className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {users.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No users found</td>
+                  </tr>
+                )}
+                {users.map(u => (
+                  <tr key={u.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-800">{u.email}</td>
+                    <td className="px-4 py-3 text-gray-600">{u.name || '—'}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={u.mode}
+                        disabled={!!updating}
+                        onChange={e => updatePlan(u.id, u.plan, e.target.value)}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                      >
+                        {MODE_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={u.plan}
+                        disabled={!!updating}
+                        onChange={e => updatePlan(u.id, e.target.value, u.mode)}
+                        className={`text-xs border rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-300 ${
+                          u.plan === 'paid' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <option value="free">free</option>
+                        <option value="paid">paid</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400">
+                      {u.created_at ? format(parseISO(u.created_at), 'MMM d, yyyy') : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {updating === u.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                        : (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => updatePlan(u.id, 'paid', 'team')}
+                              className="text-[11px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-lg hover:bg-amber-100 transition-colors font-medium"
+                              title="Upgrade to Team (paid)"
+                            >
+                              → Team
+                            </button>
+                            <button
+                              onClick={() => updatePlan(u.id, 'free', 'personal')}
+                              className="text-[11px] bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors"
+                              title="Downgrade to Personal (free)"
+                            >
+                              ↓ Free
+                            </button>
+                          </div>
+                        )
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Main ──────────────────────────────────────────────────────
+export default function AdminPanel() {
+  const { user } = useAuth()
+  const navigate  = useNavigate()
+  const [tab,     setTab]     = useState('ai')
+  const [stats,   setStats]   = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [denied,  setDenied]  = useState(false)
+
+  useEffect(() => {
+    // Quick client-side guard using VITE_ADMIN_EMAIL
+    // Server enforces the real check — this just avoids an unnecessary API call
+    if (ADMIN_EMAIL && user?.email && user.email !== ADMIN_EMAIL) {
+      setDenied(true)
+      setLoading(false)
+      return
+    }
+
+    adminApi.getStats().then(res => {
+      setStats(res.data.data)
+    }).catch(err => {
+      if (err.response?.status === 403) setDenied(true)
+      else toast.error('Failed to load admin data')
+    }).finally(() => setLoading(false))
+  }, [user])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-32">
+        <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
+      </div>
+    )
+  }
+
+  if (denied) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-32 text-center">
+        <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-4">
+          <Shield className="w-8 h-8 text-red-400" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Admin Access Only</h2>
+        <p className="text-sm text-gray-500 mb-6">You don't have permission to access this page.</p>
+        <button onClick={() => navigate('/dashboard')} className="text-sm text-indigo-600 hover:underline">
+          ← Back to Dashboard
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full flex flex-col px-6 py-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+          <Settings className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
+          <p className="text-xs text-gray-400">Pinlooply management console</p>
+        </div>
+        <span className="ml-auto text-[11px] bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full font-semibold">
+          Admin Only
+        </span>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
+        {TABS.map(t => {
+          const Icon = t.icon
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                tab === t.id
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto">
+        {tab === 'ai'    && <AIConfigTab />}
+        {tab === 'users' && <UserStatsTab stats={stats} />}
+        {tab === 'usage' && <UsageStatsTab stats={stats} />}
+        {tab === 'plans' && <PlanManagementTab />}
+      </div>
+    </div>
+  )
+}
