@@ -23,6 +23,7 @@ import ProjectDetail from './pages/ProjectDetail'
 import JoinGroup from './pages/JoinGroup'
 import GroupMembers from './pages/GroupMembers'
 import Standup from './pages/Standup'
+import WeeklySummary from './pages/WeeklySummary'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -113,6 +114,11 @@ function AppRoutes() {
       <Route path="/standup" element={
         <ProtectedRoute>
           <AppLayout><Standup /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/weekly-summary" element={
+        <ProtectedRoute>
+          <AppLayout><WeeklySummary /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/settings" element={

@@ -9,7 +9,7 @@ import { format } from 'date-fns'
 import {
   AlertTriangle, Clock, ChevronRight, Send, Loader2,
   CheckCircle2, Circle, Zap, FolderOpen, Users,
-  ClipboardList, FlaskConical, ArrowRight,
+  ClipboardList, FlaskConical, ArrowRight, BarChart3,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -380,6 +380,23 @@ export default function Dashboard() {
       </div>
 
       <AlertCards tasks={tasks} />
+
+      {/* Friday weekly summary banner */}
+      {new Date().getDay() === 5 && (
+        <button
+          onClick={() => navigate('/weekly-summary')}
+          className="w-full flex items-center gap-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-2xl px-5 py-4 mb-6 hover:from-indigo-700 hover:to-violet-700 transition-all shadow-md group"
+        >
+          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <BarChart3 className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-left flex-1 min-w-0">
+            <p className="text-sm font-bold">Your weekly summary is ready</p>
+            <p className="text-xs text-indigo-200 mt-0.5">Review what your team accomplished this week →</p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-white/70 group-hover:text-white transition-colors flex-shrink-0" />
+        </button>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left — Quick log + priorities */}

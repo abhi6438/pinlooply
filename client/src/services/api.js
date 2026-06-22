@@ -100,3 +100,7 @@ export const notificationsApi = {
 export const standupApi = {
   generate: () => api.post('/api/standup/generate'),
 }
+
+export const summaryApi = {
+  weekly: (week) => api.get(`/api/summary/weekly${week ? `?week=${week}` : ''}`),
+}
