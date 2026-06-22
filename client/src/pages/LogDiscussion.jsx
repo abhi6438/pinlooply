@@ -142,7 +142,7 @@ export default function LogDiscussion() {
     <>
       {processing && <ProcessingOverlay currentStep={step} />}
 
-      <div className="max-w-3xl mx-auto px-6 py-8 animate-fade-in">
+      <div className="px-6 py-8 animate-fade-in">
         {/* Header */}
         <div className="mb-7">
           <h1 className="text-2xl font-bold text-warm-900">Log Discussion 💬</h1>

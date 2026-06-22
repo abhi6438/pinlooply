@@ -240,6 +240,11 @@ body {
     border-left: 3px solid #EF4444;
   }
 
+  /* ── Page shell ────────────────────────────────────────────── */
+  .page-shell {
+    @apply px-6 py-8 max-w-7xl mx-auto w-full;
+  }
+
   /* ── Tab pills ─────────────────────────────────────────────── */
   .tab-pill {
     @apply flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium
@@ -248,6 +253,16 @@ body {
   .tab-pill.active  { @apply bg-primary-600 text-white; box-shadow: 0 2px 8px rgba(124,58,237,0.25); }
   .tab-pill.inactive { @apply bg-white text-warm-600 border border-warm-200; }
   .tab-pill.inactive:hover { @apply bg-warm-50 text-warm-800; }
+
+  /* ── Section tabs (underline) ──────────────────────────────── */
+  .section-tab {
+    @apply flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium whitespace-nowrap
+           transition-colors border-b-2 -mb-px text-warm-500 border-transparent;
+  }
+  .section-tab:hover { @apply text-warm-700; }
+  .section-tab.active {
+    @apply border-primary-600 text-primary-600;
+  }
 
   /* ── Health indicator ──────────────────────────────────────── */
   .health-good    { border-left: 4px solid #10B981; }

@@ -231,7 +231,7 @@ export default function Plan() {
   const currentPlanKey = info?.planKey || 'personal_free'
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-6 animate-fade-in">
+    <div className="px-6 py-6 animate-fade-in">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-warm-900">Plan & Billing 💳</h1>

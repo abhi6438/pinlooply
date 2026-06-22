@@ -12,6 +12,10 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import GenerateTestCasesButton from '../components/shared/GenerateTestCasesButton'
+import {
+  PageShell, PageHeader, PageToolbar, SearchInput,
+  FilterPills, SortSelect, ProjectSelect, PageLoader, EmptyState,
+} from '../components/ui'
 
 // ── Constants ─────────────────────────────────────────────────
 const TABS = [
@@ -652,99 +656,77 @@ export default function Lists() {
   const isTeamMode = userMode === 'team' || userMode === 'org'
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-warm-900">Task Lists 📋</h1>
-          <p className="text-sm text-warm-500 mt-1">
+    <PageShell>
+      <PageHeader
+        title="Task Lists"
+        subtitle={
+          <>
             {pendingCount} pending
             {overdueCount > 0 && <span className="text-red-500 ml-2">· {overdueCount} overdue</span>}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={loadTasks} disabled={loading} className="btn-secondary btn-sm">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
-          <button onClick={() => setShowAddForm(true)} className="btn-primary btn-sm">
-            <Plus className="w-4 h-4" /> Add Task
-          </button>
-        </div>
-      </div>
-
-      {/* Tab pills */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => { setActiveTab(t.key); setSearch('') }}
-            className={`tab-pill ${activeTab === t.key ? 'active' : 'inactive'}`}>
-            <t.icon className="w-4 h-4" />
-            {t.label}
-            <span className={`text-xs px-2 py-0.5 rounded-full ml-1 ${activeTab === t.key ? 'bg-white/20 text-white' : 'bg-warm-100 text-warm-500'}`}>
-              {tasks.filter(t2 => t2.type === t.key && t2.status !== 'done').length}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Assignee filter (team mode only) */}
-      {isTeamMode && (
-        <div className="flex gap-2 mb-4">
-          {[
-            { key: 'all',   label: 'All Tasks',       icon: ListChecks },
-            { key: 'mine',  label: 'My Tasks',         icon: UserCircle },
-            { key: 'by_me', label: 'Assigned by Me',   icon: Users },
-          ].map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setAssigneeFilter(key)}
-              className={`tab-pill ${assigneeFilter === key ? 'active' : 'inactive'}`}>
-              <Icon className="w-3.5 h-3.5" />
-              {label}
+          </>
+        }
+        actions={
+          <>
+            <button onClick={loadTasks} disabled={loading} className="btn-secondary btn-sm">
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
             </button>
-          ))}
+            <button onClick={() => setShowAddForm(true)} className="btn-primary btn-sm">
+              <Plus className="w-4 h-4" /> Add Task
+            </button>
+          </>
+        }
+      />
+
+      <FilterPills
+        value={activeTab}
+        onChange={key => { setActiveTab(key); setSearch('') }}
+        options={TABS.map(t => ({
+          value: t.key,
+          label: t.label,
+          icon: t.icon,
+          count: tasks.filter(t2 => t2.type === t.key && t2.status !== 'done').length,
+        }))}
+        className="mb-6"
+      />
+
+      {isTeamMode && (
+        <div className="mb-4">
+          <FilterPills
+            value={assigneeFilter}
+            onChange={setAssigneeFilter}
+            options={[
+              { value: 'all',   label: 'All Tasks',     icon: ListChecks },
+              { value: 'mine',  label: 'My Tasks',      icon: UserCircle },
+              { value: 'by_me', label: 'Assigned by Me', icon: Users },
+            ]}
+          />
         </div>
       )}
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="relative">
-          <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-            className="input py-1.5 text-sm pr-8 appearance-none">
-            <option value="">All Projects</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <ChevronDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
-        </div>
-
-        <div className="flex gap-2">
-          {[{ value: '', label: 'All' }, { value: 'high', label: 'High' }, { value: 'medium', label: 'Med' }, { value: 'low', label: 'Low' }].map(opt => (
-            <button key={opt.value} onClick={() => setFilterPriority(opt.value)}
-              className={`tab-pill ${filterPriority === opt.value ? 'active' : 'inactive'}`}>
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative">
-          <select value={sort} onChange={e => setSort(e.target.value)}
-            className="input py-1.5 text-xs pr-8 appearance-none">
-            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <ArrowUpDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
-        </div>
-
+      <PageToolbar className="mb-4">
+        <ProjectSelect
+          value={filterProject}
+          onChange={setFilterProject}
+          projects={projects}
+          showAll
+        />
+        <FilterPills
+          value={filterPriority}
+          onChange={setFilterPriority}
+          options={[
+            { value: '', label: 'All' },
+            { value: 'high', label: 'High' },
+            { value: 'medium', label: 'Med' },
+            { value: 'low', label: 'Low' },
+          ]}
+        />
+        <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} />
         <button onClick={() => setShowDone(d => !d)}
           className={`tab-pill ${showDone ? 'active' : 'inactive'}`}>
           <CheckSquare2 className="w-3.5 h-3.5" /> Show Done
         </button>
-
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks…"
-            className="input w-full pl-9 py-2" />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-2.5 text-warm-400 hover:text-warm-900 text-xs">✕</button>
-          )}
-        </div>
-      </div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search tasks…" className="w-64 flex-none" />
+      </PageToolbar>
 
       {selected.size > 0 && (
         <BulkBar count={selected.size} onMarkDone={bulkMarkDone} onPriority={bulkPriority} onClear={() => setSelected(new Set())} />
@@ -753,9 +735,7 @@ export default function Lists() {
       {/* Table */}
       <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-sm">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
-          </div>
+          <PageLoader className="py-16" />
         ) : displayed.length === 0 && !showAddForm ? (
           (() => { const T = TABS.find(t => t.key === activeTab); const Icon = T.icon; return (
             <div className="empty-state">
@@ -835,6 +815,6 @@ export default function Lists() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   )
 }

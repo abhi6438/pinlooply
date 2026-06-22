@@ -8,6 +8,7 @@ import {
   X, ChevronDown, RefreshCw, Clock, FolderOpen,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageShell, SearchInput, PageLoader, EmptyState } from '../components/ui'
 
 // ── Config ────────────────────────────────────────────────────
 const CFG = {
@@ -263,15 +264,15 @@ export default function Timeline() {
   const hasF = fProject || fType || fFrom || fTo
 
   return (
-    <div className="flex gap-6 px-4 sm:px-6 py-8 max-w-7xl mx-auto">
+    <PageShell className="flex gap-6 max-w-none">
 
       {/* ── Left sidebar ────────────────────────────────────── */}
       <aside className="w-56 flex-shrink-0 hidden lg:block">
         <div className="sticky top-6 space-y-5">
 
           <div>
-            <h1 className="text-2xl font-bold text-warm-900 mb-0.5">Timeline 📅</h1>
-            <p className="text-xs text-warm-400">{displayed.length} events</p>
+            <h1 className="text-2xl font-bold text-warm-900 mb-0.5">Timeline</h1>
+            <p className="text-sm text-warm-500">{displayed.length} events</p>
           </div>
 
           {/* Event types */}
@@ -367,46 +368,31 @@ export default function Timeline() {
       <div className="flex-1 min-w-0">
         {/* Header (mobile only — desktop shows in sidebar) */}
         <div className="lg:hidden mb-4">
-          <h1 className="text-2xl font-bold text-warm-900">Timeline 📅</h1>
+          <h1 className="text-2xl font-bold text-warm-900">Timeline</h1>
         </div>
 
-        {/* Top bar */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-warm-400 pointer-events-none" />
-            <input
-              value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search activity…"
-              className="input w-full pl-10 pr-9 py-2.5"
-            />
-            {search && <button onClick={() => setSearch('')} className="absolute right-3 top-2.5 text-warm-400 hover:text-warm-900"><X className="w-4 h-4" /></button>}
-          </div>
-          <button onClick={load} disabled={loading}
-            className="btn-secondary btn-sm flex-shrink-0"
-          >
+          <SearchInput value={search} onChange={setSearch} placeholder="Search activity…" />
+          <button onClick={load} disabled={loading} className="btn-secondary btn-sm flex-shrink-0">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
-          </div>
+          <PageLoader />
         ) : grouped.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">📅</div>
-            <p className="empty-state-title">No activity yet</p>
-            <p className="empty-state-sub">
-              {events.length === 0 ? 'Log a discussion to see events here' : 'Nothing matches your filters'}
-            </p>
-            {(search || hasF) && (
+          <EmptyState
+            icon="📅"
+            title="No activity yet"
+            subtitle={events.length === 0 ? 'Log a discussion to see events here' : 'Nothing matches your filters'}
+            action={(search || hasF) && (
               <button onClick={() => { setFProject(''); setFType(''); setFFrom(''); setFTo(''); setSearch('') }}
                 className="btn-secondary btn-sm mt-4">Clear all</button>
             )}
-          </div>
+          />
         ) : (
-          <div className="max-w-3xl mx-auto space-y-8">
+          <div className="space-y-8">
             {grouped.map(([dk, dayEvents]) => (
               <div key={dk}>
                 {/* Date separator */}
@@ -439,6 +425,6 @@ export default function Timeline() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   )
 }

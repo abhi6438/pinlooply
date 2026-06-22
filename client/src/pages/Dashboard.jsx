@@ -12,6 +12,7 @@ import {
   ClipboardList, FlaskConical, ArrowRight, BarChart3,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageShell, PageHeader } from '../components/ui'
 
 // ── Helpers ───────────────────────────────────────────────────
 function greeting() {
@@ -367,21 +368,17 @@ export default function Dashboard() {
   const { text: greetText, emoji: greetEmoji } = greeting()
 
   return (
-    <div className="px-6 py-8 max-w-7xl mx-auto animate-fade-in">
-      {/* Greeting */}
-      <div className="mb-7">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold text-warm-900">
-            {greetText}, {userName.split(' ')[0]} {greetEmoji}
-          </h1>
-          {group && (
-            <span className="flex items-center gap-1.5 text-xs bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full font-medium border border-primary-100">
-              <Users className="w-3.5 h-3.5" />{group.name}
-            </span>
-          )}
-        </div>
-        <p className="text-sm text-warm-500 mt-1">Here's what's happening with your projects.</p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title={`${greetText}, ${userName.split(' ')[0]} ${greetEmoji}`}
+        subtitle="Here's what's happening with your projects."
+      >
+        {group && (
+          <span className="inline-flex items-center gap-1.5 text-xs bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full font-medium border border-primary-100 mt-2">
+            <Users className="w-3.5 h-3.5" />{group.name}
+          </span>
+        )}
+      </PageHeader>
 
       <AlertCards tasks={tasks} />
 

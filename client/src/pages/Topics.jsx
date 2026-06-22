@@ -4,11 +4,14 @@ import { useAuth } from '../context/AuthContext'
 import { useProjectStore } from '../stores/useProjectStore'
 import { topicsApi } from '../services/api'
 import {
-  Tag, Search, ChevronDown, AlertTriangle, MessageSquare,
-  CheckCircle2, Circle, Loader2, RefreshCw, ArrowUpDown,
-  ArrowUp, ArrowDown, ChevronRight,
+  Tag, AlertTriangle, MessageSquare,
+  CheckCircle2, Circle, Loader2, RefreshCw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import {
+  PageShell, PageHeader, PageToolbar, SearchInput,
+  FilterPills, SortSelect, ProjectSelect, PageLoader, EmptyState,
+} from '../components/ui'
 
 const FILTER_OPTIONS = [
   { value: 'all',      label: 'All' },
@@ -141,120 +144,58 @@ export default function Topics() {
   const resolvedCount = topics.filter(t => t.status === 'resolved').length
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-warm-900">Topics 💡</h1>
-          <p className="text-sm text-warm-500 mt-1">AI-extracted discussion threads tracked over time</p>
-        </div>
-        <button
-          onClick={loadTopics}
-          disabled={loading}
-          className="btn-secondary btn-sm"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Topics"
+        subtitle="AI-extracted discussion threads tracked over time"
+        actions={
+          <button onClick={loadTopics} disabled={loading} className="btn-secondary btn-sm">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        }
+      />
 
-      {/* Controls row */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        {/* Project selector */}
-        <div className="relative">
-          <select
-            value={selectedProject}
-            onChange={e => { setSelectedProject(e.target.value) }}
-            className="input py-1.5 text-sm pr-8 appearance-none"
-          >
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <ChevronDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
-        </div>
+      <PageToolbar>
+        <ProjectSelect
+          value={selectedProject}
+          onChange={setSelectedProject}
+          projects={projects}
+        />
+        <FilterPills
+          value={filter}
+          onChange={setFilter}
+          options={FILTER_OPTIONS.map(opt => ({
+            ...opt,
+            count: opt.value === 'all' ? topics.length
+              : opt.value === 'open' ? openCount
+              : opt.value === 'resolved' ? resolvedCount
+              : undefined,
+          }))}
+        />
+        <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} />
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={`Search ${topics.length} topics…`}
+        />
+      </PageToolbar>
 
-        {/* Status filter pills */}
-        <div className="flex gap-2">
-          {FILTER_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setFilter(opt.value)}
-              className={`tab-pill ${filter === opt.value ? 'active' : 'inactive'}`}
-            >
-              {opt.label}
-              {opt.value === 'open' && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ml-1 ${filter === 'open' ? 'bg-white/20 text-white' : 'bg-warm-100 text-warm-500'}`}>
-                  {openCount}
-                </span>
-              )}
-              {opt.value === 'resolved' && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ml-1 ${filter === 'resolved' ? 'bg-white/20 text-white' : 'bg-warm-100 text-warm-500'}`}>
-                  {resolvedCount}
-                </span>
-              )}
-              {opt.value === 'all' && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ml-1 ${filter === 'all' ? 'bg-white/20 text-white' : 'bg-warm-100 text-warm-500'}`}>
-                  {topics.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Sort */}
-        <div className="relative">
-          <select
-            value={sort}
-            onChange={e => setSort(e.target.value)}
-            className="input py-1.5 text-xs pr-8 appearance-none"
-          >
-            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <ChevronDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
-        </div>
-
-        {/* Search */}
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-warm-400 pointer-events-none" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={`Search ${topics.length} topics…`}
-            className="input w-full pl-9 py-2"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-2.5 text-warm-400 hover:text-warm-900 text-xs"
-            >✕</button>
-          )}
-        </div>
-      </div>
-
-      {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
-        </div>
+        <PageLoader />
       ) : filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">💡</div>
-          <p className="empty-state-title">
-            {topics.length === 0 ? 'No topics yet.' : `No topics match "${search || filter}".`}
-          </p>
-          <p className="empty-state-sub">
-            {topics.length === 0
-              ? 'Log your first discussion to create topics!'
-              : 'Try adjusting your filters or search query.'}
-          </p>
-          {topics.length === 0 && (
-            <button
-              onClick={() => navigate('/log')}
-              className="btn-primary btn-sm mt-4"
-            >
+        <EmptyState
+          icon="💡"
+          title={topics.length === 0 ? 'No topics yet.' : `No topics match "${search || filter}".`}
+          subtitle={topics.length === 0
+            ? 'Log your first discussion to create topics!'
+            : 'Try adjusting your filters or search query.'}
+          action={topics.length === 0 && (
+            <button onClick={() => navigate('/log')} className="btn-primary btn-sm mt-4">
               Log a discussion →
             </button>
           )}
-        </div>
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -282,6 +223,6 @@ export default function Topics() {
           </div>
         </>
       )}
-    </div>
+    </PageShell>
   )
 }

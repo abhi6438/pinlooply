@@ -264,7 +264,7 @@ export default function GroupMembers() {
   )
 
   if (!groups.length) return (
-    <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto">
+    <div className="px-6 py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-gray-900">Team</h1>
         <button onClick={() => setShowCreate(true)}
@@ -284,11 +284,11 @@ export default function GroupMembers() {
   )
 
   return (
-    <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto">
+    <div className="px-6 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Team</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+          <h1 className="text-2xl font-bold text-warm-900">Team 👥</h1>
+          <p className="text-sm text-warm-500 mt-0.5">{members.length} member{members.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex items-center gap-2">
         {/* Group selector if multiple groups */}

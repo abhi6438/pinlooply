@@ -221,7 +221,7 @@ export default function AIConfirm() {
   const selectedCount = topics.length + tasks.length
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 animate-fade-in">
+    <div className="px-6 py-8 animate-fade-in">
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4">
         <div>
