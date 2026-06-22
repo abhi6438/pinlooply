@@ -29,22 +29,24 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
-  async function signup(email, password, name) {
+  async function signup(email, password, name, emailRedirectTo) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: name },
+        ...(emailRedirectTo && { emailRedirectTo }),
       },
     })
     if (error) throw error
   }
 
-  async function loginWithGoogle() {
+  // redirectTo is optional — pass invite URL when coming from an invite flow
+  async function loginWithGoogle(redirectTo) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: redirectTo || `${window.location.origin}/dashboard`,
       },
     })
     if (error) throw error

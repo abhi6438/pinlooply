@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../config/supabase'
 import { groupsApi } from '../services/api'
 import { Users, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -24,7 +25,7 @@ export default function JoinGroup() {
 
   async function handleJoin() {
     if (!user) {
-      // Save invite code to localStorage (survives login redirects), redirect to signup
+      // Keep localStorage as fallback for same-browser flow
       localStorage.setItem('pendingInvite', JSON.stringify({ groupId: group.id, inviteCode }))
       navigate(`/signup?invite=${inviteCode}`)
       return
@@ -32,6 +33,25 @@ export default function JoinGroup() {
     setStatus('joining')
     try {
       await groupsApi.join(group.id, inviteCode)
+
+      // Complete onboarding so ProtectedRoute doesn't bounce them back
+      const { data: userData } = await supabase
+        .from('users')
+        .select('onboarding_complete, name')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData?.onboarding_complete) {
+        const name = userData?.name || user.user_metadata?.full_name || ''
+        await supabase.from('users').update({
+          mode: 'team',
+          onboarding_complete: true,
+          onboarding_step: 4,
+          ...(name && { name }),
+        }).eq('id', user.id)
+      }
+
+      localStorage.removeItem('pendingInvite')
       setStatus('joined')
       setTimeout(() => navigate('/dashboard'), 1500)
     } catch (err) {

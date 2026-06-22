@@ -1,14 +1,21 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Signup() {
   const { signup, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const inviteCode = searchParams.get('invite') // present when coming from an invite link
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+
+  // After email verification Supabase follows emailRedirectTo — send them straight to the invite page
+  const emailRedirectTo = inviteCode
+    ? `${window.location.origin}/invite/${inviteCode}`
+    : undefined
 
   function set(field) {
     return e => setForm(f => ({ ...f, [field]: e.target.value }))
@@ -26,9 +33,10 @@ export default function Signup() {
     }
     setLoading(true)
     try {
-      await signup(form.email, form.password, form.name)
+      await signup(form.email, form.password, form.name, emailRedirectTo)
       toast.success('Check your email to confirm your account!')
-      navigate('/login')
+      // Keep invite param so login page can redirect correctly if they log in first
+      navigate(inviteCode ? `/login?invite=${inviteCode}` : '/login')
     } catch (err) {
       toast.error(err.message || 'Signup failed')
     } finally {
@@ -39,7 +47,8 @@ export default function Signup() {
   async function handleGoogle() {
     setGoogleLoading(true)
     try {
-      await loginWithGoogle()
+      // Google OAuth redirect also goes to the invite page when present
+      await loginWithGoogle(emailRedirectTo)
     } catch (err) {
       toast.error(err.message || 'Google login failed')
       setGoogleLoading(false)
@@ -138,7 +147,10 @@ export default function Signup() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{' '}
-          <Link to="/login" className="text-indigo-600 font-medium hover:underline">
+          <Link
+            to={inviteCode ? `/login?invite=${inviteCode}` : '/login'}
+            className="text-indigo-600 font-medium hover:underline"
+          >
             Sign in
           </Link>
         </p>

@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Login() {
   const { login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const inviteCode = searchParams.get('invite') // present when coming from invite link
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -16,7 +18,8 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/dashboard')
+      // If they came from an invite link, send them there directly
+      navigate(inviteCode ? `/invite/${inviteCode}` : '/dashboard')
     } catch (err) {
       toast.error(err.message || 'Login failed')
     } finally {
@@ -27,7 +30,11 @@ export default function Login() {
   async function handleGoogle() {
     setGoogleLoading(true)
     try {
-      await loginWithGoogle()
+      // Google OAuth redirect goes to invite page when present
+      const redirectTo = inviteCode
+        ? `${window.location.origin}/invite/${inviteCode}`
+        : undefined
+      await loginWithGoogle(redirectTo)
     } catch (err) {
       toast.error(err.message || 'Google login failed')
       setGoogleLoading(false)
@@ -104,7 +111,10 @@ export default function Login() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Don't have an account?{' '}
-          <Link to="/signup" className="text-indigo-600 font-medium hover:underline">
+          <Link
+            to={inviteCode ? `/signup?invite=${inviteCode}` : '/signup'}
+            className="text-indigo-600 font-medium hover:underline"
+          >
             Sign up
           </Link>
         </p>
