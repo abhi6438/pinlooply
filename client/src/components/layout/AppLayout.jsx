@@ -40,7 +40,7 @@ function Avatar({ user, size = 8 }) {
     return <img src={user.user_metadata.avatar_url} className={`${sizeClass} rounded-full object-cover flex-shrink-0`} alt="avatar" />
   }
   return (
-    <div className={`${sizeClass} rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold flex-shrink-0`}>
+    <div className={`${sizeClass} rounded-full bg-primary-500 text-white flex items-center justify-center text-xs font-semibold flex-shrink-0`}>
       {initials}
     </div>
   )
@@ -55,7 +55,7 @@ function timeAgo(ts) {
 }
 
 // ── Notification Bell (pure UI — state owned by AppLayout) ────
-function NotificationBell({ notifications, unreadCount, onMarkRead, onMarkAllRead }) {
+function NotificationBell({ notifications, unreadCount, onMarkRead, onMarkAllRead, collapsed }) {
   const [open, setOpen] = useState(false)
   const ref = useRef()
 
@@ -73,48 +73,47 @@ function NotificationBell({ notifications, unreadCount, onMarkRead, onMarkAllRea
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        className={`relative p-2 rounded-lg transition-colors ${
-          open ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-100 text-gray-500'
-        }`}
+        className={`relative flex items-center gap-3 w-full px-3 py-2 rounded-xl transition-colors text-purple-200 hover:bg-[#312E81] hover:text-white ${open ? 'bg-[#312E81] text-white' : ''}`}
         title="Notifications"
       >
-        <Bell className="w-5 h-5" />
+        <Bell className="w-5 h-5 flex-shrink-0" />
+        {!collapsed && <span className="text-sm font-medium">Notifications</span>}
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+          <span className="absolute top-1 left-6 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <span className="text-sm font-semibold text-gray-900">Notifications</span>
+        <div className="absolute left-0 bottom-12 w-80 bg-white border border-warm-200 rounded-2xl shadow-warm-md z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-warm-100">
+            <span className="text-sm font-semibold text-warm-900">Notifications</span>
             {unreadCount > 0 && (
               <button onClick={onMarkAllRead}
-                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium">
                 <CheckCheck className="w-3.5 h-3.5" /> Mark all read
               </button>
             )}
           </div>
-          <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+          <div className="max-h-80 overflow-y-auto divide-y divide-warm-50">
             {notifications.length === 0 ? (
               <div className="py-8 text-center">
-                <Bell className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">No notifications yet</p>
+                <Bell className="w-8 h-8 text-warm-200 mx-auto mb-2" />
+                <p className="text-sm text-warm-400">No notifications yet</p>
               </div>
             ) : notifications.map(n => (
               <button key={n.id} onClick={() => onMarkRead(n.id)}
-                className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-indigo-50/50' : ''}`}>
+                className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-warm-50 transition-colors ${!n.is_read ? 'bg-primary-50/40' : ''}`}>
                 <span className="text-lg leading-none mt-0.5 flex-shrink-0">{typeIcon[n.type] || '🔔'}</span>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm leading-snug ${!n.is_read ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+                  <p className={`text-sm leading-snug ${!n.is_read ? 'font-medium text-warm-900' : 'text-warm-700'}`}>
                     {n.title}
                   </p>
-                  {n.body && <p className="text-xs text-gray-500 mt-0.5 truncate">{n.body}</p>}
-                  <p className="text-xs text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
+                  {n.body && <p className="text-xs text-warm-500 mt-0.5 truncate">{n.body}</p>}
+                  <p className="text-xs text-warm-400 mt-1">{timeAgo(n.created_at)}</p>
                 </div>
-                {!n.is_read && <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0" />}
+                {!n.is_read && <span className="w-2 h-2 rounded-full bg-primary-500 mt-1.5 flex-shrink-0" />}
               </button>
             ))}
           </div>
@@ -129,9 +128,7 @@ function SideNavLink({ to, icon: Icon, label, collapsed }) {
   return (
     <NavLink to={to}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-          isActive ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-        }`
+        `sidebar-link${isActive ? ' active' : ''} flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-3'} py-2.5`
       }
     >
       <Icon className="w-5 h-5 flex-shrink-0" />
@@ -147,51 +144,68 @@ function Sidebar({ user, userProfile, bellProps, onLogout }) {
   const items = getNavItems(userProfile?.mode)
 
   return (
-    <aside className={`hidden md:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 flex-shrink-0 ${collapsed ? 'w-16' : 'w-60'}`}>
-      <div className={`flex items-center h-16 px-4 border-b border-gray-100 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-        {!collapsed && <span className="text-lg font-bold text-gray-900">Pinlooply</span>}
+    <aside className={`hidden md:flex flex-col bg-[#1E1B4B] text-white transition-all duration-300 flex-shrink-0 ${collapsed ? 'w-16' : 'w-64'}`}>
+      {/* Top: logo + collapse button */}
+      <div className={`flex items-center h-16 px-4 border-b border-[#312E81] ${collapsed ? 'justify-center' : 'justify-between'}`}>
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-sm">P</span>
+            </div>
+            <span className="text-white font-bold text-lg">Pinlooply</span>
+          </div>
+        )}
+        {collapsed && (
+          <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
+            <span className="text-white font-bold text-sm">P</span>
+          </div>
+        )}
         <button onClick={toggleSidebar}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+          className="p-1.5 rounded-lg text-purple-300 hover:text-white transition-colors flex-shrink-0"
           title={collapsed ? 'Expand' : 'Collapse'}>
           {collapsed ? <Menu className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </button>
       </div>
 
-      <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-0.5">
         {items.map((item) => <SideNavLink key={item.to} {...item} collapsed={collapsed} />)}
       </nav>
 
-      <div className={`border-t border-gray-100 p-3 space-y-2 ${collapsed ? 'flex flex-col items-center' : ''}`}>
-        {/* Admin link — only visible to admin */}
+      {/* Bottom section */}
+      <div className="px-3 py-4 border-t border-[#312E81] space-y-2">
+        {/* Notification Bell */}
+        <NotificationBell {...bellProps} collapsed={collapsed} />
+
+        {/* Admin link */}
         {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
           <SideNavLink to="/admin" icon={Shield} label="Admin" collapsed={collapsed} />
         )}
 
-        {/* Bell — desktop sidebar */}
+        {/* User section */}
         {collapsed ? (
-          <NotificationBell {...bellProps} />
-        ) : (
-          <div className="flex items-center px-1">
-            <NotificationBell {...bellProps} />
-            <span className="text-xs text-gray-400 ml-2">Notifications</span>
+          <div className="flex flex-col items-center gap-2 pt-1">
+            <Avatar user={user} size={8} />
+            <button onClick={onLogout} title="Sign out"
+              className="p-1.5 text-purple-300 hover:text-red-400 transition-colors rounded-lg">
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-        )}
-
-        {collapsed ? (
-          <button onClick={onLogout} title="Sign out" className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500">
-            <LogOut className="w-5 h-5" />
-          </button>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1">
             <Avatar user={user} size={8} />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-white truncate">
                 {userProfile?.name || user?.user_metadata?.full_name || 'You'}
               </p>
-              <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+              {userProfile?.plan && (
+                <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary-700 text-primary-200 leading-none mt-0.5">
+                  {userProfile.plan}
+                </span>
+              )}
             </div>
             <button onClick={onLogout} title="Sign out"
-              className="p-1.5 hover:bg-red-50 hover:text-red-600 rounded-lg text-gray-400 transition-colors flex-shrink-0">
+              className="p-1.5 text-purple-300 hover:text-red-400 transition-colors rounded-lg flex-shrink-0">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -205,13 +219,13 @@ function Sidebar({ user, userProfile, bellProps, onLogout }) {
 function BottomNav({ mode }) {
   const items = getNavItems(mode).slice(0, 5)
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-warm-200 z-40">
       <div className="flex">
         {items.map(({ to, icon: Icon, label }) => (
           <NavLink key={to} to={to}
             className={({ isActive }) =>
               `flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs transition-colors ${
-                isActive ? 'text-indigo-600' : 'text-gray-500'
+                isActive ? 'text-primary-600' : 'text-warm-400'
               }`
             }
           >
@@ -227,10 +241,13 @@ function BottomNav({ mode }) {
 // ── Mobile header ─────────────────────────────────────────────
 function MobileHeader({ user, bellProps }) {
   return (
-    <header className="md:hidden flex items-center justify-between h-14 px-4 bg-white border-b border-gray-200 sticky top-0 z-30">
-      <span className="text-base font-bold text-gray-900">Pinlooply</span>
+    <header className="md:hidden flex items-center justify-between h-14 px-4 bg-white shadow-warm-sm sticky top-0 z-30">
+      <button className="p-1.5 text-warm-600 rounded-lg">
+        <Menu className="w-5 h-5" />
+      </button>
+      <span className="text-base font-bold text-warm-900">Pinlooply</span>
       <div className="flex items-center gap-2">
-        <NotificationBell {...bellProps} />
+        <NotificationBell {...bellProps} collapsed={true} />
         <Avatar user={user} size={8} />
       </div>
     </header>
@@ -304,7 +321,7 @@ export default function AppLayout({ children }) {
   const bellProps = { notifications, unreadCount, onMarkRead: markRead, onMarkAllRead: markAllRead }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-warm-50 overflow-hidden">
       <Sidebar user={user} userProfile={userProfile} bellProps={bellProps} onLogout={handleLogout} />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <MobileHeader user={user} bellProps={bellProps} />

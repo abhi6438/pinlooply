@@ -10,46 +10,35 @@ import { ChevronLeft, Check, Plus, X } from 'lucide-react'
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444']
 
 // ─────────────────────────────────────────────
-// Progress Bar
-// ─────────────────────────────────────────────
-function ProgressBar({ current, total }) {
-  return (
-    <div className="w-full bg-gray-100 rounded-full h-1.5 mb-8">
-      <div
-        className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500"
-        style={{ width: `${(current / total) * 100}%` }}
-      />
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────
 // Step 1 — Welcome + Name
 // ─────────────────────────────────────────────
 function StepName({ value, onChange, onNext, hasInvite }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Welcome to Pinlooply 👋</h1>
-        <p className="text-gray-500 mt-2">
-          {hasInvite ? "Just tell us your name and we'll take you straight to your team." : "Let's get you set up in under 2 minutes."}
+        <div className="text-5xl mb-4">👋</div>
+        <h1 className="text-2xl font-bold text-warm-900">Welcome to Pinlooply</h1>
+        <p className="text-warm-500 mt-2">
+          {hasInvite
+            ? "Just tell us your name and we'll take you straight to your team."
+            : "Let's get you set up in under 2 minutes."}
         </p>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">What should we call you?</label>
+        <label className="label">What should we call you?</label>
         <input
           type="text"
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder="Your name"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="input"
           autoFocus
         />
       </div>
       <button
         onClick={onNext}
         disabled={!value.trim()}
-        className="w-full bg-indigo-600 text-white rounded-lg px-4 py-3 text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-40"
+        className="btn-primary btn-lg w-full"
       >
         Continue
       </button>
@@ -68,10 +57,10 @@ const MODES = [
 
 function StepMode({ value, onChange, onNext }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">How will you use Pinlooply?</h1>
-        <p className="text-gray-500 mt-2">You can change this later.</p>
+        <h1 className="text-2xl font-bold text-warm-900">How will you use Pinlooply?</h1>
+        <p className="text-warm-500 mt-2">You can change this later.</p>
       </div>
       <div className="space-y-3">
         {MODES.map(m => (
@@ -80,17 +69,17 @@ function StepMode({ value, onChange, onNext }) {
             onClick={() => onChange(m.value)}
             className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
               value === m.value
-                ? 'border-indigo-500 bg-indigo-50'
-                : 'border-gray-200 hover:border-gray-300 bg-white'
+                ? 'border-primary-500 bg-primary-50'
+                : 'border-warm-200 hover:border-warm-400 bg-white'
             }`}
           >
             <span className="text-2xl">{m.emoji}</span>
             <div>
-              <p className="font-medium text-gray-900">{m.label}</p>
-              <p className="text-sm text-gray-500">{m.desc}</p>
+              <p className="font-medium text-warm-900">{m.label}</p>
+              <p className="text-sm text-warm-500">{m.desc}</p>
             </div>
             {value === m.value && (
-              <div className="ml-auto w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
+              <div className="ml-auto w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
                 <Check className="w-3 h-3 text-white" />
               </div>
             )}
@@ -100,7 +89,7 @@ function StepMode({ value, onChange, onNext }) {
       <button
         onClick={onNext}
         disabled={!value}
-        className="w-full bg-indigo-600 text-white rounded-lg px-4 py-3 text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-40"
+        className="btn-primary btn-lg w-full"
       >
         Continue
       </button>
@@ -113,44 +102,44 @@ function StepMode({ value, onChange, onNext }) {
 // ─────────────────────────────────────────────
 function StepProject({ value, onChange, onNext, loading }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Create your first project</h1>
-        <p className="text-gray-500 mt-2">A project holds discussions, topics, and tasks.</p>
+        <h1 className="text-2xl font-bold text-warm-900">Create your first project</h1>
+        <p className="text-warm-500 mt-2">A project holds discussions, topics, and tasks.</p>
       </div>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Project name</label>
+          <label className="label">Project name</label>
           <input
             type="text"
             value={value.name}
             onChange={e => onChange({ ...value, name: e.target.value })}
             placeholder="e.g. Product Roadmap"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="input"
             autoFocus
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Description <span className="text-gray-400 font-normal">(optional)</span>
+          <label className="label">
+            Description <span className="text-warm-400 font-normal">(optional)</span>
           </label>
           <textarea
             value={value.description}
             onChange={e => onChange({ ...value, description: e.target.value })}
             placeholder="What is this project about?"
             rows={2}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+            className="input resize-none"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
-          <div className="flex gap-3">
+          <label className="label">Color</label>
+          <div className="flex gap-3 mt-2">
             {COLORS.map(c => (
               <button
                 key={c}
                 onClick={() => onChange({ ...value, color: c })}
-                className={`w-8 h-8 rounded-full transition-transform ${
-                  value.color === c ? 'scale-125 ring-2 ring-offset-2 ring-gray-400' : 'hover:scale-110'
+                className={`w-10 h-10 rounded-full cursor-pointer transition-transform hover:scale-110 ${
+                  value.color === c ? 'ring-2 ring-primary-600 ring-offset-2 scale-110' : ''
                 }`}
                 style={{ backgroundColor: c }}
               />
@@ -161,7 +150,7 @@ function StepProject({ value, onChange, onNext, loading }) {
       <button
         onClick={onNext}
         disabled={!value.name.trim() || loading}
-        className="w-full bg-indigo-600 text-white rounded-lg px-4 py-3 text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-40"
+        className="btn-primary btn-lg w-full"
       >
         {loading ? 'Creating...' : 'Create Project'}
       </button>
@@ -192,26 +181,26 @@ function StepGroup({ value, onChange, onNext, onSkip, loading }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Name your team</h1>
-        <p className="text-gray-500 mt-2">You can invite more people later.</p>
+        <h1 className="text-2xl font-bold text-warm-900">Name your team</h1>
+        <p className="text-warm-500 mt-2">You can invite more people later.</p>
       </div>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Team name</label>
+          <label className="label">Team name</label>
           <input
             type="text"
             value={value.name}
             onChange={e => onChange({ ...value, name: e.target.value })}
             placeholder="e.g. Engineering"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="input"
             autoFocus
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Invite teammates <span className="text-gray-400 font-normal">(optional)</span>
+          <label className="label">
+            Invite teammates <span className="text-warm-400 font-normal">(optional)</span>
           </label>
           <div className="flex gap-2">
             <input
@@ -220,19 +209,19 @@ function StepGroup({ value, onChange, onNext, onSkip, loading }) {
               onChange={e => setEmailInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="teammate@example.com"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="input flex-1"
             />
             <button
               onClick={addEmail}
-              className="p-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="btn-secondary p-2.5"
             >
-              <Plus className="w-4 h-4 text-gray-600" />
+              <Plus className="w-4 h-4" />
             </button>
           </div>
           {value.invites.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
               {value.invites.map(e => (
-                <span key={e} className="flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-full">
+                <span key={e} className="flex items-center gap-1 bg-primary-50 text-primary-700 text-xs px-2.5 py-1 rounded-full">
                   {e}
                   <button onClick={() => removeEmail(e)}><X className="w-3 h-3" /></button>
                 </span>
@@ -245,13 +234,13 @@ function StepGroup({ value, onChange, onNext, onSkip, loading }) {
         <button
           onClick={onNext}
           disabled={!value.name.trim() || loading}
-          className="w-full bg-indigo-600 text-white rounded-lg px-4 py-3 text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-40"
+          className="btn-primary btn-lg w-full"
         >
           {loading ? 'Saving...' : 'Continue'}
         </button>
         <button
           onClick={onSkip}
-          className="w-full text-gray-500 text-sm py-2 hover:text-gray-700 transition-colors"
+          className="btn-ghost btn-sm w-full text-warm-500"
         >
           Skip for now
         </button>
@@ -265,17 +254,17 @@ function StepGroup({ value, onChange, onNext, onSkip, loading }) {
 // ─────────────────────────────────────────────
 function StepDone({ name, onFinish }) {
   return (
-    <div className="text-center space-y-6 py-4">
+    <div className="text-center space-y-6 py-4 animate-slide-up">
       <div className="text-6xl">🎉</div>
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Pinlooply is ready for you!</h1>
-        <p className="text-gray-500 mt-2">
+        <h1 className="text-2xl font-bold text-warm-900">Pinlooply is ready for you!</h1>
+        <p className="text-warm-500 mt-2">
           Hey {name?.split(' ')[0] || 'there'}, everything is set up. Let's get started.
         </p>
       </div>
       <button
         onClick={onFinish}
-        className="w-full bg-indigo-600 text-white rounded-lg px-4 py-3 text-sm font-medium hover:bg-indigo-700 transition-colors"
+        className="btn-primary btn-lg w-full"
       >
         Start logging your first discussion →
       </button>
@@ -415,35 +404,47 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-6">
-          <span className="text-xl font-bold text-gray-900">Pinlooply</span>
+    <div className="min-h-screen bg-warm-50 flex flex-col items-center justify-center px-4 py-12">
+      <div className="max-w-md mx-auto w-full">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <span className="text-xl font-bold text-warm-900">Pinlooply</span>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          <ProgressBar current={step} total={totalSteps} />
-
-          {step > 1 && step < (needsGroup ? 5 : 4) + 1 && step !== (needsGroup ? 5 : 4) && (
-            <button
-              onClick={goBack}
-              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-6 -mt-2"
-            >
-              <ChevronLeft className="w-4 h-4" /> Back
-            </button>
-          )}
-
-          {step === 1 && <StepName value={name} onChange={setName} onNext={handleStep1} hasInvite={!!pendingInvite} />}
-          {step === 2 && <StepMode value={mode} onChange={setMode} onNext={handleStep2} />}
-          {step === 3 && <StepProject value={project} onChange={setProject} onNext={handleStep3} loading={loading} />}
-          {step === 4 && needsGroup && (
-            <StepGroup value={group} onChange={setGroup} onNext={handleStep4} onSkip={handleSkipGroup} loading={loading} />
-          )}
-          {step === 5 && <StepDone name={name} onFinish={handleFinish} />}
-          {step === 4 && !needsGroup && <StepDone name={name} onFinish={handleFinish} />}
+        {/* Progress dots */}
+        <div className="flex items-center gap-2 mb-12 justify-center">
+          {Array.from({ length: totalSteps }, (_, i) => i + 1).map(i => (
+            <div
+              key={i}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                i <= step ? 'bg-primary-600 w-8' : 'bg-warm-200 w-2'
+              }`}
+            />
+          ))}
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-4">
+        {/* Back button */}
+        {step > 1 && step < totalSteps + 1 && step !== totalSteps && (
+          <button
+            onClick={goBack}
+            className="btn-ghost btn-sm flex items-center gap-1 mb-6 text-warm-500"
+          >
+            <ChevronLeft className="w-4 h-4" /> Back
+          </button>
+        )}
+
+        {/* Step content */}
+        {step === 1 && <StepName value={name} onChange={setName} onNext={handleStep1} hasInvite={!!pendingInvite} />}
+        {step === 2 && <StepMode value={mode} onChange={setMode} onNext={handleStep2} />}
+        {step === 3 && <StepProject value={project} onChange={setProject} onNext={handleStep3} loading={loading} />}
+        {step === 4 && needsGroup && (
+          <StepGroup value={group} onChange={setGroup} onNext={handleStep4} onSkip={handleSkipGroup} loading={loading} />
+        )}
+        {step === 5 && <StepDone name={name} onFinish={handleFinish} />}
+        {step === 4 && !needsGroup && <StepDone name={name} onFinish={handleFinish} />}
+
+        {/* Step counter */}
+        <p className="text-center text-xs text-warm-400 mt-6">
           Step {Math.min(step, totalSteps)} of {totalSteps}
         </p>
       </div>

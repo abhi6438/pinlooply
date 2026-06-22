@@ -24,7 +24,13 @@ const TABS = [
 const PRIORITY_META = {
   high:   { label: 'High',   color: 'text-red-600 bg-red-50 border-red-200' },
   medium: { label: 'Medium', color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
-  low:    { label: 'Low',    color: 'text-gray-500 bg-gray-100 border-gray-200' },
+  low:    { label: 'Low',    color: 'text-warm-500 bg-warm-100 border-warm-200' },
+}
+
+const PRIORITY_DOT = {
+  high:   'bg-red-500',
+  medium: 'bg-yellow-400',
+  low:    'bg-warm-300',
 }
 
 const SORT_OPTIONS = [
@@ -66,7 +72,7 @@ function MemberAvatar({ member, size = 6 }) {
     return <img src={avatarUrl} className={`${sz} rounded-full object-cover flex-shrink-0`} alt={name} title={name} />
   }
   return (
-    <div className={`${sz} rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold flex-shrink-0`} title={name}>
+    <div className={`${sz} rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-semibold flex-shrink-0`} title={name}>
       {initials}
     </div>
   )
@@ -101,12 +107,11 @@ function AssigneeCell({ task, groupMembers, onAssign }) {
   }
 
   if (!hasMembers) {
-    // Solo mode — show name only
-    if (!assignedUser) return <span className="text-xs text-gray-300">—</span>
+    if (!assignedUser) return <span className="text-xs text-warm-300">—</span>
     return (
       <div className="flex items-center gap-1.5">
         <MemberAvatar member={assignedUser} size={5} />
-        <span className="text-xs text-gray-600 truncate max-w-[80px]">{assignedUser.name}</span>
+        <span className="text-xs text-warm-500 truncate max-w-[80px]">{assignedUser.name}</span>
       </div>
     )
   }
@@ -116,48 +121,48 @@ function AssigneeCell({ task, groupMembers, onAssign }) {
       <button
         onClick={() => setOpen(o => !o)}
         disabled={saving}
-        className="flex items-center gap-1.5 group hover:bg-gray-100 rounded-lg px-1.5 py-1 transition-colors"
+        className="flex items-center gap-1.5 group hover:bg-warm-100 rounded-lg px-1.5 py-1 transition-colors"
         title="Assign member"
       >
         {saving ? (
-          <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+          <Loader2 className="w-4 h-4 text-primary-500 animate-spin" />
         ) : assignedUser ? (
           <>
             <MemberAvatar member={assignedUser} size={5} />
-            <span className="text-xs text-gray-600 truncate max-w-[80px] hidden lg:block">{assignedUser.name}</span>
+            <span className="text-xs text-warm-500 truncate max-w-[80px] hidden lg:block">{assignedUser.name}</span>
           </>
         ) : (
           <>
-            <UserCircle className="w-5 h-5 text-gray-300 group-hover:text-gray-400" />
-            <span className="text-xs text-gray-300 hidden lg:block">Assign</span>
+            <UserCircle className="w-5 h-5 text-warm-300 group-hover:text-warm-400" />
+            <span className="text-xs text-warm-300 hidden lg:block">Assign</span>
           </>
         )}
-        <ChevronDown className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100" />
+        <ChevronDown className="w-3 h-3 text-warm-300 opacity-0 group-hover:opacity-100" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-8 bg-white border border-gray-200 rounded-xl shadow-xl z-30 min-w-[180px] py-1">
+        <div className="absolute left-0 top-8 bg-white border border-warm-200 rounded-xl shadow-xl z-30 min-w-[180px] py-1">
           <button
             onClick={() => pick(null)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-warm-500 hover:bg-warm-50"
           >
-            <UserCircle className="w-5 h-5 text-gray-300" />
+            <UserCircle className="w-5 h-5 text-warm-300" />
             Unassigned
           </button>
-          <div className="border-t border-gray-100 my-1" />
+          <div className="border-t border-warm-100 my-1" />
           {groupMembers.map(m => {
             const u = m.users || m
             return (
               <button
                 key={u.id}
                 onClick={() => pick(u.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-indigo-50 ${
-                  assignedUser?.id === u.id ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-primary-50 ${
+                  assignedUser?.id === u.id ? 'bg-primary-50 text-primary-700 font-medium' : 'text-warm-900'
                 }`}
               >
                 <MemberAvatar member={u} size={5} />
                 <span className="truncate">{u.name || u.email}</span>
-                {assignedUser?.id === u.id && <Check className="w-3.5 h-3.5 ml-auto text-indigo-600" />}
+                {assignedUser?.id === u.id && <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />}
               </button>
             )
           })}
@@ -170,8 +175,10 @@ function AssigneeCell({ task, groupMembers, onAssign }) {
 // ── Priority badge ────────────────────────────────────────────
 function PriorityBadge({ priority }) {
   const m = PRIORITY_META[priority] || PRIORITY_META.medium
+  const dot = PRIORITY_DOT[priority] || PRIORITY_DOT.medium
   return (
-    <span className={`inline-flex text-xs px-1.5 py-0.5 rounded border font-medium ${m.color}`}>
+    <span className={`inline-flex items-center gap-1.5 text-xs px-1.5 py-0.5 rounded border font-medium ${m.color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
       {m.label}
     </span>
   )
@@ -214,7 +221,7 @@ function QuickAddRow({ projects, activeType, groupMembers, onAdd, onCancel }) {
   }
 
   return (
-    <tr className="bg-indigo-50/50 border-t-2 border-indigo-200">
+    <tr className="bg-primary-50/50 border-t-2 border-primary-200">
       <td className="pl-4 py-2.5 w-8" />
       <td className="px-3 py-2.5" colSpan={2}>
         <input
@@ -223,12 +230,12 @@ function QuickAddRow({ projects, activeType, groupMembers, onAdd, onCancel }) {
           onChange={e => setTitle(e.target.value)}
           onKeyDown={onKey}
           placeholder="Task title…"
-          className="w-full text-sm border border-indigo-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+          className="input w-full text-sm py-1.5"
         />
       </td>
       <td className="px-2 py-2.5 w-28 hidden sm:table-cell">
         <select value={priority} onChange={e => setPriority(e.target.value)}
-          className="text-xs border border-gray-200 rounded px-2 py-1 bg-white w-full">
+          className="input text-xs py-1 w-full">
           <option value="high">High</option>
           <option value="medium">Medium</option>
           <option value="low">Low</option>
@@ -236,14 +243,14 @@ function QuickAddRow({ projects, activeType, groupMembers, onAdd, onCancel }) {
       </td>
       <td className="px-2 py-2.5 w-32 hidden md:table-cell">
         <select value={projectId} onChange={e => setProjectId(e.target.value)}
-          className="text-xs border border-gray-200 rounded px-2 py-1 bg-white w-full">
+          className="input text-xs py-1 w-full">
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </td>
       {groupMembers.length > 0 && (
         <td className="px-2 py-2.5 w-32 hidden lg:table-cell">
           <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-            className="text-xs border border-gray-200 rounded px-2 py-1 bg-white w-full">
+            className="input text-xs py-1 w-full">
             <option value="">Unassigned</option>
             {groupMembers.map(m => {
               const u = m.users || m
@@ -255,16 +262,16 @@ function QuickAddRow({ projects, activeType, groupMembers, onAdd, onCancel }) {
       <td className="px-2 py-2.5 w-28 hidden lg:table-cell">
         <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
           onClick={e => e.target.showPicker?.()}
-          className="text-xs border border-gray-200 rounded px-2 py-1 bg-white w-full cursor-pointer" />
+          className="input text-xs py-1 w-full cursor-pointer" />
       </td>
       <td className="pr-4 py-2.5 w-20">
         <div className="flex gap-1">
           <button onClick={submit} disabled={!title.trim() || saving}
-            className="flex items-center gap-1 text-xs bg-indigo-600 text-white px-2.5 py-1 rounded hover:bg-indigo-700 disabled:opacity-40">
+            className="btn-primary btn-sm">
             {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
             Add
           </button>
-          <button onClick={onCancel} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded">
+          <button onClick={onCancel} className="p-1 text-warm-400 hover:text-warm-900 hover:bg-warm-100 rounded">
             <X className="w-3 h-3" />
           </button>
         </div>
@@ -302,37 +309,37 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
 
   if (editing) {
     return (
-      <tr className="bg-indigo-50/40 border-l-2 border-indigo-400">
+      <tr className="bg-primary-50/40 border-l-2 border-primary-400">
         <td className="pl-4 pr-2 py-2.5 w-10" />
         <td className="px-3 py-2.5" colSpan={2}>
           <input ref={editRef} value={draft.title}
             onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
             onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit() }}
-            className="w-full text-sm border border-indigo-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white" />
+            className="input w-full text-sm py-1.5" />
         </td>
         <td className="px-2 py-2.5 w-28 hidden md:table-cell">
           <select value={draft.priority} onChange={e => setDraft(d => ({ ...d, priority: e.target.value }))}
-            className="text-xs border border-gray-200 rounded px-2 py-1 bg-white w-full">
-            <option value="high">🔴 High</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="low">🟢 Low</option>
+            className="input text-xs py-1 w-full">
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
           </select>
         </td>
         <td className="px-2 py-2.5 w-28 hidden lg:table-cell">
           <input type="date" value={draft.due_date} onChange={e => setDraft(d => ({ ...d, due_date: e.target.value }))}
             onClick={e => e.target.showPicker?.()}
-            className="text-xs border border-gray-200 rounded px-2 py-1 bg-white w-full cursor-pointer" />
+            className="input text-xs py-1 w-full cursor-pointer" />
         </td>
         {groupMembers.length > 0 && <td className="px-2 py-2.5 hidden xl:table-cell" />}
         <td className="px-2 py-2.5 hidden xl:table-cell" />
         <td className="pr-4 py-2.5">
           <div className="flex gap-1">
             <button onClick={saveEdit} disabled={!draft.title.trim() || saving}
-              className="flex items-center gap-1 text-xs bg-indigo-600 text-white px-2.5 py-1 rounded hover:bg-indigo-700 disabled:opacity-40">
+              className="btn-primary btn-sm">
               {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
               Save
             </button>
-            <button onClick={cancelEdit} className="text-xs text-gray-500 px-2 py-1 rounded hover:bg-gray-100">Cancel</button>
+            <button onClick={cancelEdit} className="text-xs text-warm-500 px-2 py-1 rounded hover:bg-warm-100">Cancel</button>
           </div>
         </td>
       </tr>
@@ -340,22 +347,22 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
   }
 
   return (
-    <tr className={`group transition-colors ${done ? 'bg-gray-50/50' : 'hover:bg-gray-50'}`}>
+    <tr className={`group transition-colors ${overdue && !done ? 'border-l-4 border-red-400' : ''} ${done ? 'bg-warm-50/50' : 'hover:bg-warm-50'}`}>
       {/* Checkbox */}
       <td className="pl-4 pr-2 py-3 w-10">
         {selected ? (
           <button onClick={() => onSelect(task.id)} title="Deselect">
-            <CheckSquare2 className="w-4 h-4 text-indigo-600" />
+            <CheckSquare2 className="w-5 h-5 rounded accent-primary-600 cursor-pointer text-primary-600" />
           </button>
         ) : (
-          <div className="relative w-4 h-4">
+          <div className="relative w-5 h-5">
             <button onClick={() => onToggleDone(task)} title={done ? 'Mark pending' : 'Mark done'}
               className="absolute inset-0 transition-opacity group-hover:opacity-0">
-              {done ? <CheckSquare2 className="w-4 h-4 text-green-500" /> : <Square className="w-4 h-4 text-gray-300" />}
+              {done ? <CheckSquare2 className="w-5 h-5 rounded accent-primary-600 cursor-pointer text-green-500" /> : <Square className="w-5 h-5 rounded accent-primary-600 cursor-pointer text-warm-300" />}
             </button>
             <button onClick={() => onSelect(task.id)} title="Select for bulk action"
               className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Square className="w-4 h-4 text-indigo-400 hover:text-indigo-600" />
+              <Square className="w-5 h-5 rounded accent-primary-600 cursor-pointer text-primary-400 hover:text-primary-600" />
             </button>
           </div>
         )}
@@ -364,10 +371,9 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
       {/* Title */}
       <td className="px-3 py-3">
         <div className="min-w-0">
-          <span className={`text-sm leading-snug ${done ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+          <span className={`text-sm leading-snug ${done ? 'line-through text-warm-400' : 'text-warm-900'}`}>
             {task.title}
           </span>
-          {/* AI-suggested name if not yet resolved to user */}
           {task.assigned_to_name && !task.assigned_user && (
             <span className="ml-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
               → {task.assigned_to_name}
@@ -375,7 +381,7 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
           )}
           <div className="flex flex-wrap items-center gap-1.5 mt-1 sm:hidden">
             <PriorityBadge priority={task.priority} />
-            {task.projects && <span className="text-xs text-gray-400">{task.projects.name}</span>}
+            {task.projects && <span className="text-xs text-warm-400">{task.projects.name}</span>}
           </div>
         </div>
       </td>
@@ -388,7 +394,7 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
       {/* Project */}
       <td className="px-3 py-3 w-32 hidden md:table-cell">
         {task.projects && (
-          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full line-clamp-1">
+          <span className="text-xs text-warm-500 bg-warm-100 px-2 py-0.5 rounded-full line-clamp-1">
             {task.projects.name}
           </span>
         )}
@@ -404,12 +410,12 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
       {/* Due date */}
       <td className="px-3 py-3 w-28 hidden lg:table-cell">
         {dueLabel ? (
-          <span className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+          <span className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-medium' : 'text-warm-400'}`}>
             {overdue && <AlertTriangle className="w-3 h-3" />}
             {dueLabel}
           </span>
         ) : (
-          <span className="text-xs text-gray-300">—</span>
+          <span className="text-xs text-warm-300">—</span>
         )}
       </td>
 
@@ -417,12 +423,12 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
       <td className="px-3 py-3 w-28 hidden xl:table-cell">
         {task.topics ? (
           <button onClick={() => onNavigateTopic(task.topics.id)}
-            className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 hover:underline truncate max-w-[100px]">
+            className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline truncate max-w-[100px]">
             <Tag className="w-3 h-3 flex-shrink-0" />
             <span className="truncate">{task.topics.title}</span>
           </button>
         ) : (
-          <span className="text-xs text-gray-300">—</span>
+          <span className="text-xs text-warm-300">—</span>
         )}
       </td>
 
@@ -433,11 +439,11 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
             <GenerateTestCasesButton taskId={task.id} label="" size="sm" variant="ghost" />
           )}
           <button onClick={() => setEditing(true)} title="Edit task"
-            className="p-1 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded transition-colors">
+            className="p-1 text-warm-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
             <Pencil className="w-3.5 h-3.5" />
           </button>
           <button onClick={() => onDelete(task.id)} title="Delete task"
-            className="p-1 text-gray-400 hover:text-red-400 hover:bg-red-50 rounded transition-colors">
+            className="p-1 text-warm-400 hover:text-red-400 hover:bg-red-50 rounded transition-colors">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -460,7 +466,7 @@ function BulkBar({ count, onMarkDone, onPriority, onClear }) {
   }, [])
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-600 text-white text-sm rounded-xl mb-3">
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-600 text-white text-sm rounded-2xl mb-3">
       <span className="font-medium">{count} selected</span>
       <div className="flex gap-2 ml-auto">
         <button onClick={onMarkDone}
@@ -473,10 +479,10 @@ function BulkBar({ count, onMarkDone, onPriority, onClear }) {
             Priority <ChevronDown className={`w-3 h-3 transition-transform ${priorityOpen ? 'rotate-180' : ''}`} />
           </button>
           {priorityOpen && (
-            <div className="absolute right-0 top-9 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-30 min-w-[110px]">
-              {[{ value: 'high', label: '🔴 High' }, { value: 'medium', label: '🟡 Medium' }, { value: 'low', label: '🟢 Low' }].map(p => (
+            <div className="absolute right-0 top-9 bg-white rounded-xl shadow-xl border border-warm-200 py-1 z-30 min-w-[110px]">
+              {[{ value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }].map(p => (
                 <button key={p.value} onClick={() => { onPriority(p.value); setPriorityOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700">
+                  className="w-full text-left px-3 py-2 text-sm text-warm-900 hover:bg-primary-50 hover:text-primary-700">
                   {p.label}
                 </button>
               ))}
@@ -496,7 +502,7 @@ export default function Lists() {
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab]     = useState('task')
-  const [assigneeFilter, setAssigneeFilter] = useState('all') // 'all' | 'mine' | 'by_me'
+  const [assigneeFilter, setAssigneeFilter] = useState('all')
   const [tasks, setTasks]             = useState([])
   const [loading, setLoading]         = useState(false)
   const [filterProject, setFilterProject] = useState('')
@@ -513,7 +519,6 @@ export default function Lists() {
     if (!user) return
     if (!projects.length) fetchProjects(user.id)
 
-    // Load user profile + group members for team mode
     async function loadGroupContext() {
       const { data: profile } = await supabase
         .from('users').select('mode').eq('id', user.id).single()
@@ -647,64 +652,50 @@ export default function Lists() {
   const isTeamMode = userMode === 'team' || userMode === 'org'
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Lists</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <h1 className="text-2xl font-bold text-warm-900">Task Lists 📋</h1>
+          <p className="text-sm text-warm-500 mt-1">
             {pendingCount} pending
             {overdueCount > 0 && <span className="text-red-500 ml-2">· {overdueCount} overdue</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={loadTasks} disabled={loading}
-            className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-40">
+          <button onClick={loadTasks} disabled={loading} className="btn-secondary btn-sm">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
-          <button onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-1.5 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700">
+          <button onClick={() => setShowAddForm(true)} className="btn-primary btn-sm">
             <Plus className="w-4 h-4" /> Add Task
           </button>
         </div>
       </div>
 
-      {/* Type tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit">
-        {TABS.map(tab => {
-          const Icon = tab.icon
-          const count = tasks.filter(t => t.type === tab.key && t.status !== 'done').length
-          return (
-            <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSearch('') }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === tab.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}>
-              <Icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{tab.label}</span>
-              {count > 0 && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                  activeTab === tab.key ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-600'
-                }`}>{count}</span>
-              )}
-            </button>
-          )
-        })}
+      {/* Tab pills */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {TABS.map(t => (
+          <button key={t.key} onClick={() => { setActiveTab(t.key); setSearch('') }}
+            className={`tab-pill ${activeTab === t.key ? 'active' : 'inactive'}`}>
+            <t.icon className="w-4 h-4" />
+            {t.label}
+            <span className={`text-xs px-2 py-0.5 rounded-full ml-1 ${activeTab === t.key ? 'bg-white/20 text-white' : 'bg-warm-100 text-warm-500'}`}>
+              {tasks.filter(t2 => t2.type === t.key && t2.status !== 'done').length}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Assignee filter (team mode only) */}
       {isTeamMode && (
-        <div className="flex gap-1 mb-4">
+        <div className="flex gap-2 mb-4">
           {[
-            { key: 'all',   label: 'All Tasks', icon: ListChecks },
-            { key: 'mine',  label: 'My Tasks',  icon: UserCircle },
-            { key: 'by_me', label: 'Assigned by Me', icon: Users },
+            { key: 'all',   label: 'All Tasks',       icon: ListChecks },
+            { key: 'mine',  label: 'My Tasks',         icon: UserCircle },
+            { key: 'by_me', label: 'Assigned by Me',   icon: Users },
           ].map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setAssigneeFilter(key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
-                assigneeFilter === key
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-              }`}>
+              className={`tab-pill ${assigneeFilter === key ? 'active' : 'inactive'}`}>
               <Icon className="w-3.5 h-3.5" />
               {label}
             </button>
@@ -713,22 +704,20 @@ export default function Lists() {
       )}
 
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative">
           <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 bg-white appearance-none pr-7 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            className="input py-1.5 text-sm pr-8 appearance-none">
             <option value="">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <ChevronDown className="absolute right-2 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
         </div>
 
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white">
-          {[{ value: '', label: 'All' }, { value: 'high', label: '🔴 High' }, { value: 'medium', label: '🟡 Med' }, { value: 'low', label: '🟢 Low' }].map(opt => (
+        <div className="flex gap-2">
+          {[{ value: '', label: 'All' }, { value: 'high', label: 'High' }, { value: 'medium', label: 'Med' }, { value: 'low', label: 'Low' }].map(opt => (
             <button key={opt.value} onClick={() => setFilterPriority(opt.value)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors border-r border-gray-200 last:border-0 ${
-                filterPriority === opt.value ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}>
+              className={`tab-pill ${filterPriority === opt.value ? 'active' : 'inactive'}`}>
               {opt.label}
             </button>
           ))}
@@ -736,25 +725,23 @@ export default function Lists() {
 
         <div className="relative">
           <select value={sort} onChange={e => setSort(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 bg-white appearance-none pr-7 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            className="input py-1.5 text-xs pr-8 appearance-none">
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <ArrowUpDown className="absolute right-2 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <ArrowUpDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
         </div>
 
         <button onClick={() => setShowDone(d => !d)}
-          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-            showDone ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-          }`}>
+          className={`tab-pill ${showDone ? 'active' : 'inactive'}`}>
           <CheckSquare2 className="w-3.5 h-3.5" /> Show Done
         </button>
 
-        <div className="relative flex-1 min-w-[160px]">
-          <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks…"
-            className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            className="input w-full pl-9 py-2" />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+            <button onClick={() => setSearch('')} className="absolute right-3 top-2.5 text-warm-400 hover:text-warm-900 text-xs">✕</button>
           )}
         </div>
       </div>
@@ -764,46 +751,44 @@ export default function Lists() {
       )}
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+            <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
           </div>
         ) : displayed.length === 0 && !showAddForm ? (
-          <div className="text-center py-16">
-            {(() => { const T = TABS.find(t => t.key === activeTab); const Icon = T.icon; return (
-              <>
-                <Icon className="w-8 h-8 text-gray-200 mx-auto mb-3" />
-                <p className="text-sm text-gray-400">{T.emptyMsg}</p>
-                <button onClick={() => setShowAddForm(true)}
-                  className="mt-3 text-sm text-indigo-600 hover:underline flex items-center gap-1 mx-auto">
-                  <Plus className="w-3.5 h-3.5" /> Add one manually
-                </button>
-              </>
-            )})()}
-          </div>
+          (() => { const T = TABS.find(t => t.key === activeTab); const Icon = T.icon; return (
+            <div className="empty-state">
+              <div className="empty-state-icon"><Icon className="w-8 h-8" /></div>
+              <p className="empty-state-title">{T.emptyMsg}</p>
+              <button onClick={() => setShowAddForm(true)}
+                className="btn-primary btn-sm mt-4">
+                <Plus className="w-3.5 h-3.5" /> Add one manually
+              </button>
+            </div>
+          )})()
         ) : (
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-warm-50 border-b border-warm-200">
               <tr>
                 <th className="pl-4 pr-2 py-2.5 w-10">
-                  <button onClick={toggleSelectAll} className="text-gray-300 hover:text-indigo-500">
+                  <button onClick={toggleSelectAll} className="text-warm-300 hover:text-primary-600">
                     {selected.size === displayed.length && displayed.length > 0
-                      ? <CheckSquare2 className="w-4 h-4 text-indigo-600" />
+                      ? <CheckSquare2 className="w-4 h-4 text-primary-600" />
                       : <Square className="w-4 h-4" />
                     }
                   </button>
                 </th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">Task</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-24 hidden sm:table-cell">Priority</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-32 hidden md:table-cell">Project</th>
-                {isTeamMode && <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-32 hidden lg:table-cell">Assignee</th>}
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-28 hidden lg:table-cell">Due</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-28 hidden xl:table-cell">Topic</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500">Task</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-24 hidden sm:table-cell">Priority</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-32 hidden md:table-cell">Project</th>
+                {isTeamMode && <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-32 hidden lg:table-cell">Assignee</th>}
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-28 hidden lg:table-cell">Due</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-28 hidden xl:table-cell">Topic</th>
                 <th className="pr-4 w-10" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-warm-100">
               {displayed.map(task => (
                 <TaskRow
                   key={task.id}
@@ -832,18 +817,18 @@ export default function Lists() {
         )}
 
         {!loading && displayed.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 flex items-center justify-between">
+          <div className="px-4 py-2.5 border-t border-warm-100 bg-warm-50 text-xs text-warm-400 flex items-center justify-between">
             <span>
               {displayed.length} task{displayed.length !== 1 ? 's' : ''}
               {search && ` matching "${search}"`}
               {overdueCount > 0 && <span className="text-red-500 ml-2">· {overdueCount} overdue</span>}
             </span>
             {showAddForm ? (
-              <button onClick={() => setShowAddForm(false)} className="text-gray-400 hover:text-gray-600 flex items-center gap-1">
+              <button onClick={() => setShowAddForm(false)} className="text-warm-400 hover:text-warm-900 flex items-center gap-1">
                 <X className="w-3 h-3" /> Cancel add
               </button>
             ) : (
-              <button onClick={() => setShowAddForm(true)} className="text-indigo-500 hover:text-indigo-700 flex items-center gap-1">
+              <button onClick={() => setShowAddForm(true)} className="text-primary-600 hover:text-primary-700 flex items-center gap-1">
                 <Plus className="w-3 h-3" /> Add task
               </button>
             )}

@@ -22,7 +22,7 @@ const PLANS = [
       'Standup generator',
       'Weekly summary',
     ],
-    cta:      null, // current for personal users
+    cta:      null,
     ctaLabel: null,
   },
   {
@@ -30,7 +30,7 @@ const PLANS = [
     label: 'Group',
     badge: 'Free',
     icon:  '👥',
-    color: 'indigo',
+    color: 'primary',
     features: [
       'Everything in Personal',
       'Up to 5 members',
@@ -76,31 +76,24 @@ const PLANS = [
   },
 ]
 
-const COLOR_MAP = {
-  gray:   { bg: 'bg-gray-50',   border: 'border-gray-200',  badge: 'bg-gray-100 text-gray-600',   btn: 'bg-gray-800 hover:bg-gray-900 text-white',   ring: 'ring-gray-200'   },
-  indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200',badge: 'bg-indigo-100 text-indigo-700',btn: 'bg-indigo-600 hover:bg-indigo-700 text-white', ring: 'ring-indigo-300' },
-  violet: { bg: 'bg-violet-50', border: 'border-violet-200',badge: 'bg-violet-100 text-violet-700',btn: 'bg-violet-600 hover:bg-violet-700 text-white', ring: 'ring-violet-300' },
-  amber:  { bg: 'bg-amber-50',  border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700',  btn: 'bg-amber-500 hover:bg-amber-600 text-white',  ring: 'ring-amber-300'  },
-}
-
 // ── Usage bar ─────────────────────────────────────────────────
 function UsageBar({ used, max, label }) {
-  const pct    = max === Infinity ? 0 : Math.min(100, Math.round((used / max) * 100))
-  const isInfinity = max === Infinity
+  const pct         = max === Infinity ? 0 : Math.min(100, Math.round((used / max) * 100))
+  const isInfinity  = max === Infinity
   const isNearLimit = pct >= 80
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-600">{label}</span>
-        <span className={`text-xs font-semibold ${isNearLimit && !isInfinity ? 'text-orange-600' : 'text-gray-700'}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs text-warm-500">{label}</span>
+        <span className={`text-xs font-semibold ${isNearLimit && !isInfinity ? 'text-amber-600' : 'text-warm-900'}`}>
           {isInfinity ? `${used} used` : `${used} / ${max}`}
         </span>
       </div>
       {!isInfinity && (
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all ${isNearLimit ? 'bg-orange-400' : 'bg-indigo-500'}`}
+            className={`h-full rounded-full transition-all ${isNearLimit ? 'bg-amber-500' : 'bg-primary-600'}`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -111,19 +104,16 @@ function UsageBar({ used, max, label }) {
 
 // ── Plan card ─────────────────────────────────────────────────
 function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
-  const c = COLOR_MAP[plan.color]
-  const isLocked = isCurrent
-
   return (
-    <div className={`relative rounded-2xl border-2 p-5 flex flex-col gap-4 transition-all ${
+    <div className={`relative rounded-2xl p-5 flex flex-col gap-4 transition-all ${
       isCurrent
-        ? `${c.border} ${c.bg} ring-2 ${c.ring}`
-        : 'border-gray-200 bg-white hover:border-gray-300'
+        ? 'card border-2 border-primary-500'
+        : 'card-hover'
     }`}>
       {/* Current badge */}
       {isCurrent && (
-        <span className="absolute -top-3 left-4 px-3 py-0.5 bg-indigo-600 text-white text-xs font-semibold rounded-full shadow-sm">
-          Current plan
+        <span className="absolute -top-3 left-4 badge badge-purple shadow-sm">
+          Current Plan
         </span>
       )}
 
@@ -132,8 +122,12 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
         <div className="flex items-center gap-2">
           <span className="text-2xl">{plan.icon}</span>
           <div>
-            <h3 className="text-sm font-bold text-gray-900">{plan.label}</h3>
-            <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${c.badge}`}>
+            <h3 className="text-sm font-bold text-warm-900">{plan.label}</h3>
+            <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${
+              plan.badge === 'Paid'
+                ? 'bg-amber-100 text-amber-700'
+                : 'bg-warm-100 text-warm-500'
+            }`}>
               {plan.badge}
             </span>
           </div>
@@ -144,7 +138,7 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
       {/* Features */}
       <ul className="space-y-1.5 flex-1">
         {plan.features.map((f, i) => (
-          <li key={i} className="flex items-center gap-2 text-xs text-gray-700">
+          <li key={i} className="flex items-center gap-2 text-xs text-warm-500">
             <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
             {f}
           </li>
@@ -158,7 +152,7 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
             <button
               onClick={() => onUpgrade('group')}
               disabled={upgrading}
-              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all ${c.btn} disabled:opacity-50`}
+              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {upgrading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
               {plan.ctaLabel}
@@ -169,7 +163,7 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
               href={plan.bmcUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all ${c.btn}`}
+              className="btn-secondary w-full flex items-center justify-center gap-2"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               {plan.ctaLabel}
@@ -178,7 +172,7 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
           {plan.cta === 'contact' && (
             <a
               href="mailto:support@pinlooply.com"
-              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all ${c.btn}`}
+              className="btn-secondary w-full flex items-center justify-center gap-2"
             >
               <ChevronRight className="w-3.5 h-3.5" />
               {plan.ctaLabel}
@@ -188,7 +182,7 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
       )}
 
       {isCurrent && (
-        <div className="w-full py-2.5 rounded-xl text-xs font-semibold text-center text-indigo-700 bg-indigo-100">
+        <div className="w-full py-2.5 rounded-xl text-xs font-semibold text-center text-primary-700 bg-primary-50">
           ✓ Your current plan
         </div>
       )}
@@ -199,8 +193,8 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
 // ── Main ──────────────────────────────────────────────────────
 export default function Plan() {
   const { user } = useAuth()
-  const [info, setInfo]     = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [info, setInfo]         = useState(null)
+  const [loading, setLoading]   = useState(true)
   const [upgrading, setUpgrading] = useState(false)
 
   useEffect(() => {
@@ -216,10 +210,8 @@ export default function Plan() {
     try {
       await planApi.upgrade(mode)
       toast.success('Plan updated! Refreshing…')
-      // Reload plan info
       const res = await planApi.get()
       setInfo(res.data.data)
-      // Reload page so auth context mode refreshes
       setTimeout(() => window.location.reload(), 800)
     } catch (err) {
       toast.error(err.response?.data?.message || 'Upgrade failed')
@@ -231,7 +223,7 @@ export default function Plan() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
       </div>
     )
   }
@@ -239,20 +231,20 @@ export default function Plan() {
   const currentPlanKey = info?.planKey || 'personal_free'
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-6">
+    <div className="max-w-5xl mx-auto px-6 py-6 animate-fade-in">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Plan & Billing</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your plan and see what's included.</p>
+        <h1 className="text-2xl font-bold text-warm-900">Plan & Billing 💳</h1>
+        <p className="text-sm text-warm-500 mt-1">Manage your plan and see what's included.</p>
       </div>
 
       {/* Current plan summary */}
       {info && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row sm:items-center gap-5">
+        <div className="card p-5 mb-8 flex flex-col sm:flex-row sm:items-center gap-5">
           <div className="flex-1">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Current Plan</p>
-            <h2 className="text-xl font-bold text-gray-900">{info.label}</h2>
-            <p className="text-sm text-gray-500 mt-0.5 capitalize">{info.mode} mode · {info.plan}</p>
+            <p className="text-xs text-warm-400 uppercase tracking-wide font-semibold mb-1">Current Plan</p>
+            <h2 className="text-xl font-bold text-warm-900">{info.label}</h2>
+            <p className="text-sm text-warm-500 mt-0.5 capitalize">{info.mode} mode · {info.plan}</p>
           </div>
           <div className="flex flex-col gap-3 sm:w-64">
             <UsageBar
@@ -274,9 +266,9 @@ export default function Plan() {
       {/* Near-limit warning */}
       {info && info.usage.projects.max !== Infinity &&
         info.usage.projects.used >= info.usage.projects.max - 1 && (
-        <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-6">
-          <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-orange-800">
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
+          <span className="text-lg">⚠️</span>
+          <p className="text-sm text-amber-800">
             You're using {info.usage.projects.used} of {info.usage.projects.max} projects.
             Upgrade to add more.
           </p>
@@ -297,9 +289,9 @@ export default function Plan() {
       </div>
 
       {/* Paid upgrade note */}
-      <div className="mt-6 text-center text-xs text-gray-400">
+      <div className="mt-6 text-center text-xs text-warm-400">
         Paid plans (Team & Org) are activated after donation confirmation.
-        <a href="mailto:support@pinlooply.com" className="text-indigo-500 hover:underline ml-1">
+        <a href="mailto:support@pinlooply.com" className="text-primary-600 hover:underline ml-1">
           Contact us
         </a> after donating.
       </div>

@@ -37,82 +37,43 @@ function formatDate(iso) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// ── Compact topic row ─────────────────────────────────────────
-function TopicRow({ topic, onClick }) {
+// ── Topic Card ────────────────────────────────────────────────
+function TopicCard({ topic, onClick }) {
+  const borderColor = topic.status === 'resolved' ? 'border-warm-300' : 'border-primary-500'
   return (
-    <tr
+    <div
       onClick={onClick}
-      className="group hover:bg-indigo-50/40 cursor-pointer transition-colors"
+      className={`card-hover border-l-4 ${borderColor} cursor-pointer animate-fade-in`}
     >
-      {/* Status dot */}
-      <td className="pl-4 pr-2 py-3 w-8">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <span className="font-semibold text-warm-900 leading-snug line-clamp-2">{topic.title}</span>
         {topic.status === 'resolved'
-          ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-          : <Circle className="w-4 h-4 text-blue-400" />
+          ? <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+          : <Circle className="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" />
         }
-      </td>
+      </div>
 
-      {/* Title + summary */}
-      <td className="px-3 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900 group-hover:text-indigo-700 transition-colors line-clamp-1">
-            {topic.title}
-          </span>
-          {topic.conflict_count > 0 && (
-            <span className="flex-shrink-0 inline-flex items-center gap-0.5 text-xs text-orange-500 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">
-              <AlertTriangle className="w-2.5 h-2.5" />
-              {topic.conflict_count}
-            </span>
-          )}
-        </div>
-        {topic.summary && (
-          <p className="text-xs text-gray-400 mt-0.5 line-clamp-1 max-w-xl">
-            {topic.summary}
-          </p>
-        )}
-      </td>
+      {topic.summary && (
+        <p className="text-sm text-warm-500 line-clamp-2 mb-3">{topic.summary}</p>
+      )}
 
-      {/* Discussions */}
-      <td className="px-3 py-3 w-28 hidden sm:table-cell">
-        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-          <MessageSquare className="w-3.5 h-3.5 text-gray-400" />
+      <div className="flex flex-wrap items-center gap-2 mt-auto">
+        <span className={`badge ${topic.status === 'resolved' ? 'badge-low' : 'badge-medium'}`}>
+          {topic.status === 'resolved' ? 'Resolved' : 'Open'}
+        </span>
+        <span className="inline-flex items-center gap-1 text-xs text-warm-500 bg-warm-100 px-2 py-0.5 rounded-full">
+          <MessageSquare className="w-3 h-3" />
           {topic.discussion_count}
         </span>
-      </td>
-
-      {/* Updated */}
-      <td className="px-3 py-3 w-24 hidden md:table-cell text-xs text-gray-400">
-        {formatDate(topic.updated_at)}
-      </td>
-
-      {/* Arrow */}
-      <td className="pr-4 py-3 w-8 text-right">
-        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 transition-colors ml-auto" />
-      </td>
-    </tr>
-  )
-}
-
-// ── Sort header button ────────────────────────────────────────
-function SortTh({ label, field, current, onSort, className = '' }) {
-  const [cField, cDir] = current.split(':')
-  const active = cField === field
-  const nextDir = active && cDir === 'asc' ? 'desc' : 'asc'
-  return (
-    <th
-      className={`px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer select-none hover:text-gray-700 ${className}`}
-      onClick={() => onSort(`${field}:${nextDir}`)}
-    >
-      <span className="flex items-center gap-1">
-        {label}
-        {active
-          ? cDir === 'asc'
-            ? <ArrowUp className="w-3 h-3" />
-            : <ArrowDown className="w-3 h-3" />
-          : <ArrowUpDown className="w-3 h-3 opacity-30" />
-        }
-      </span>
-    </th>
+        {topic.conflict_count > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-xs text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">
+            <AlertTriangle className="w-2.5 h-2.5" />
+            {topic.conflict_count}
+          </span>
+        )}
+        <span className="ml-auto text-xs text-warm-400">{formatDate(topic.updated_at)}</span>
+      </div>
+    </div>
   )
 }
 
@@ -180,17 +141,17 @@ export default function Topics() {
   const resolvedCount = topics.filter(t => t.status === 'resolved').length
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Topics</h1>
-          <p className="text-sm text-gray-400 mt-0.5">AI-extracted discussion threads tracked over time</p>
+          <h1 className="text-2xl font-bold text-warm-900">Topics 💡</h1>
+          <p className="text-sm text-warm-500 mt-1">AI-extracted discussion threads tracked over time</p>
         </div>
         <button
           onClick={loadTopics}
           disabled={loading}
-          className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40"
+          className="btn-secondary btn-sm"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -198,44 +159,40 @@ export default function Topics() {
       </div>
 
       {/* Controls row */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {/* Project */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        {/* Project selector */}
         <div className="relative">
           <select
             value={selectedProject}
             onChange={e => { setSelectedProject(e.target.value) }}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white appearance-none pr-7 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="input py-1.5 text-sm pr-8 appearance-none"
           >
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <ChevronDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
         </div>
 
-        {/* Status filter */}
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white">
+        {/* Status filter pills */}
+        <div className="flex gap-2">
           {FILTER_OPTIONS.map(opt => (
             <button
               key={opt.value}
               onClick={() => setFilter(opt.value)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors border-r border-gray-200 last:border-0 ${
-                filter === opt.value
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
+              className={`tab-pill ${filter === opt.value ? 'active' : 'inactive'}`}
             >
               {opt.label}
-              {opt.value === 'open' && openCount > 0 && (
-                <span className={`ml-1.5 text-xs px-1 rounded-full ${filter === 'open' ? 'bg-white/20' : 'bg-gray-100'}`}>
+              {opt.value === 'open' && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ml-1 ${filter === 'open' ? 'bg-white/20 text-white' : 'bg-warm-100 text-warm-500'}`}>
                   {openCount}
                 </span>
               )}
-              {opt.value === 'resolved' && resolvedCount > 0 && (
-                <span className={`ml-1.5 text-xs px-1 rounded-full ${filter === 'resolved' ? 'bg-white/20' : 'bg-gray-100'}`}>
+              {opt.value === 'resolved' && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ml-1 ${filter === 'resolved' ? 'bg-white/20 text-white' : 'bg-warm-100 text-warm-500'}`}>
                   {resolvedCount}
                 </span>
               )}
               {opt.value === 'all' && (
-                <span className={`ml-1.5 text-xs px-1 rounded-full ${filter === 'all' ? 'bg-white/20' : 'bg-gray-100'}`}>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ml-1 ${filter === 'all' ? 'bg-white/20 text-white' : 'bg-warm-100 text-warm-500'}`}>
                   {topics.length}
                 </span>
               )}
@@ -248,80 +205,70 @@ export default function Topics() {
           <select
             value={sort}
             onChange={e => setSort(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 bg-white appearance-none pr-7 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="input py-1.5 text-xs pr-8 appearance-none"
           >
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <ChevronDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2 top-2.5 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
         </div>
 
-        {/* Search — grows to fill space */}
+        {/* Search */}
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-2.5 top-2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-warm-400 pointer-events-none" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={`Search ${topics.length} topics…`}
-            className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="input w-full pl-9 py-2"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 text-xs"
+              className="absolute right-3 top-2.5 text-warm-400 hover:text-warm-900 text-xs"
             >✕</button>
           )}
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+      {/* Content */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">💡</div>
+          <p className="empty-state-title">
+            {topics.length === 0 ? 'No topics yet.' : `No topics match "${search || filter}".`}
+          </p>
+          <p className="empty-state-sub">
+            {topics.length === 0
+              ? 'Log your first discussion to create topics!'
+              : 'Try adjusting your filters or search query.'}
+          </p>
+          {topics.length === 0 && (
+            <button
+              onClick={() => navigate('/log')}
+              className="btn-primary btn-sm mt-4"
+            >
+              Log a discussion →
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map(topic => (
+              <TopicCard
+                key={topic.id}
+                topic={topic}
+                onClick={() => navigate(`/topics/${topic.id}`)}
+              />
+            ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <Tag className="w-8 h-8 text-gray-200 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">
-              {topics.length === 0
-                ? 'No topics yet — log a discussion to get started.'
-                : `No topics match "${search || filter}".`}
-            </p>
-            {topics.length === 0 && (
-              <button
-                onClick={() => navigate('/log')}
-                className="mt-3 text-sm text-indigo-600 hover:underline"
-              >
-                Log a discussion →
-              </button>
-            )}
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="pl-4 pr-2 py-2.5 w-8" />
-                <SortTh label="Topic" field="title" current={sort} onSort={setSort} />
-                <SortTh label="Discussions" field="discussions" current={sort} onSort={setSort} className="w-28 hidden sm:table-cell" />
-                <SortTh label="Updated" field="updated_at" current={sort} onSort={setSort} className="w-24 hidden md:table-cell" />
-                <th className="pr-4 w-8" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map(topic => (
-                <TopicRow
-                  key={topic.id}
-                  topic={topic}
-                  onClick={() => navigate(`/topics/${topic.id}`)}
-                />
-              ))}
-            </tbody>
-          </table>
-        )}
 
-        {/* Footer count */}
-        {!loading && filtered.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 flex items-center justify-between">
+          {/* Footer count */}
+          <div className="mt-4 text-xs text-warm-400 flex items-center justify-between">
             <span>
               {filtered.length} of {topics.length} topic{topics.length !== 1 ? 's' : ''}
               {search && ` matching "${search}"`}
@@ -333,8 +280,8 @@ export default function Topics() {
               </span>
             )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   )
 }

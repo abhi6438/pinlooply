@@ -56,104 +56,118 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Pinlooply</h1>
-          <p className="text-gray-500 mt-2">AI-powered team memory</p>
+    <div className="min-h-screen flex">
+      {/* Left branding panel */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-[#1E1B4B] p-12 relative overflow-hidden">
+        {/* Subtle decorative circles */}
+        <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-primary-700 opacity-20 -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-primary-600 opacity-15 translate-y-1/2 -translate-x-1/2" />
+
+        {/* Top logo */}
+        <div className="relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">P</span>
+            </div>
+            <span className="text-white text-xl font-bold">Pinlooply</span>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Create your account</h2>
+        {/* Center content */}
+        <div className="relative z-10 space-y-8">
+          <div>
+            <h2 className="text-4xl font-bold text-white leading-tight">
+              Start capturing your<br/>
+              <span className="text-primary-300">team's memory</span><br/>
+              today.
+            </h2>
+            <p className="text-purple-200 mt-4 text-lg leading-relaxed">
+              Join thousands of teams who never miss a decision.
+            </p>
+          </div>
+          <div className="space-y-4">
+            {[
+              'AI extracts tasks automatically',
+              'Team memory that never forgets',
+              'Weekly summaries in one click',
+            ].map(f => (
+              <div key={f} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <span className="text-purple-100 text-sm">{f}</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          {/* Google */}
-          <button
-            onClick={handleGoogle}
-            disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
-          >
+        {/* Bottom */}
+        <div className="relative z-10">
+          <p className="text-purple-400 text-sm">Trusted by dev teams worldwide 🌍</p>
+        </div>
+      </div>
+
+      {/* Right form panel */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-warm-50">
+        <div className="w-full max-w-sm animate-fade-in">
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="w-12 h-12 rounded-2xl bg-primary-600 flex items-center justify-center mx-auto mb-3">
+              <span className="text-white font-bold text-xl">P</span>
+            </div>
+            <h1 className="text-xl font-bold text-warm-900">Pinlooply</h1>
+          </div>
+
+          <h2 className="text-2xl font-bold text-warm-900 mb-2">Create your account ✨</h2>
+          <p className="text-warm-500 mb-8">Get started for free. No credit card required.</p>
+
+          {/* Google button */}
+          <button onClick={handleGoogle} disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-3 bg-white border border-warm-200 rounded-xl px-4 py-3 text-sm font-semibold text-warm-800 hover:bg-warm-50 hover:border-warm-300 transition-all shadow-warm-sm disabled:opacity-60 mb-6">
             <GoogleIcon />
             {googleLoading ? 'Redirecting...' : 'Continue with Google'}
           </button>
 
-          <div className="flex items-center my-6">
-            <div className="flex-1 border-t border-gray-200" />
-            <span className="mx-4 text-sm text-gray-400">or</span>
-            <div className="flex-1 border-t border-gray-200" />
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex-1 h-px bg-warm-200" />
+            <span className="text-sm text-warm-400 font-medium">or</span>
+            <div className="flex-1 h-px bg-warm-200" />
           </div>
 
           <form onSubmit={handleSignup} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full name</label>
-              <input
-                type="text"
-                required
-                value={form.name}
-                onChange={set('name')}
-                placeholder="Jane Smith"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
+              <label className="label">Full name</label>
+              <input type="text" required value={form.name} onChange={set('name')}
+                placeholder="Jane Smith" className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                required
-                value={form.email}
-                onChange={set('email')}
-                placeholder="you@example.com"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
+              <label className="label">Email</label>
+              <input type="email" required value={form.email} onChange={set('email')}
+                placeholder="you@example.com" className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                required
-                value={form.password}
-                onChange={set('password')}
-                placeholder="Min. 8 characters"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
+              <label className="label">Password</label>
+              <input type="password" required value={form.password} onChange={set('password')}
+                placeholder="Min. 8 characters" className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
-              <input
-                type="password"
-                required
-                value={form.confirm}
-                onChange={set('confirm')}
-                placeholder="••••••••"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
+              <label className="label">Confirm password</label>
+              <input type="password" required value={form.confirm} onChange={set('confirm')}
+                placeholder="••••••••" className="input" />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white rounded-lg px-4 py-3 text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
-            >
-              {loading ? 'Creating account...' : 'Create account'}
+            <button type="submit" disabled={loading}
+              className="btn-primary btn-lg w-full mt-2">
+              {loading ? 'Creating account...' : 'Create account →'}
             </button>
           </form>
 
-          <p className="text-xs text-gray-400 text-center mt-4">
-            By signing up you agree to our{' '}
-            <a href="#" className="underline hover:text-gray-600">Terms of Service</a>
-            {' '}and{' '}
-            <a href="#" className="underline hover:text-gray-600">Privacy Policy</a>.
+          <p className="text-center text-sm text-warm-500 mt-6">
+            Already have an account?{' '}
+            <Link to={inviteCode ? `/login?invite=${inviteCode}` : '/login'} className="text-primary-600 font-semibold hover:text-primary-700">Sign in</Link>
           </p>
         </div>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Already have an account?{' '}
-          <Link
-            to={inviteCode ? `/login?invite=${inviteCode}` : '/login'}
-            className="text-indigo-600 font-medium hover:underline"
-          >
-            Sign in
-          </Link>
-        </p>
       </div>
     </div>
   )

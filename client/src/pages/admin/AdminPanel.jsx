@@ -23,23 +23,15 @@ const TABS = [
 ]
 
 // ── Stat card ─────────────────────────────────────────────────
-function StatCard({ label, value, sub, color = 'indigo', icon: Icon }) {
-  const colors = {
-    indigo: 'bg-indigo-50 text-indigo-700',
-    emerald:'bg-emerald-50 text-emerald-700',
-    violet: 'bg-violet-50 text-violet-700',
-    amber:  'bg-amber-50 text-amber-700',
-    gray:   'bg-gray-50 text-gray-700',
-    red:    'bg-red-50 text-red-700',
-  }
+function StatCard({ label, value, sub, iconBg, iconColor, icon: Icon }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
-      <div className={`w-8 h-8 rounded-lg ${colors[color]} flex items-center justify-center mb-3`}>
-        <Icon className="w-4 h-4" />
+    <div className="card p-4">
+      <div className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center mb-3`}>
+        <Icon className={`w-4 h-4 ${iconColor}`} />
       </div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-xs font-medium text-gray-700 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <p className="text-2xl font-bold text-warm-900">{value}</p>
+      <p className="text-xs font-medium text-warm-900 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-warm-400 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -70,7 +62,6 @@ function AIConfigTab() {
     setConfigs(c => ({ ...c, [plan]: { ...c[plan], [field]: value } }))
   }
 
-  // Auto-set model to first option when provider changes
   function setProvider(plan, provider) {
     const firstModel = data?.providers?.[provider]?.models?.[0] || ''
     setConfigs(c => ({ ...c, [plan]: { provider, model_name: firstModel } }))
@@ -91,51 +82,55 @@ function AIConfigTab() {
     } finally { setSaving(false) }
   }
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-indigo-400 animate-spin" /></div>
+  if (loading) return (
+    <div className="flex justify-center py-20">
+      <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+    </div>
+  )
 
   const providers = Object.entries(data?.providers || {})
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Plan rows */}
       {[
-        { key: 'free', label: 'Free Plan',  badge: 'bg-gray-100 text-gray-600' },
-        { key: 'paid', label: 'Paid Plan',  badge: 'bg-amber-100 text-amber-700' },
-      ].map(({ key, label, badge }) => {
-        const cfg = configs[key]
+        { key: 'free', label: 'Free Plan',  badgeCls: 'badge' },
+        { key: 'paid', label: 'Paid Plan',  badgeCls: 'badge badge-purple' },
+      ].map(({ key, label, badgeCls }) => {
+        const cfg    = configs[key]
         const models = data?.providers?.[cfg.provider]?.models || []
         return (
-          <div key={key} className="bg-white border border-gray-200 rounded-xl p-5">
+          <div key={key} className="card p-5">
             <div className="flex items-center gap-3 mb-4">
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${badge}`}>{label}</span>
+              <span className={badgeCls}>{label}</span>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">AI Provider</label>
+                <label className="label">AI Provider</label>
                 <div className="relative">
                   <select
                     value={cfg.provider}
                     onChange={e => setProvider(key, e.target.value)}
-                    className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8"
+                    className="input appearance-none pr-8"
                   >
                     {providers.map(([pk, pv]) => (
                       <option key={pk} value={pk}>{pv.label}</option>
                     ))}
                   </select>
-                  <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3 pointer-events-none" />
+                  <ChevronDown className="w-4 h-4 text-warm-400 absolute right-2.5 top-3 pointer-events-none" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Model</label>
+                <label className="label">Model</label>
                 <div className="relative">
                   <select
                     value={cfg.model_name}
                     onChange={e => setField(key, 'model_name', e.target.value)}
-                    className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8"
+                    className="input appearance-none pr-8"
                   >
                     {models.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
-                  <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3 pointer-events-none" />
+                  <ChevronDown className="w-4 h-4 text-warm-400 absolute right-2.5 top-3 pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -144,20 +139,20 @@ function AIConfigTab() {
       })}
 
       {/* Provider overview */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Available Providers</h3>
+      <div className="card p-5">
+        <h3 className="section-title mb-3">Available Providers</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {providers.map(([pk, pv]) => {
             const inUse = configs.free.provider === pk || configs.paid.provider === pk
             return (
-              <div key={pk} className={`rounded-xl border p-3 ${inUse ? 'border-indigo-200 bg-indigo-50' : 'border-gray-200 bg-gray-50'}`}>
+              <div key={pk} className={`rounded-xl border p-3 ${inUse ? 'border-primary-200 bg-primary-50' : 'border-warm-200 bg-warm-50'}`}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={`w-2 h-2 rounded-full ${inUse ? 'bg-indigo-500' : 'bg-gray-300'}`} />
-                  <span className="text-xs font-semibold text-gray-800">{pv.label}</span>
+                  <span className={`w-2 h-2 rounded-full ${inUse ? 'bg-primary-500' : 'bg-warm-300'}`} />
+                  <span className="text-xs font-semibold text-warm-900">{pv.label}</span>
                 </div>
                 <div className="space-y-0.5">
                   {pv.models.map(m => (
-                    <p key={m} className="text-[11px] text-gray-500 truncate">{m}</p>
+                    <p key={m} className="text-[11px] text-warm-400 truncate">{m}</p>
                   ))}
                 </div>
               </div>
@@ -170,8 +165,8 @@ function AIConfigTab() {
       <button
         onClick={save}
         disabled={saving}
-        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm ${
-          saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all ${
+          saved ? 'bg-emerald-600 text-white' : 'btn-primary'
         } disabled:opacity-50`}
       >
         {saving   ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
@@ -184,40 +179,43 @@ function AIConfigTab() {
 
 // ── Tab 2: User Stats ─────────────────────────────────────────
 function UserStatsTab({ stats }) {
-  if (!stats) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-indigo-400 animate-spin" /></div>
+  if (!stats) return (
+    <div className="flex justify-center py-20">
+      <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+    </div>
+  )
 
   const { users } = stats
-  const modeRows = Object.entries(users.byMode || {}).filter(([, v]) => v > 0)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Users"     value={users.total}        icon={Users}      color="indigo" />
-        <StatCard label="New This Week"   value={users.newThisWeek}  icon={TrendingUp} color="emerald" />
-        <StatCard label="Free"            value={users.byPlan?.free || 0} icon={Shield} color="gray" />
-        <StatCard label="Paid"            value={users.byPlan?.paid || 0} icon={Crown}  color="amber" />
+        <StatCard label="Total Users"   value={users.total}             icon={Users}      iconBg="bg-primary-100"  iconColor="text-primary-600" />
+        <StatCard label="New This Week" value={users.newThisWeek}       icon={TrendingUp} iconBg="bg-emerald-100"  iconColor="text-emerald-600" />
+        <StatCard label="Free"          value={users.byPlan?.free || 0} icon={Shield}     iconBg="bg-warm-100"     iconColor="text-warm-500" />
+        <StatCard label="Paid"          value={users.byPlan?.paid || 0} icon={Crown}      iconBg="bg-amber-100"    iconColor="text-amber-600" />
       </div>
 
       {/* Mode breakdown */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Users by Mode</h3>
+      <div className="card p-5">
+        <h3 className="section-title mb-4">Users by Mode</h3>
         <div className="space-y-3">
           {[
-            { key: 'personal', label: '👤 Personal', color: 'bg-gray-400' },
-            { key: 'group',    label: '👥 Group',    color: 'bg-indigo-500' },
-            { key: 'team',     label: '🏢 Team',     color: 'bg-violet-500' },
+            { key: 'personal', label: '👤 Personal', color: 'bg-warm-400' },
+            { key: 'group',    label: '👥 Group',    color: 'bg-primary-500' },
+            { key: 'team',     label: '🏢 Team',     color: 'bg-primary-700' },
             { key: 'org',      label: '🏗️ Org',      color: 'bg-amber-500'  },
           ].map(({ key, label, color }) => {
             const count = users.byMode?.[key] || 0
-            const pct = users.total > 0 ? Math.round((count / users.total) * 100) : 0
+            const pct   = users.total > 0 ? Math.round((count / users.total) * 100) : 0
             return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-700">{label}</span>
-                  <span className="text-xs font-semibold text-gray-900">{count} <span className="text-gray-400 font-normal">({pct}%)</span></span>
+                  <span className="text-xs text-warm-900">{label}</span>
+                  <span className="text-xs font-semibold text-warm-900">{count} <span className="text-warm-400 font-normal">({pct}%)</span></span>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
                 </div>
               </div>
@@ -226,34 +224,32 @@ function UserStatsTab({ stats }) {
         </div>
       </div>
 
-      {/* Recent signups */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900">Recent Signups</h3>
+      {/* Recent signups table */}
+      <div className="card overflow-hidden">
+        <div className="px-5 py-3 border-b border-warm-100">
+          <h3 className="section-title">Recent Signups</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="bg-gray-50">
+            <thead className="bg-warm-50">
               <tr>
                 {['Email', 'Name', 'Mode', 'Plan', 'Joined'].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  <th key={h} className="px-4 py-2.5 text-left font-semibold text-warm-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(users.recent || []).map(u => (
-                <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 text-gray-800 font-medium">{u.email}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{u.name || '—'}</td>
+            <tbody className="divide-y divide-warm-100">
+              {(users.recent || []).map((u, idx) => (
+                <tr key={u.id} className={`hover:bg-warm-50 transition-colors ${idx % 2 === 1 ? 'bg-warm-50/40' : ''}`}>
+                  <td className="px-4 py-2.5 text-warm-900 font-medium">{u.email}</td>
+                  <td className="px-4 py-2.5 text-warm-500">{u.name || '—'}</td>
                   <td className="px-4 py-2.5">
-                    <span className="capitalize px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-[11px] font-medium">{u.mode}</span>
+                    <span className="badge capitalize">{u.mode}</span>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`capitalize px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                      u.plan === 'paid' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-600'
-                    }`}>{u.plan}</span>
+                    <span className={`badge capitalize ${u.plan === 'paid' ? 'badge-purple' : ''}`}>{u.plan}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-gray-400">
+                  <td className="px-4 py-2.5 text-warm-400">
                     {u.created_at ? format(parseISO(u.created_at), 'MMM d, yyyy') : '—'}
                   </td>
                 </tr>
@@ -268,50 +264,52 @@ function UserStatsTab({ stats }) {
 
 // ── Tab 3: Usage Stats ────────────────────────────────────────
 function UsageStatsTab({ stats }) {
-  if (!stats) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-indigo-400 animate-spin" /></div>
+  if (!stats) return (
+    <div className="flex justify-center py-20">
+      <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+    </div>
+  )
 
   const { content, users } = stats
 
-  // Rough AI cost estimate: groq free ≈ $0, claude ≈ $0.003/1k tokens, avg 2k tokens/call
-  const paidUsers = users?.byPlan?.paid || 0
-  const freeUsers = (users?.total || 0) - paidUsers
-  // Estimate calls: discussions processed per user per week
+  const paidUsers    = users?.byPlan?.paid || 0
+  const freeUsers    = (users?.total || 0) - paidUsers
   const estPaidCalls = paidUsers * 10
   const estFreeCalls = freeUsers * 10
   const estCostUSD   = (estPaidCalls * 2 * 0.003).toFixed(2)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Content stats */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard label="Discussions"  value={content.discussions || 0} icon={MessageSquare} color="indigo" />
-        <StatCard label="Tasks"        value={content.tasks        || 0} icon={CheckSquare2}  color="emerald" />
-        <StatCard label="Topics"       value={content.topics       || 0} icon={GitBranch}     color="violet" />
-        <StatCard label="Projects"     value={content.projects     || 0} icon={FolderOpen}    color="gray" />
-        <StatCard label="Conflicts"    value={content.conflicts    || 0} icon={AlertCircle}   color="red" />
+        <StatCard label="Discussions" value={content.discussions || 0} icon={MessageSquare} iconBg="bg-primary-100"  iconColor="text-primary-600" />
+        <StatCard label="Tasks"       value={content.tasks        || 0} icon={CheckSquare2}  iconBg="bg-emerald-100"  iconColor="text-emerald-600" />
+        <StatCard label="Topics"      value={content.topics       || 0} icon={GitBranch}     iconBg="bg-primary-100"  iconColor="text-primary-600" />
+        <StatCard label="Projects"    value={content.projects     || 0} icon={FolderOpen}    iconBg="bg-warm-100"     iconColor="text-warm-500" />
+        <StatCard label="Conflicts"   value={content.conflicts    || 0} icon={AlertCircle}   iconBg="bg-red-100"      iconColor="text-red-500" />
       </div>
 
       {/* AI usage estimate */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">AI Usage Estimate (This Month)</h3>
+      <div className="card p-5">
+        <h3 className="section-title mb-4">AI Usage Estimate (This Month)</h3>
         <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="text-center p-3 bg-gray-50 rounded-xl">
-            <p className="text-xl font-bold text-gray-900">{estFreeCalls}</p>
-            <p className="text-xs text-gray-500 mt-1">Est. Groq calls</p>
+          <div className="text-center p-3 bg-warm-50 rounded-xl border border-warm-100">
+            <p className="text-xl font-bold text-warm-900">{estFreeCalls}</p>
+            <p className="text-xs text-warm-500 mt-1">Est. Groq calls</p>
             <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Free tier</p>
           </div>
-          <div className="text-center p-3 bg-amber-50 rounded-xl">
-            <p className="text-xl font-bold text-gray-900">{estPaidCalls}</p>
-            <p className="text-xs text-gray-500 mt-1">Est. Claude calls</p>
+          <div className="text-center p-3 bg-amber-50 rounded-xl border border-amber-100">
+            <p className="text-xl font-bold text-warm-900">{estPaidCalls}</p>
+            <p className="text-xs text-warm-500 mt-1">Est. Claude calls</p>
             <p className="text-[11px] text-amber-600 font-medium mt-0.5">Paid tier</p>
           </div>
-          <div className="text-center p-3 bg-indigo-50 rounded-xl">
-            <p className="text-xl font-bold text-gray-900">${estCostUSD}</p>
-            <p className="text-xs text-gray-500 mt-1">Est. AI cost</p>
-            <p className="text-[11px] text-indigo-600 font-medium mt-0.5">This month</p>
+          <div className="text-center p-3 bg-primary-50 rounded-xl border border-primary-100">
+            <p className="text-xl font-bold text-warm-900">${estCostUSD}</p>
+            <p className="text-xs text-warm-500 mt-1">Est. AI cost</p>
+            <p className="text-[11px] text-primary-600 font-medium mt-0.5">This month</p>
           </div>
         </div>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-warm-400">
           Estimates based on {users?.total || 0} users × ~10 AI calls/week × ~2k tokens/call. Actual costs depend on real usage.
         </p>
       </div>
@@ -324,7 +322,7 @@ function PlanManagementTab() {
   const [search,   setSearch]   = useState('')
   const [users,    setUsers]    = useState([])
   const [loading,  setLoading]  = useState(false)
-  const [updating, setUpdating] = useState(null) // userId being updated
+  const [updating, setUpdating] = useState(null)
 
   const load = useCallback(async (q = '') => {
     setLoading(true)
@@ -356,29 +354,26 @@ function PlanManagementTab() {
   const MODE_OPTIONS = ['personal', 'group', 'team', 'org']
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in">
       {/* Search */}
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-warm-400 absolute left-3 top-2.5" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by email…"
-            className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+            className="input pl-9"
           />
         </div>
-        <button
-          type="submit"
-          className="px-4 py-2.5 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 transition-colors"
-        >
+        <button type="submit" className="btn-primary px-4">
           Search
         </button>
         <button
           type="button"
           onClick={() => { setSearch(''); load('') }}
-          className="px-3 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
+          className="btn-ghost p-2.5"
           title="Refresh"
         >
           <RefreshCw className="w-4 h-4" />
@@ -386,37 +381,37 @@ function PlanManagementTab() {
       </form>
 
       {/* User table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="card overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+            <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="bg-gray-50">
+              <thead className="bg-warm-50">
                 <tr>
                   {['Email', 'Name', 'Mode', 'Plan', 'Joined', 'Actions'].map(h => (
-                    <th key={h} className="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                    <th key={h} className="px-4 py-2.5 text-left font-semibold text-warm-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-warm-100">
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No users found</td>
+                    <td colSpan={6} className="px-4 py-8 text-center text-warm-400">No users found</td>
                   </tr>
                 )}
-                {users.map(u => (
-                  <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{u.email}</td>
-                    <td className="px-4 py-3 text-gray-600">{u.name || '—'}</td>
+                {users.map((u, idx) => (
+                  <tr key={u.id} className={`hover:bg-warm-50 transition-colors ${idx % 2 === 1 ? 'bg-warm-50/40' : ''}`}>
+                    <td className="px-4 py-3 font-medium text-warm-900">{u.email}</td>
+                    <td className="px-4 py-3 text-warm-500">{u.name || '—'}</td>
                     <td className="px-4 py-3">
                       <select
                         value={u.mode}
                         disabled={!!updating}
                         onChange={e => updatePlan(u.id, u.plan, e.target.value)}
-                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                        className="input py-1 text-xs"
                       >
                         {MODE_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
@@ -426,20 +421,20 @@ function PlanManagementTab() {
                         value={u.plan}
                         disabled={!!updating}
                         onChange={e => updatePlan(u.id, e.target.value, u.mode)}
-                        className={`text-xs border rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-300 ${
-                          u.plan === 'paid' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white'
+                        className={`input py-1 text-xs ${
+                          u.plan === 'paid' ? 'border-amber-200 bg-amber-50 text-amber-700' : ''
                         }`}
                       >
                         <option value="free">free</option>
                         <option value="paid">paid</option>
                       </select>
                     </td>
-                    <td className="px-4 py-3 text-gray-400">
+                    <td className="px-4 py-3 text-warm-400">
                       {u.created_at ? format(parseISO(u.created_at), 'MMM d, yyyy') : '—'}
                     </td>
                     <td className="px-4 py-3">
                       {updating === u.id
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary-600" />
                         : (
                           <div className="flex gap-1">
                             <button
@@ -451,7 +446,7 @@ function PlanManagementTab() {
                             </button>
                             <button
                               onClick={() => updatePlan(u.id, 'free', 'personal')}
-                              className="text-[11px] bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors"
+                              className="text-[11px] bg-warm-50 text-warm-500 border border-warm-200 px-2 py-1 rounded-lg hover:bg-warm-100 transition-colors"
                               title="Downgrade to Personal (free)"
                             >
                               ↓ Free
@@ -481,8 +476,6 @@ export default function AdminPanel() {
   const [denied,  setDenied]  = useState(false)
 
   useEffect(() => {
-    // Quick client-side guard using VITE_ADMIN_EMAIL
-    // Server enforces the real check — this just avoids an unnecessary API call
     if (ADMIN_EMAIL && user?.email && user.email !== ADMIN_EMAIL) {
       setDenied(true)
       setLoading(false)
@@ -500,7 +493,7 @@ export default function AdminPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full py-32">
-        <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
+        <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
       </div>
     )
   }
@@ -511,9 +504,9 @@ export default function AdminPanel() {
         <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-4">
           <Shield className="w-8 h-8 text-red-400" />
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Admin Access Only</h2>
-        <p className="text-sm text-gray-500 mb-6">You don't have permission to access this page.</p>
-        <button onClick={() => navigate('/dashboard')} className="text-sm text-indigo-600 hover:underline">
+        <h2 className="text-xl font-bold text-warm-900 mb-2">Admin Access Only</h2>
+        <p className="text-sm text-warm-500 mb-6">You don't have permission to access this page.</p>
+        <button onClick={() => navigate('/dashboard')} className="btn-ghost text-sm text-primary-600">
           ← Back to Dashboard
         </button>
       </div>
@@ -524,31 +517,19 @@ export default function AdminPanel() {
     <div className="h-full flex flex-col px-6 py-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
-          <Settings className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
-          <p className="text-xs text-gray-400">Pinlooply management console</p>
-        </div>
-        <span className="ml-auto text-[11px] bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full font-semibold">
-          Admin Only
-        </span>
+        <h1 className="text-2xl font-bold text-warm-900">Admin Panel 🛡️</h1>
+        <span className="badge">Admin</span>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
+      {/* Tab navigation */}
+      <div className="flex gap-1.5 mb-6 flex-wrap">
         {TABS.map(t => {
           const Icon = t.icon
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                tab === t.id
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={`tab-pill flex items-center gap-2 ${tab === t.id ? 'active' : 'inactive'}`}
             >
               <Icon className="w-3.5 h-3.5" />
               {t.label}

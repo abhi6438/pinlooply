@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProjectStore } from '../stores/useProjectStore'
 import { discussionsApi } from '../services/api'
-import { Send, ChevronDown, CheckCircle2, Loader2 } from 'lucide-react'
+import { CheckCircle2, Loader2, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const SOURCES = [
@@ -25,13 +25,13 @@ const PROCESSING_STEPS = [
 function ProcessingOverlay({ currentStep }) {
   return (
     <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-8 w-full max-w-sm mx-4">
+      <div className="bg-white rounded-2xl border border-warm-200 shadow-xl p-8 w-full max-w-sm mx-4">
         <div className="flex items-center justify-center mb-6">
-          <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+          <div className="w-14 h-14 rounded-full bg-primary-50 flex items-center justify-center">
+            <Loader2 className="w-7 h-7 text-primary-600 animate-spin" />
           </div>
         </div>
-        <h2 className="text-center font-semibold text-gray-900 mb-6">Processing with AI...</h2>
+        <h2 className="text-center font-semibold text-warm-900 mb-6">Processing with AI...</h2>
         <div className="space-y-3">
           {PROCESSING_STEPS.map((step, i) => {
             const done = i < currentStep
@@ -40,7 +40,7 @@ function ProcessingOverlay({ currentStep }) {
               <div
                 key={step}
                 className={`flex items-center gap-3 text-sm transition-all duration-300 ${
-                  done ? 'text-green-600' : active ? 'text-indigo-600 font-medium' : 'text-gray-300'
+                  done ? 'text-green-600' : active ? 'text-primary-600 font-medium' : 'text-warm-200'
                 }`}
               >
                 {done ? (
@@ -48,7 +48,7 @@ function ProcessingOverlay({ currentStep }) {
                 ) : active ? (
                   <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
                 ) : (
-                  <div className="w-4 h-4 rounded-full border-2 border-gray-200 flex-shrink-0" />
+                  <div className="w-4 h-4 rounded-full border-2 border-warm-200 flex-shrink-0" />
                 )}
                 {step}
               </div>
@@ -142,82 +142,88 @@ export default function LogDiscussion() {
     <>
       {processing && <ProcessingOverlay currentStep={step} />}
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Log Discussion</h1>
-          <p className="text-gray-500 mt-1 text-sm">Paste notes, Slack threads, or type what happened — AI will extract everything.</p>
+      <div className="max-w-3xl mx-auto px-6 py-8 animate-fade-in">
+        {/* Header */}
+        <div className="mb-7">
+          <h1 className="text-2xl font-bold text-warm-900">Log Discussion 💬</h1>
+          <p className="text-warm-500 mt-1 text-sm">Tell Pinloop what happened — AI will handle the rest.</p>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <div className="card space-y-5">
+          {/* Source pill toggle */}
+          <div>
+            <label className="label mb-2">Source</label>
+            <div className="flex flex-wrap gap-2 mb-1">
+              {SOURCES.map(s => (
+                <button
+                  key={s.value}
+                  onClick={() => setSource(s.value)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    source === s.value
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'bg-white border border-warm-200 text-warm-600 hover:border-primary-300 hover:text-primary-600'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Textarea */}
           <div>
+            <label className="label mb-2">Discussion</label>
             <textarea
               ref={textareaRef}
               value={text}
               onChange={handleTextChange}
               onKeyDown={onKeyDown}
-              placeholder="What happened today? Paste your discussion, meeting notes, or Slack messages here..."
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none min-h-[160px] leading-relaxed"
+              placeholder="What happened today? Describe your meeting, standup, or team discussion... 💬"
+              className="input min-h-48 text-base"
               style={{ height: 'auto' }}
             />
-            <div className="flex justify-end mt-1">
-              <span className={`text-xs ${text.length > 4000 ? 'text-red-500' : 'text-gray-400'}`}>
-                {text.length.toLocaleString()} characters
+            <div className="flex justify-end mt-1.5">
+              <span className={`text-xs ${text.length > 4000 ? 'text-red-500' : 'text-warm-400'}`}>
+                {text.length} characters
               </span>
             </div>
           </div>
 
-          {/* Project + Source row */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Project</label>
-              <div className="relative">
-                <select
-                  value={projectId}
-                  onChange={e => setProjectId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white appearance-none pr-8"
-                >
-                  {projects.length === 0 && <option value="">No projects</option>}
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <ChevronDown className="absolute right-2.5 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Source</label>
-              <div className="relative">
-                <select
-                  value={source}
-                  onChange={e => setSource(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white appearance-none pr-8"
-                >
-                  {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-                <ChevronDown className="absolute right-2.5 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
+          {/* Project selector */}
+          <div>
+            <label className="label mb-2">Project</label>
+            <div className="relative">
+              <select
+                value={projectId}
+                onChange={e => setProjectId(e.target.value)}
+                className="input appearance-none pr-9 text-sm"
+              >
+                {projects.length === 0 && <option value="">No projects</option>}
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-400 pointer-events-none" />
             </div>
           </div>
 
           {/* Submit */}
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs text-gray-400 hidden sm:block">
-              Press <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600 font-mono text-xs">⌘ Enter</kbd> to process
+          <div className="flex items-center justify-between pt-1 gap-3">
+            <span className="text-xs text-warm-400 hidden sm:block">
+              Press <kbd className="px-1.5 py-0.5 bg-warm-100 rounded text-warm-600 font-mono text-xs border border-warm-200">⌘ Enter</kbd> to process
             </span>
             <button
               onClick={handleSubmit}
               disabled={!text.trim() || !projectId || processing}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-40 ml-auto"
+              className="btn-primary btn-lg w-full sm:w-auto"
             >
-              <Send className="w-4 h-4" />
-              Process with AI →
+              Process with AI ✨
             </button>
           </div>
         </div>
 
         {/* Tips */}
-        <div className="mt-6 bg-indigo-50 rounded-xl p-4">
-          <p className="text-xs font-semibold text-indigo-700 mb-2">💡 Tips for better results</p>
-          <ul className="text-xs text-indigo-600 space-y-1">
+        <div className="mt-6 bg-primary-50 rounded-2xl p-5 border border-primary-100">
+          <p className="text-xs font-semibold text-primary-700 mb-2">💡 Tips for better results</p>
+          <ul className="text-xs text-primary-600 space-y-1.5">
             <li>• Include names when assigning tasks ("John will fix the login bug")</li>
             <li>• Mention dates for deadlines ("deploy by Friday")</li>
             <li>• Paste full Slack threads or meeting notes for richer extraction</li>
