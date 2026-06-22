@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 import {
   AlertTriangle, Clock, ChevronRight, Send, Loader2,
   CheckCircle2, Circle, Zap, FolderOpen, Users,
+  ClipboardList, FlaskConical, ArrowRight,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -189,6 +190,94 @@ function PriorityTask({ task, onToggle }) {
   )
 }
 
+// ── Morning Briefing Widget ───────────────────────────────────
+function MorningBriefing({ tasks, projects, userName }) {
+  const navigate = useNavigate()
+  const now = new Date()
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+
+  const projectTaskMap = {}
+  for (const t of tasks) {
+    if (!t.project_id || t.status === 'done') continue
+    if (!projectTaskMap[t.project_id]) {
+      const proj = projects.find(p => p.id === t.project_id)
+      projectTaskMap[t.project_id] = { name: proj?.name || 'Unknown', overdue: [], dueSoon: [] }
+    }
+    if (t.due_date) {
+      const due = new Date(t.due_date)
+      if (due < now) projectTaskMap[t.project_id].overdue.push(t)
+      else if (due <= tomorrow) projectTaskMap[t.project_id].dueSoon.push(t)
+    }
+  }
+
+  const attentionItems = []
+  for (const info of Object.values(projectTaskMap)) {
+    if (info.overdue.length > 0) {
+      attentionItems.push({ label: info.name, detail: `${info.overdue.length} overdue`, color: 'text-red-600', bg: 'bg-red-50', dot: 'bg-red-500' })
+    } else if (info.dueSoon.length > 0) {
+      attentionItems.push({ label: info.name, detail: `${info.dueSoon.length} due today`, color: 'text-orange-600', bg: 'bg-orange-50', dot: 'bg-orange-400' })
+    }
+  }
+
+  const pendingTests = tasks.filter(t => t.type === 'test_case' && t.status !== 'done')
+  const testsByProject = pendingTests.reduce((acc, t) => {
+    const name = projects.find(p => p.id === t.project_id)?.name || 'Unknown'
+    acc[name] = (acc[name] || 0) + 1
+    return acc
+  }, {})
+
+  if (!attentionItems.length && !pendingTests.length) return null
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+        <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Morning Briefing</p>
+      </div>
+      <div className="p-4 space-y-4">
+        {attentionItems.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🔴 Needs Attention</p>
+            <div className="space-y-1.5">
+              {attentionItems.map((item, i) => (
+                <div key={i} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg ${item.bg}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${item.dot}`} />
+                  <span className="text-xs font-medium text-gray-800 truncate flex-1">{item.label}</span>
+                  <span className={`text-xs ${item.color} flex-shrink-0`}>{item.detail}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => navigate('/standup')}
+          className="w-full flex items-center gap-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 rounded-xl px-3 py-2.5 transition-colors group"
+        >
+          <ClipboardList className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+          <div className="text-left flex-1 min-w-0">
+            <p className="text-xs font-semibold text-indigo-800">Today's Standup</p>
+            <p className="text-xs text-indigo-500">Generate with AI →</p>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+        {pendingTests.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🧪 Test Cases Due</p>
+            <div className="space-y-1.5">
+              {Object.entries(testsByProject).map(([name, count]) => (
+                <div key={name} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-purple-50">
+                  <FlaskConical className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                  <span className="text-xs text-gray-700 truncate flex-1">{name}</span>
+                  <span className="text-xs text-purple-600 font-medium">{count} pending</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Who's Working On What ─────────────────────────────────────
 function WhoSection({ group }) {
   const navigate = useNavigate()
@@ -313,8 +402,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right — Who's working + Project health */}
+        {/* Right — Briefing + Who's working + Project health */}
         <div className="space-y-6">
+          <MorningBriefing tasks={tasks} projects={projects} userName={userName} />
           {group && <WhoSection group={group} />}
           <div>
           <h2 className="text-sm font-semibold text-gray-900 mb-4">Project Health</h2>

@@ -96,3 +96,7 @@ export const notificationsApi = {
   markRead: (id) => api.patch(`/api/notifications/${id}/read`),
   markAllRead: () => api.patch('/api/notifications/read-all'),
 }
+
+export const standupApi = {
+  generate: () => api.post('/api/standup/generate'),
+}

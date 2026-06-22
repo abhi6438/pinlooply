@@ -8,7 +8,7 @@ import { notificationsApi } from '../../services/api'
 import {
   LayoutDashboard, MessageSquarePlus, FolderOpen, ListChecks,
   CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
-  Bell, CheckCheck,
+  Bell, CheckCheck, ClipboardList,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -21,6 +21,7 @@ function getNavItems(mode) {
     { to: '/projects',   icon: FolderOpen,        label: 'Projects' },
     { to: '/lists',      icon: ListChecks,        label: 'Lists' },
     { to: '/timeline',   icon: CalendarDays,      label: 'Timeline' },
+    { to: '/standup',    icon: ClipboardList,     label: 'Standup' },
   ]
   if (mode === 'team' || mode === 'org') {
     items.push({ to: '/team', icon: Users, label: 'Team' })

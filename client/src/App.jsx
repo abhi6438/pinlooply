@@ -22,6 +22,7 @@ import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import JoinGroup from './pages/JoinGroup'
 import GroupMembers from './pages/GroupMembers'
+import Standup from './pages/Standup'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -107,6 +108,11 @@ function AppRoutes() {
       <Route path="/team" element={
         <ProtectedRoute>
           <AppLayout><GroupMembers /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/standup" element={
+        <ProtectedRoute>
+          <AppLayout><Standup /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/settings" element={
