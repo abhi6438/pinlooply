@@ -18,6 +18,10 @@ import Topics from './pages/Topics'
 import TopicDetail from './pages/TopicDetail'
 import Lists from './pages/Lists'
 import Timeline from './pages/Timeline'
+import Projects from './pages/Projects'
+import ProjectDetail from './pages/ProjectDetail'
+import JoinGroup from './pages/JoinGroup'
+import GroupMembers from './pages/GroupMembers'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -69,12 +73,12 @@ function AppRoutes() {
       } />
       <Route path="/projects" element={
         <ProtectedRoute>
-          <AppLayout><Placeholder title="Projects" /></AppLayout>
+          <AppLayout><Projects /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/projects/:id" element={
         <ProtectedRoute>
-          <AppLayout><Placeholder title="Project Detail" /></AppLayout>
+          <AppLayout><ProjectDetail /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/topics" element={
@@ -97,9 +101,12 @@ function AppRoutes() {
           <AppLayout><Timeline /></AppLayout>
         </ProtectedRoute>
       } />
+      {/* Public invite page — no auth wrapper */}
+      <Route path="/invite/:inviteCode" element={<JoinGroup />} />
+
       <Route path="/team" element={
         <ProtectedRoute>
-          <AppLayout><Placeholder title="Team" /></AppLayout>
+          <AppLayout><GroupMembers /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/settings" element={

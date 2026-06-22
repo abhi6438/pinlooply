@@ -1,7 +1,8 @@
 import axios from 'axios'
 import { supabase } from '../config/supabase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+// Empty string = relative paths (/api/*) — Vite proxy in dev, Vercel routing in prod
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 const api = axios.create({ baseURL: API_URL })
 
@@ -13,6 +14,25 @@ api.interceptors.request.use(async (config) => {
   }
   return config
 })
+
+export const groupsApi = {
+  list: () => api.get('/api/groups'),
+  create: (payload) => api.post('/api/groups', payload),
+  get: (groupId) => api.get(`/api/groups/${groupId}`),
+  validateInvite: (inviteCode) => api.get(`/api/groups/invite/${inviteCode}`),
+  join: (groupId, invite_code) => api.post(`/api/groups/${groupId}/join`, { invite_code }),
+  inviteMember: (groupId, email) => api.post(`/api/groups/${groupId}/members`, { email }),
+  updateRole: (groupId, memberId, role) => api.patch(`/api/groups/${groupId}/members/${memberId}`, { role }),
+  removeMember: (groupId, memberId) => api.delete(`/api/groups/${groupId}/members/${memberId}`),
+}
+
+export const projectsApi = {
+  list: () => api.get('/api/projects'),
+  create: (payload) => api.post('/api/projects', payload),
+  update: (projectId, payload) => api.patch(`/api/projects/${projectId}`, payload),
+  archive: (projectId) => api.delete(`/api/projects/${projectId}`),
+  stats: (projectId) => api.get(`/api/projects/${projectId}/stats`),
+}
 
 export const timelineApi = {
   list: (params = {}) => {
