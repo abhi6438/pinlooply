@@ -15,32 +15,17 @@ async function getMember(groupId, userId) {
   return data
 }
 
-// ── Helper: find user by email (public.users → auth fallback) ─────
+// ── Helper: find user by email in public.users ────────────────────
+// The trigger handle_new_user() populates public.users.email on signup,
+// so this is the single reliable source of truth.
+// Dropping the auth.admin.listUsers() fallback — it times out in Vercel serverless.
 async function findUserByEmail(email) {
-  const normalized = email.trim().toLowerCase()
-
-  // Primary: look in public.users
-  const { data: publicUser } = await supabaseAdmin
+  const { data } = await supabaseAdmin
     .from('users')
     .select('id, name, email')
-    .eq('email', normalized)
+    .eq('email', email.trim().toLowerCase())
     .maybeSingle()
-
-  if (publicUser) return publicUser
-
-  // Fallback: search auth.users (handles users who signed up but haven't set email in public profile)
-  const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-  if (authErr) throw new Error(`Auth lookup failed: ${authErr.message}`)
-
-  const authUser = authData?.users?.find(u => u.email?.toLowerCase() === normalized)
-  if (!authUser) return null
-
-  // Return a compatible shape
-  return {
-    id: authUser.id,
-    email: authUser.email,
-    name: authUser.user_metadata?.full_name || authUser.email,
-  }
+  return data  // null if not found
 }
 
 // ── POST /api/groups — create group + add owner ───────────────────
