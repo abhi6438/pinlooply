@@ -24,6 +24,7 @@ import JoinGroup from './pages/JoinGroup'
 import GroupMembers from './pages/GroupMembers'
 import Standup from './pages/Standup'
 import WeeklySummary from './pages/WeeklySummary'
+import Plan from './pages/settings/Plan'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -123,7 +124,12 @@ function AppRoutes() {
       } />
       <Route path="/settings" element={
         <ProtectedRoute>
-          <AppLayout><Placeholder title="Settings" /></AppLayout>
+          <AppLayout><Plan /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/plan" element={
+        <ProtectedRoute>
+          <AppLayout><Plan /></AppLayout>
         </ProtectedRoute>
       } />
     </Routes>

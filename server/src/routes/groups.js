@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { supabaseAdmin } from '../config/supabase.js'
+import { checkMemberLimit } from '../middleware/planCheck.js'
 
 const router = Router()
 
@@ -160,7 +161,7 @@ router.post('/:groupId/join', requireAuth, async (req, res) => {
 })
 
 // ── POST /api/groups/:groupId/members — invite by email ──────────
-router.post('/:groupId/members', requireAuth, async (req, res) => {
+router.post('/:groupId/members', requireAuth, checkMemberLimit, async (req, res) => {
   try {
     const userId = req.user.id
     const { groupId } = req.params

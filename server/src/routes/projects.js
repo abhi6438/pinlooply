@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { supabaseAdmin } from '../config/supabase.js'
+import { checkProjectLimit } from '../middleware/planCheck.js'
 
 const router = Router()
 
@@ -101,7 +102,7 @@ router.get('/', requireAuth, async (req, res) => {
 })
 
 // ── POST /api/projects — create project ───────────────────────────
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, checkProjectLimit, async (req, res) => {
   const userId = req.user.id
   const { name, description, color } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' })

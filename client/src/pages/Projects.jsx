@@ -6,6 +6,10 @@ import {
   MoreVertical, Archive, Pencil, X, Loader2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { UpgradeBanner } from '../components/shared/UpgradeGate'
+
+// Free plan project limit (mirrors server PLAN_LIMITS)
+const FREE_PROJECT_LIMIT = 3
 
 // ── Constants ─────────────────────────────────────────────────────
 const COLORS = [
@@ -201,9 +205,10 @@ function ProjectCard({ project, onEdit, onArchive }) {
 
 // ── Main ──────────────────────────────────────────────────────────
 export default function Projects() {
-  const [projects, setProjects] = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [modal,    setModal]    = useState(null) // null | 'create' | project object
+  const [projects,     setProjects]     = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [modal,        setModal]        = useState(null) // null | 'create' | project object
+  const [upgradeMsg,   setUpgradeMsg]   = useState(null) // null | string — shows upgrade banner
 
   useEffect(() => { load() }, [])
 
@@ -222,11 +227,30 @@ export default function Projects() {
       await projectsApi.update(modal.id, payload)
       toast.success('Project updated')
     } else {
-      // Create
-      await projectsApi.create(payload)
-      toast.success('Project created')
+      // Create — may get 403 if plan limit hit
+      try {
+        await projectsApi.create(payload)
+        toast.success('Project created')
+        setUpgradeMsg(null)
+      } catch (err) {
+        if (err.response?.status === 403 && err.response?.data?.upgrade) {
+          setUpgradeMsg(err.response.data.message)
+          setModal(null)
+          return
+        }
+        throw err
+      }
     }
     load()
+  }
+
+  function openCreate() {
+    // Pre-emptive gate: warn before even opening the modal
+    if (projects.length >= FREE_PROJECT_LIMIT) {
+      setUpgradeMsg(`You've reached ${FREE_PROJECT_LIMIT} projects. Upgrade to Group (free) to add more.`)
+      return
+    }
+    setModal('create')
   }
 
   async function handleArchive(project) {
@@ -247,12 +271,23 @@ export default function Projects() {
           <p className="text-xs text-gray-400 mt-0.5">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
         </div>
         <button
-          onClick={() => setModal('create')}
+          onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700"
         >
           <Plus className="w-4 h-4" /> New Project
         </button>
       </div>
+
+      {/* Upgrade banner — shown when project limit hit */}
+      {upgradeMsg && (
+        <div className="mb-4">
+          <UpgradeBanner
+            message={upgradeMsg}
+            plan="group_free"
+            onDismiss={() => setUpgradeMsg(null)}
+          />
+        </div>
+      )}
 
       {/* Grid */}
       {loading ? (
@@ -265,7 +300,7 @@ export default function Projects() {
           <p className="text-sm font-medium text-gray-500">No projects yet</p>
           <p className="text-xs mt-1">Create your first project to get started</p>
           <button
-            onClick={() => setModal('create')}
+            onClick={openCreate}
             className="mt-4 text-sm text-indigo-500 hover:underline"
           >
             + Create project
