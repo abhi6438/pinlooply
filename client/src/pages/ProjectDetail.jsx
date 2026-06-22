@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { projectsApi, topicsApi, tasksApi, timelineApi, discussionsApi } from '../services/api'
+import { projectsApi, topicsApi, tasksApi, timelineApi, discussionsApi, publishApi } from '../services/api'
 import { useProjectStore } from '../stores/useProjectStore'
 import {
   ArrowLeft, FolderOpen, CheckSquare2, Tag, AlertTriangle,
   Users, Settings, LayoutDashboard, Clock, Loader2,
-  MessageSquare, Zap, Archive,
+  MessageSquare, Zap, Archive, Globe, Copy, CheckCheck, EyeOff,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -333,6 +333,18 @@ function SettingsTab({ project, onUpdate, onArchive }) {
   const [description, setDescription] = useState(project.description || '')
   const [color,       setColor]       = useState(project.color || COLORS[0])
   const [saving,      setSaving]      = useState(false)
+  // Publish state
+  const [publishState,  setPublishState]  = useState(null) // { slug, is_active } | null
+  const [publishing,    setPublishing]    = useState(false)
+  const [copiedUrl,     setCopiedUrl]     = useState(false)
+
+  // Load publish status on mount
+  useEffect(() => {
+    if (!project.id) return
+    publishApi.getStatus(project.id)
+      .then(res => setPublishState(res.data.data))
+      .catch(() => {})
+  }, [project.id])
 
   async function handleSave() {
     setSaving(true)
@@ -343,8 +355,45 @@ function SettingsTab({ project, onUpdate, onArchive }) {
     finally { setSaving(false) }
   }
 
+  async function enablePublish() {
+    setPublishing(true)
+    try {
+      const res = await publishApi.enable(project.id)
+      setPublishState({ slug: res.data.data.slug, is_active: true })
+      toast.success('Status page published!')
+    } catch { toast.error('Failed to publish') }
+    finally { setPublishing(false) }
+  }
+
+  async function disablePublish() {
+    setPublishing(true)
+    try {
+      await publishApi.disable(project.id)
+      setPublishState(s => ({ ...s, is_active: false }))
+      toast.success('Status page unpublished')
+    } catch { toast.error('Failed to unpublish') }
+    finally { setPublishing(false) }
+  }
+
+  async function copyLink() {
+    const url = `${window.location.origin}/p/${publishState.slug}`
+    try { await navigator.clipboard.writeText(url) }
+    catch {
+      const ta = document.createElement('textarea')
+      ta.value = url; document.body.appendChild(ta); ta.select()
+      document.execCommand('copy'); document.body.removeChild(ta)
+    }
+    setCopiedUrl(true)
+    toast.success('Link copied!')
+    setTimeout(() => setCopiedUrl(false), 2500)
+  }
+
+  const isPublished = publishState?.is_active && publishState?.slug
+  const publicUrl = publishState?.slug ? `${window.location.origin}/p/${publishState.slug}` : null
+
   return (
     <div className="max-w-lg space-y-6">
+      {/* General settings */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-700">General</h3>
         <div>
@@ -374,6 +423,76 @@ function SettingsTab({ project, onUpdate, onArchive }) {
         </button>
       </div>
 
+      {/* Publish Status Page */}
+      <div className={`bg-white border rounded-xl p-5 space-y-4 ${isPublished ? 'border-emerald-200' : 'border-gray-200'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Globe className={`w-4 h-4 ${isPublished ? 'text-emerald-600' : 'text-gray-400'}`} />
+            <h3 className="text-sm font-semibold text-gray-700">Publish Status Page</h3>
+          </div>
+          {isPublished && (
+            <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Live
+            </span>
+          )}
+        </div>
+
+        <p className="text-xs text-gray-500">
+          Share a public status page showing your project health, open tasks, and recent updates — no login required.
+        </p>
+
+        {isPublished ? (
+          <div className="space-y-3">
+            {/* URL display */}
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+              <span className="text-xs text-gray-600 truncate flex-1 font-mono">{publicUrl}</span>
+              <button
+                onClick={copyLink}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg transition-all flex-shrink-0 ${
+                  copiedUrl ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                }`}
+              >
+                {copiedUrl ? <CheckCheck className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copiedUrl ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <a
+                href={`/p/${publishState.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-indigo-600 hover:underline"
+              >
+                <Globe className="w-3 h-3" /> View page
+              </a>
+              <span className="text-gray-300">|</span>
+              <button
+                onClick={disablePublish}
+                disabled={publishing}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-600 transition-colors"
+              >
+                {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <EyeOff className="w-3 h-3" />}
+                Unpublish
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={enablePublish}
+            disabled={publishing}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+          >
+            {publishing
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing…</>
+              : <><Globe className="w-4 h-4" /> Publish Status Page</>
+            }
+          </button>
+        )}
+      </div>
+
+      {/* Danger Zone */}
       <div className="bg-white border border-red-200 rounded-xl p-5">
         <h3 className="text-sm font-semibold text-red-600 mb-2">Danger Zone</h3>
         <p className="text-xs text-gray-500 mb-3">Archiving hides the project from your workspace. Data is preserved.</p>

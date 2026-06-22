@@ -216,4 +216,89 @@ router.get('/:projectId/stats', requireAuth, async (req, res) => {
   })
 })
 
+// ── Slug generator ────────────────────────────────────────────────
+function generateSlug(name) {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 30)
+    .replace(/-$/, '')
+  const suffix = Math.random().toString(36).slice(2, 6)
+  return `${base}-${suffix}`
+}
+
+// ── POST /api/projects/:projectId/publish ─────────────────────────
+router.post('/:projectId/publish', requireAuth, async (req, res) => {
+  const { projectId } = req.params
+  const userId = req.user.id
+
+  const { data: proj } = await supabaseAdmin
+    .from('projects')
+    .select('user_id, name')
+    .eq('id', projectId)
+    .single()
+
+  if (!proj || proj.user_id !== userId)
+    return res.status(403).json({ error: 'Forbidden' })
+
+  // Check if already published
+  const { data: existing } = await supabaseAdmin
+    .from('publish_pages')
+    .select('id, slug, is_active')
+    .eq('project_id', projectId)
+    .single()
+
+  let slug = existing?.slug
+  if (!slug) slug = generateSlug(proj.name)
+
+  // Upsert publish page
+  const { data, error } = await supabaseAdmin
+    .from('publish_pages')
+    .upsert({ project_id: projectId, slug, is_active: true }, { onConflict: 'project_id' })
+    .select()
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true, data: { slug: data.slug, url: `/p/${data.slug}` } })
+})
+
+// ── DELETE /api/projects/:projectId/publish ───────────────────────
+router.delete('/:projectId/publish', requireAuth, async (req, res) => {
+  const { projectId } = req.params
+  const userId = req.user.id
+
+  const { data: proj } = await supabaseAdmin
+    .from('projects')
+    .select('user_id')
+    .eq('id', projectId)
+    .single()
+
+  if (!proj || proj.user_id !== userId)
+    return res.status(403).json({ error: 'Forbidden' })
+
+  const { error } = await supabaseAdmin
+    .from('publish_pages')
+    .update({ is_active: false })
+    .eq('project_id', projectId)
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true })
+})
+
+// ── GET /api/projects/:projectId/publish-status ───────────────────
+// Returns current publish state for the settings tab
+router.get('/:projectId/publish-status', requireAuth, async (req, res) => {
+  const { projectId } = req.params
+
+  const { data } = await supabaseAdmin
+    .from('publish_pages')
+    .select('slug, is_active')
+    .eq('project_id', projectId)
+    .single()
+
+  res.json({ success: true, data: data || { slug: null, is_active: false } })
+})
+
 export default router

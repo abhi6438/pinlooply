@@ -117,3 +117,9 @@ export const adminApi = {
   getUsers:       (search = '')  => api.get(`/api/admin/users${search ? `?search=${encodeURIComponent(search)}` : ''}`),
   updateUserPlan: (userId, body) => api.patch(`/api/admin/users/${userId}/plan`, body),
 }
+
+export const publishApi = {
+  getStatus: (projectId) => api.get(`/api/projects/${projectId}/publish-status`),
+  enable:    (projectId) => api.post(`/api/projects/${projectId}/publish`),
+  disable:   (projectId) => api.delete(`/api/projects/${projectId}/publish`),
+}

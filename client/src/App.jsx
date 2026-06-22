@@ -26,6 +26,7 @@ import Standup from './pages/Standup'
 import WeeklySummary from './pages/WeeklySummary'
 import Plan from './pages/settings/Plan'
 import AdminPanel from './pages/admin/AdminPanel'
+import PublicProject from './pages/PublicProject'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -107,6 +108,9 @@ function AppRoutes() {
       } />
       {/* Public invite page — no auth wrapper */}
       <Route path="/invite/:inviteCode" element={<JoinGroup />} />
+
+      {/* Public project status page — no auth wrapper */}
+      <Route path="/p/:slug" element={<PublicProject />} />
 
       <Route path="/team" element={
         <ProtectedRoute>
