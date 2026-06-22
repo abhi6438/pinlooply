@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { projectsApi, topicsApi, tasksApi, timelineApi, discussionsApi, publishApi } from '../services/api'
+import GenerateTestCasesButton from '../components/shared/GenerateTestCasesButton'
 import { useProjectStore } from '../stores/useProjectStore'
 import {
   ArrowLeft, FolderOpen, CheckSquare2, Tag, AlertTriangle,
@@ -227,6 +228,7 @@ function TasksTab({ projectId }) {
             <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Priority</th>
             <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
             <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Due</th>
+            <th className="px-4 py-2.5" />
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -247,6 +249,11 @@ function TasksTab({ projectId }) {
                 </td>
                 <td className={`px-4 py-3 text-xs ${overdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
                   {t.due_date ? new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                </td>
+                <td className="px-4 py-3">
+                  {t.type !== 'test_case' && (
+                    <GenerateTestCasesButton taskId={t.id} label="" size="sm" variant="ghost" />
+                  )}
                 </td>
               </tr>
             )

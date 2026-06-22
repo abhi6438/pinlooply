@@ -58,6 +58,7 @@ import summaryRouter from './routes/summary.js'
 import planRouter from './routes/plan.js'
 import adminRouter from './routes/admin.js'
 import publicRouter from './routes/public.js'
+import testCasesRouter from './routes/testcases.js'
 app.use('/api/discussions', discussionsRouter)
 app.use('/api/topics', topicsRouter)
 app.use('/api/tasks', tasksRouter)
@@ -70,6 +71,7 @@ app.use('/api/summary', summaryRouter)
 app.use('/api/plan', planRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/public', publicRouter)
+app.use('/api/testcases', testCasesRouter)
 
 // ── Global JSON error handler — MUST be last ─────────────────────────
 // Catches errors from middleware (e.g. CORS, body-parser) and returns JSON

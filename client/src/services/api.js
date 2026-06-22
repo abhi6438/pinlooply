@@ -123,3 +123,9 @@ export const publishApi = {
   enable:    (projectId) => api.post(`/api/projects/${projectId}/publish`),
   disable:   (projectId) => api.delete(`/api/projects/${projectId}/publish`),
 }
+
+export const testCasesApi = {
+  generate:  (payload)    => api.post('/api/testcases/generate', payload),
+  save:      (payload)    => api.post('/api/testcases/save', payload),
+  list:      (projectId)  => api.get(`/api/testcases/${projectId}`),
+}

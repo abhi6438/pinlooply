@@ -27,6 +27,7 @@ import WeeklySummary from './pages/WeeklySummary'
 import Plan from './pages/settings/Plan'
 import AdminPanel from './pages/admin/AdminPanel'
 import PublicProject from './pages/PublicProject'
+import TestCaseGenerator from './pages/TestCaseGenerator'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -111,6 +112,17 @@ function AppRoutes() {
 
       {/* Public project status page — no auth wrapper */}
       <Route path="/p/:slug" element={<PublicProject />} />
+
+      <Route path="/test-cases" element={
+        <ProtectedRoute>
+          <AppLayout><TestCaseGenerator /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/test-cases/:taskId" element={
+        <ProtectedRoute>
+          <AppLayout><TestCaseGenerator /></AppLayout>
+        </ProtectedRoute>
+      } />
 
       <Route path="/team" element={
         <ProtectedRoute>

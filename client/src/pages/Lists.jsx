@@ -11,6 +11,7 @@ import {
   ArrowUpDown, X, RefreshCw, Pencil, Check, UserCircle, Users,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import GenerateTestCasesButton from '../components/shared/GenerateTestCasesButton'
 
 // ── Constants ─────────────────────────────────────────────────
 const TABS = [
@@ -425,9 +426,12 @@ function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, o
         )}
       </td>
 
-      {/* Edit + Delete */}
-      <td className="pr-4 py-3 w-20">
+      {/* Edit + Delete + Generate Tests */}
+      <td className="pr-4 py-3 w-32">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+          {task.type !== 'test_case' && (
+            <GenerateTestCasesButton taskId={task.id} label="" size="sm" variant="ghost" />
+          )}
           <button onClick={() => setEditing(true)} title="Edit task"
             className="p-1 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded transition-colors">
             <Pencil className="w-3.5 h-3.5" />
