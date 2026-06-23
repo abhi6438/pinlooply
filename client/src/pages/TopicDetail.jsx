@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { topicsApi } from '../services/api'
-import GenerateTestCasesButton from '../components/shared/GenerateTestCasesButton'
 import {
   Tag, ArrowLeft, CheckCircle2, Circle, AlertTriangle,
   MessageSquare, History, ChevronDown, ChevronRight,
@@ -274,7 +273,6 @@ export default function TopicDetail() {
             </div>
             {/* Actions */}
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-              <GenerateTestCasesButton label="Generate Tests" size="sm" variant="outline" />
               <button
                 onClick={() => setDrawerOpen(true)}
                 className="btn-secondary btn-sm"

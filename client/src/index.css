@@ -76,6 +76,11 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
@@ -277,9 +282,10 @@ body {
 
 /* ── Utility Animations ────────────────────────────────────────── */
 @layer utilities {
-  .animate-fade-in  { animation: fadeIn 0.2s ease-out; }
-  .animate-slide-up { animation: slideUp 0.25s ease-out; }
-  .animate-scale-in { animation: scaleIn 0.15s ease-out; }
+  .animate-fade-in        { animation: fadeIn 0.2s ease-out; }
+  .animate-slide-up       { animation: slideUp 0.25s ease-out; }
+  .animate-scale-in       { animation: scaleIn 0.15s ease-out; }
+  .animate-slide-in-right { animation: slideInRight 0.25s ease-out; }
 
   .hover-lift {
     transition: transform 0.15s ease, box-shadow 0.15s ease;

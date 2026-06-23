@@ -6,7 +6,7 @@ import { supabase } from '../config/supabase'
 import {
   CheckCircle2, Tag, ListChecks, AlertTriangle, FileText,
   Trash2, ArrowLeft, Save, Loader2, Pencil, X, Check,
-  UserCircle,
+  UserCircle, FlaskConical, Zap,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../components/ui'
@@ -209,7 +209,7 @@ export default function AIConfirm() {
     setSaving(true)
     try {
       await discussionsApi.save(rawText, projectId, source, { ...aiResult, topics, tasks, conflicts })
-      toast.success('Discussion saved!')
+      toast.success('Saved! Test cases generating in background…')
       navigate(`/projects/${projectId}`)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to save')
@@ -293,6 +293,38 @@ export default function AIConfirm() {
           }
         </div>
 
+        {/* Test Cases — auto-generated after save */}
+        {tasks.length > 0 && (
+          <div className="card animate-fade-in border border-purple-100">
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="section-title">🧪 Test Cases</h2>
+              <span className="ml-auto text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                Auto-generated
+              </span>
+            </div>
+            <div className="bg-purple-50/60 rounded-xl p-4 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Zap className="w-4 h-4 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-purple-900">
+                  {tasks.length * 8}+ test cases will be generated automatically
+                </p>
+                <p className="text-xs text-purple-600 mt-1 leading-relaxed">
+                  After saving, AI will generate happy path, edge case, negative, and UI/UX tests for each of your {tasks.length} task{tasks.length !== 1 ? 's' : ''}. Find them in the <strong>Test Cases</strong> page.
+                </p>
+                <div className="flex gap-2 mt-2.5 flex-wrap">
+                  {['Happy path', 'Edge cases', 'Negative', 'UI/UX'].map(label => (
+                    <span key={label} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-0.5 rounded-full">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Conflicts */}
         {conflicts.length > 0 && (
           <div className="card animate-fade-in">
@@ -327,7 +359,7 @@ export default function AIConfirm() {
       {/* Action bar */}
       <div className="flex gap-3 mt-7 sticky bottom-4">
         <button
-          onClick={() => navigate('/log', { state: { prefilledText: rawText, projectId } })}
+          onClick={() => navigate('/dashboard')}
           className="btn-ghost flex items-center gap-2"
         >
           <ArrowLeft className="w-4 h-4" /> Go Back

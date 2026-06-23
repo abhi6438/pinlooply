@@ -30,6 +30,7 @@ Extract ALL information and return ONLY valid JSON with no explanation or markdo
   "tasks": [
     {
       "title": "task title",
+      "description": "clear description of what needs to be done and why, 1-3 sentences",
       "type": "task|test_case|deployment_check|backlog",
       "priority": "high|medium|low",
       "due_date": "YYYY-MM-DD or null",
@@ -171,6 +172,7 @@ export async function saveDiscussion({ rawText, projectId, userId, source, aiRes
   }
 
   // 4. Create tasks (with optional assignee resolution)
+  const savedTasks = []
   for (const task of aiResult.tasks || []) {
     // Try to resolve assigned_to_name → user UUID via public.users within the project's group
     let assignedTo = null
@@ -185,18 +187,28 @@ export async function saveDiscussion({ rawText, projectId, userId, source, aiRes
       if (matched?.length) assignedTo = matched[0].id
     }
 
-    await supabaseAdmin.from('tasks').insert({
+    const { data: newTask } = await supabaseAdmin.from('tasks').insert({
       project_id: projectId,
       discussion_id: discussion.id,
       topic_id: topicIds[0] || null,
       title: task.title,
+      description: task.description || null,
       type: task.type || 'task',
       priority: task.priority || 'medium',
       due_date: task.due_date || null,
       assigned_to_name: task.assigned_to_name || null,
       assigned_to: assignedTo,
       assigned_by: userId,
-    })
+    }).select('id, title, type').single()
+
+    if (newTask) savedTasks.push(newTask)
+  }
+
+  // 4a. Auto-generate test cases for all saved tasks (fire-and-forget)
+  if (savedTasks.length > 0) {
+    autoGenerateTestCases(userId, projectId, savedTasks).catch(err =>
+      console.error('[saveDiscussion] auto test case generation error:', err.message)
+    )
   }
 
   // 5. Save conflicts
@@ -214,4 +226,59 @@ export async function saveDiscussion({ rawText, projectId, userId, source, aiRes
   }
 
   return discussion
+}
+
+// ── Auto-generate test cases for tasks (background) ───────────
+async function autoGenerateTestCases(userId, projectId, tasks) {
+  const { generateTestCases } = await import('./testCaseService.js')
+  for (const task of tasks) {
+    try {
+      const genResult = await generateTestCases(userId, {
+        taskTitle: task.title,
+        taskType: task.type,
+        projectContext: '',
+      })
+      const testCases = genResult?.test_cases
+      if (!testCases?.length) continue
+
+      // Try with extended columns first; fall back to base columns if they don't exist yet
+      const rowsFull = testCases.map(tc => ({
+        project_id: projectId,
+        title: tc.title,
+        type: 'test_case',
+        status: 'pending',
+        priority: tc.priority || 'medium',
+        assigned_by: userId,
+        category: tc.category || 'happy_path',
+        steps: tc.steps || [],
+        expected_result: tc.expected_result || '',
+        // Store as description too so it's readable even without migration
+        description: [
+          tc.expected_result ? `Expected: ${tc.expected_result}` : '',
+          tc.steps?.length ? `Steps:\n${tc.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : '',
+        ].filter(Boolean).join('\n\n') || null,
+      }))
+
+      const { error } = await supabaseAdmin.from('tasks').insert(rowsFull)
+      if (error) {
+        // Likely missing columns — fall back to base columns only
+        console.warn(`[autoGenerateTestCases] extended insert failed for "${task.title}", trying base columns:`, error.message)
+        const rowsBase = testCases.map(tc => ({
+          project_id: projectId,
+          title: tc.title,
+          type: 'test_case',
+          status: 'pending',
+          priority: tc.priority || 'medium',
+          assigned_by: userId,
+          description: [
+            tc.expected_result ? `Expected: ${tc.expected_result}` : '',
+            tc.steps?.length ? `Steps:\n${tc.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : '',
+          ].filter(Boolean).join('\n\n') || tc.title,
+        }))
+        await supabaseAdmin.from('tasks').insert(rowsBase)
+      }
+    } catch (err) {
+      console.error(`[autoGenerateTestCases] task "${task.title}" failed:`, err.message)
+    }
+  }
 }

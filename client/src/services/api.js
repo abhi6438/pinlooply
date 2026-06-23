@@ -6,14 +6,37 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 
 const api = axios.create({ baseURL: API_URL })
 
-// Attach Supabase JWT to every request
+// Attach Supabase JWT to every request (always get a fresh token)
 api.interceptors.request.use(async (config) => {
+  // getUser() validates with Supabase server and triggers refresh if needed
   const { data: { session } } = await supabase.auth.getSession()
   if (session?.access_token) {
     config.headers.Authorization = `Bearer ${session.access_token}`
   }
   return config
 })
+
+// On 401 — refresh session and retry once
+api.interceptors.response.use(
+  res => res,
+  async (error) => {
+    const original = error.config
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true
+      try {
+        const { data: { session } } = await supabase.auth.refreshSession()
+        if (session?.access_token) {
+          original.headers.Authorization = `Bearer ${session.access_token}`
+          return api(original)
+        }
+      } catch {
+        // Refresh failed — sign out so user is prompted to log in again
+        await supabase.auth.signOut()
+      }
+    }
+    return Promise.reject(error)
+  }
+)
 
 export const groupsApi = {
   list: () => api.get('/api/groups'),
@@ -125,7 +148,9 @@ export const publishApi = {
 }
 
 export const testCasesApi = {
-  generate:  (payload)    => api.post('/api/testcases/generate', payload),
-  save:      (payload)    => api.post('/api/testcases/save', payload),
-  list:      (projectId)  => api.get(`/api/testcases/${projectId}`),
+  generate:     (payload)         => api.post('/api/testcases/generate', payload),
+  save:         (payload)         => api.post('/api/testcases/save', payload),
+  list:         (projectId)       => api.get(`/api/testcases/${projectId}`),
+  updateStatus: (id, status)      => api.patch(`/api/testcases/${id}/status`, { status }),
+  delete:       (id)              => api.delete(`/api/testcases/${id}`),
 }

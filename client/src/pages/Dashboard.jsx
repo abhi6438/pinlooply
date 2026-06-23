@@ -89,11 +89,68 @@ function ProjectCard({ project, taskCount }) {
 }
 
 // ── Quick Log ─────────────────────────────────────────────────
-function QuickLogBox({ projects, userId }) {
+// ── Sources ───────────────────────────────────────────────────
+const SOURCES = [
+  { key: 'manual',          label: 'Manual entry' },
+  { key: 'pasted_slack',    label: 'Slack' },
+  { key: 'pasted_email',    label: 'Email' },
+  { key: 'pasted_whatsapp', label: 'WhatsApp' },
+]
+
+const PROCESSING_STEPS = [
+  'Reading your discussion…',
+  'Detecting topics…',
+  'Extracting tasks…',
+  'Checking for conflicts…',
+  'Done!',
+]
+
+// ── Processing Overlay ─────────────────────────────────────────
+function ProcessingOverlay({ step }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8">
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-4">
+            <Zap className="w-7 h-7 text-primary-600" />
+          </div>
+          <h3 className="text-base font-semibold text-warm-900">Processing with AI ✨</h3>
+          <p className="text-xs text-warm-400 mt-1">This takes just a moment</p>
+        </div>
+        <div className="space-y-3">
+          {PROCESSING_STEPS.map((label, i) => {
+            const done = i < step
+            const active = i === step
+            return (
+              <div key={i} className={`flex items-center gap-3 transition-opacity ${i > step ? 'opacity-30' : 'opacity-100'}`}>
+                <div className="flex-shrink-0">
+                  {done
+                    ? <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    : active
+                      ? <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
+                      : <div className="w-5 h-5 rounded-full border-2 border-warm-200" />
+                  }
+                </div>
+                <span className={`text-sm ${done ? 'text-warm-400 line-through' : active ? 'text-warm-900 font-medium' : 'text-warm-400'}`}>
+                  {label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Log Discussion Box ─────────────────────────────────────────
+function QuickLogBox({ projects }) {
   const navigate = useNavigate()
-  const [text, setText] = useState('')
+  const [text,      setText]      = useState('')
   const [projectId, setProjectId] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [source,    setSource]    = useState('manual')
+  const [saving,    setSaving]    = useState(false)
+  const [step,      setStep]      = useState(0)
 
   useEffect(() => {
     if (projects.length && !projectId) setProjectId(projects[0]?.id || '')
@@ -103,38 +160,81 @@ function QuickLogBox({ projects, userId }) {
     e?.preventDefault()
     if (!text.trim() || !projectId) return
     setSaving(true)
+    setStep(0)
+
+    // Animate through steps while API call runs
+    let currentStep = 0
+    const interval = setInterval(() => {
+      currentStep += 1
+      if (currentStep < PROCESSING_STEPS.length - 1) {
+        setStep(currentStep)
+      } else {
+        clearInterval(interval)
+      }
+    }, 600)
+
     try {
-      const res = await discussionsApi.process(text.trim(), projectId, 'manual')
+      const res = await discussionsApi.process(text.trim(), projectId, source)
+      clearInterval(interval)
+      setStep(PROCESSING_STEPS.length - 1) // "Done!"
+      await new Promise(r => setTimeout(r, 400))
       navigate('/log/confirm', {
-        state: { rawText: text.trim(), projectId, source: 'manual', aiResult: res.data.data }
+        state: { rawText: text.trim(), projectId, source, aiResult: res.data.data }
       })
     } catch (err) {
+      clearInterval(interval)
       toast.error(err?.response?.data?.error || err.message || 'Failed to process')
     } finally {
       setSaving(false)
+      setStep(0)
     }
   }
 
-  function onKeyDown(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSubmit()
-  }
+  const placeholder = {
+    manual:          'What happened today? Describe your meeting, standup, or team discussion…',
+    pasted_slack:    'Paste Slack thread here…',
+    pasted_email:    'Paste email thread here…',
+    pasted_whatsapp: 'Paste WhatsApp chat here…',
+  }[source]
 
   return (
+    <>
+    {saving && <ProcessingOverlay step={step} />}
     <div className="card">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-4">
         <Zap className="w-4 h-4 text-primary-600" />
-        <h2 className="text-sm font-semibold text-warm-900">Quick Log</h2>
+        <h2 className="text-sm font-semibold text-warm-900">Log Discussion</h2>
+        <span className="text-xs text-warm-400 ml-auto">AI extracts topics, tasks &amp; decisions</span>
       </div>
+
+      {/* Source selector */}
+      <div className="flex gap-2 flex-wrap mb-3">
+        {SOURCES.map(s => (
+          <button
+            key={s.key}
+            type="button"
+            onClick={() => setSource(s.key)}
+            className={`text-xs px-3 py-1.5 rounded-xl font-medium border transition-colors ${
+              source === s.key
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-white text-warm-600 border-warm-200 hover:border-primary-300'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       <form onSubmit={handleSubmit}>
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="What happened today? Paste a Slack thread, meeting notes, or anything worth remembering..."
-          rows={4}
+          onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSubmit() }}
+          placeholder={placeholder}
+          rows={5}
           className="input resize-none text-sm"
         />
-        <div className="flex items-center justify-between mt-3 gap-2">
+        <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
             {projects.length > 0 ? (
               <select
@@ -147,7 +247,7 @@ function QuickLogBox({ projects, userId }) {
             ) : (
               <span className="text-xs text-warm-400">No projects yet</span>
             )}
-            <span className="text-xs text-warm-400 hidden sm:inline">⌘+Enter</span>
+            <span className="text-xs text-warm-300 hidden sm:inline">⌘+Enter</span>
           </div>
           <button
             type="submit"
@@ -155,11 +255,12 @@ function QuickLogBox({ projects, userId }) {
             className="btn-primary btn-sm flex items-center gap-2 flex-shrink-0"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            Process with AI
+            Process with AI ✨
           </button>
         </div>
       </form>
     </div>
+    </>
   )
 }
 
@@ -402,7 +503,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left — Quick log + priorities */}
         <div className="lg:col-span-2 space-y-6">
-          <QuickLogBox projects={projects} userId={user?.id} />
+          <QuickLogBox projects={projects} />
 
           <div className="card">
             <h2 className="section-title mb-1">Today's Priorities</h2>

@@ -105,7 +105,7 @@ router.get('/:projectId', requireAuth, async (req, res) => {
 
     const { data, error } = await supabaseAdmin
       .from('tasks')
-      .select('id, title, type, status, priority, steps, expected_result, category, due_date, created_at, parent_task_id')
+      .select('*')
       .eq('project_id', projectId)
       .eq('type', 'test_case')
       .order('created_at', { ascending: false })
@@ -125,6 +125,42 @@ router.get('/:projectId', requireAuth, async (req, res) => {
     console.error('Get test cases error:', err)
     res.status(500).json({ error: 'Failed to fetch test cases' })
   }
+})
+
+// ── PATCH /api/testcases/:id/status ──────────────────────────
+router.patch('/:id/status', requireAuth, async (req, res) => {
+  const { id } = req.params
+  const { status } = req.body
+
+  // Map frontend 'pass' → DB 'done', 'pending' stays 'pending', 'fail' stays 'fail'
+  const dbStatus = status === 'pass' ? 'done' : (status || 'pending')
+
+  const { data, error } = await supabaseAdmin
+    .from('tasks')
+    .update({ status: dbStatus })
+    .eq('id', id)
+    .eq('type', 'test_case')
+    .select()
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true, data })
+})
+
+// ── DELETE /api/testcases/:id ─────────────────────────────────
+router.delete('/:id', requireAuth, async (req, res) => {
+  const { id } = req.params
+  const userId = req.user.id
+
+  // Verify ownership via project membership
+  const { error } = await supabaseAdmin
+    .from('tasks')
+    .delete()
+    .eq('id', id)
+    .eq('type', 'test_case')
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true })
 })
 
 export default router

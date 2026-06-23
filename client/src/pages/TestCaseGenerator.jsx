@@ -1,577 +1,760 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { testCasesApi, projectsApi, tasksApi } from '../services/api'
-import { useProjectStore } from '../stores/useProjectStore'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { projectsApi, testCasesApi, topicsApi, tasksApi } from '../services/api'
 import {
-  FlaskConical, Loader2, ChevronDown, ChevronRight, Pencil,
-  Trash2, Check, X, Copy, RefreshCw, Save, CheckSquare2,
-  Square, AlertTriangle, ArrowLeft,
+  FlaskConical, Plus, Trash2, Loader2, Sparkles, X,
+  CheckCircle2, XCircle, Clock, CheckSquare2, ChevronRight,
+  Calendar, Flag, Tag, AlertCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // ── Constants ─────────────────────────────────────────────────
 const CATEGORIES = [
-  { key: 'all',         label: 'All',        emoji: '📋' },
-  { key: 'happy_path',  label: 'Happy Path', emoji: '✅' },
-  { key: 'edge_case',   label: 'Edge Cases', emoji: '⚠️' },
-  { key: 'negative',    label: 'Negative',   emoji: '❌' },
-  { key: 'ui_ux',       label: 'UI/UX',      emoji: '🎨' },
-  { key: 'performance', label: 'Performance',emoji: '⚡' },
+  { key: 'all',         label: 'All' },
+  { key: 'happy_path',  label: 'Happy Path' },
+  { key: 'edge_case',   label: 'Edge Case' },
+  { key: 'negative',    label: 'Negative' },
+  { key: 'ui_ux',       label: 'UI / UX' },
+  { key: 'performance', label: 'Performance' },
 ]
 
-const CATEGORY_BORDER = {
-  happy_path:  'border-l-4 border-emerald-500',
-  edge_case:   'border-l-4 border-amber-500',
-  negative:    'border-l-4 border-red-500',
-  ui_ux:       'border-l-4 border-primary-500',
-  performance: 'border-l-4 border-blue-500',
+const CAT_META = {
+  happy_path:  { badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400', label: 'Happy Path'  },
+  edge_case:   { badge: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-400',   label: 'Edge Case'   },
+  negative:    { badge: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-400',     label: 'Negative'    },
+  ui_ux:       { badge: 'bg-purple-50 text-purple-700 border-purple-200',    dot: 'bg-purple-400',  label: 'UI / UX'     },
+  performance: { badge: 'bg-blue-50 text-blue-700 border-blue-200',          dot: 'bg-blue-400',    label: 'Performance' },
 }
 
-const PRIORITY_STYLE = {
-  high:   { label: '🔴 High',   cls: 'bg-red-50 text-red-600 border-red-200' },
-  medium: { label: '🟡 Medium', cls: 'bg-yellow-50 text-yellow-600 border-yellow-200' },
-  low:    { label: '🟢 Low',    cls: 'bg-green-50 text-green-600 border-green-200' },
+const PRIORITY_META = {
+  high:   { badge: 'bg-red-50 text-red-600 border-red-200',         label: 'High'   },
+  medium: { badge: 'bg-yellow-50 text-yellow-600 border-yellow-200', label: 'Medium' },
+  low:    { badge: 'bg-warm-100 text-warm-500 border-warm-200',      label: 'Low'    },
 }
 
-const LOADING_STEPS = [
-  'Reading your task…',
-  'Analyzing requirements…',
-  'Generating test cases…',
-  'Done!',
-]
+// normalise DB 'done' → 'pass'
+function normalizeStatus(s) {
+  if (s === 'done') return 'pass'
+  return s || 'pending'
+}
 
-// ── Loading animation ─────────────────────────────────────────
-function LoadingSteps({ step }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 gap-6">
-      <div className="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center">
-        <FlaskConical className="w-7 h-7 text-primary-600 animate-pulse" />
+// ── Delete Confirm Modal ──────────────────────────────────────
+function DeleteConfirmModal({ title, onConfirm, onCancel }) {
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+          <Trash2 className="w-6 h-6 text-red-500" />
+        </div>
+        <h3 className="text-base font-semibold text-warm-900 text-center mb-1">Delete test case?</h3>
+        <p className="text-sm text-warm-500 text-center mb-6 line-clamp-2">"{title}"</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 btn btn-secondary">Cancel</button>
+          <button onClick={onConfirm} className="flex-1 btn bg-red-500 text-white hover:bg-red-600 border-red-500">Delete</button>
+        </div>
       </div>
-      <div className="space-y-2 text-center">
-        {LOADING_STEPS.map((s, i) => (
-          <div key={s} className={`flex items-center gap-2 text-sm transition-all ${
-            i < step ? 'text-emerald-600' : i === step ? 'text-primary-700 font-medium' : 'text-warm-300'
-          }`}>
-            {i < step
-              ? <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              : i === step
-                ? <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
-                : <div className="w-4 h-4 rounded-full border border-warm-200 flex-shrink-0" />
-            }
-            {s}
+    </div>,
+    document.body
+  )
+}
+
+// ── Detail Side Panel ─────────────────────────────────────────
+function DetailPanel({ tc, onClose, onDelete, onStatusChange }) {
+  const [status, setStatus] = useState(normalizeStatus(tc.status))
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const catMeta = CAT_META[tc.category] || CAT_META.happy_path
+  const priMeta = PRIORITY_META[tc.priority] || PRIORITY_META.medium
+
+  async function setAndSave(next) {
+    setStatus(next)
+    onStatusChange(tc.id, next)
+  }
+
+  async function doDelete() {
+    setConfirmDelete(false)
+    setDeleting(true)
+    try {
+      await testCasesApi.delete(tc.id)
+      onDelete(tc.id)
+      onClose()
+      toast.success('Deleted')
+    } catch {
+      toast.error('Failed to delete')
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <>
+      {confirmDelete && (
+        <DeleteConfirmModal title={tc.title} onConfirm={doDelete} onCancel={() => setConfirmDelete(false)} />
+      )}
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" onClick={onClose} />
+      {/* Panel */}
+      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white z-50 shadow-2xl flex flex-col animate-slide-in-right">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-warm-100">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="w-4 h-4 text-primary-600" />
+            <span className="text-sm font-semibold text-warm-700">Test Case</span>
           </div>
-        ))}
+          <div className="flex items-center gap-1">
+            <button onClick={() => setConfirmDelete(true)} disabled={deleting}
+              className="p-1.5 text-warm-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            </button>
+            <button onClick={onClose} className="p-1.5 text-warm-400 hover:text-warm-700 hover:bg-warm-100 rounded-lg">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+          {/* Title */}
+          <h2 className="text-base font-semibold text-warm-900 leading-snug">{tc.title}</h2>
+
+          {/* Meta row */}
+          <div className="flex flex-wrap gap-2">
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium border capitalize ${catMeta.badge}`}>
+              {catMeta.label}
+            </span>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${priMeta.badge}`}>
+              {priMeta.label} priority
+            </span>
+          </div>
+
+          {/* Status — Pass / Fail / Pending buttons */}
+          <div>
+            <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide mb-2">Status</p>
+            <div className="flex gap-2">
+              {[
+                { key: 'pass',    icon: CheckCircle2, label: 'Pass',    active: 'bg-green-500 text-white border-green-500',   idle: 'border-warm-200 text-warm-500 hover:border-green-400 hover:text-green-600' },
+                { key: 'fail',    icon: XCircle,      label: 'Fail',    active: 'bg-red-500 text-white border-red-500',       idle: 'border-warm-200 text-warm-500 hover:border-red-400 hover:text-red-600'   },
+                { key: 'pending', icon: Clock,        label: 'Pending', active: 'bg-warm-600 text-white border-warm-600',     idle: 'border-warm-200 text-warm-500 hover:border-warm-400'                     },
+              ].map(({ key, icon: Icon, label, active, idle }) => (
+                <button key={key} onClick={() => setAndSave(key)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${status === key ? active : idle}`}>
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Steps */}
+          {tc.steps?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide mb-3">Steps</p>
+              <div className="space-y-2">
+                {tc.steps.map((step, i) => (
+                  <div key={i} className="flex gap-3 items-start">
+                    <span className="w-6 h-6 rounded-full bg-warm-100 text-warm-600 text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">
+                      {i + 1}
+                    </span>
+                    <p className="text-sm text-warm-700 pt-0.5">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Expected Result */}
+          {tc.expected_result && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">Expected Result</p>
+              <p className="text-sm text-emerald-800 leading-relaxed">{tc.expected_result}</p>
+            </div>
+          )}
+
+          {/* Description fallback */}
+          {!tc.steps?.length && !tc.expected_result && tc.description && (
+            <div className="bg-warm-50 rounded-xl p-4">
+              <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide mb-2">Details</p>
+              <p className="text-sm text-warm-700 leading-relaxed whitespace-pre-wrap">{tc.description}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Test Case Row ─────────────────────────────────────────────
+function TestCaseRow({ tc, onSelect, onStatusChange, onDelete }) {
+  const [status, setStatus] = useState(normalizeStatus(tc.status))
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const catMeta = CAT_META[tc.category] || CAT_META.happy_path
+  const priMeta = PRIORITY_META[tc.priority] || PRIORITY_META.medium
+
+  function quickStatus(next, e) {
+    e.stopPropagation()
+    setStatus(next)
+    onStatusChange(tc.id, next)
+  }
+
+  async function doDelete() {
+    setConfirmDelete(false)
+    setDeleting(true)
+    try {
+      await testCasesApi.delete(tc.id)
+      onDelete(tc.id)
+      toast.success('Deleted')
+    } catch {
+      toast.error('Failed to delete')
+      setDeleting(false)
+    }
+  }
+
+  const rowBg = status === 'pass' ? 'bg-green-50/40' : status === 'fail' ? 'bg-red-50/40' : ''
+
+  return (
+    <>
+      {confirmDelete && (
+        <DeleteConfirmModal title={tc.title} onConfirm={doDelete} onCancel={() => setConfirmDelete(false)} />
+      )}
+      <tr
+        onClick={() => onSelect(tc)}
+        className={`group border-b border-warm-100 last:border-0 cursor-pointer hover:bg-warm-50 transition-colors ${rowBg}`}
+      >
+        {/* Status quick-buttons */}
+        <td className="pl-4 py-3 w-28">
+          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={e => quickStatus('pass', e)}
+              title="Mark Pass"
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-all ${
+                status === 'pass'
+                  ? 'bg-green-500 text-white border-green-500'
+                  : 'border-warm-200 text-warm-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Pass</span>
+            </button>
+            <button
+              onClick={e => quickStatus('fail', e)}
+              title="Mark Fail"
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-all ${
+                status === 'fail'
+                  ? 'bg-red-500 text-white border-red-500'
+                  : 'border-warm-200 text-warm-400 hover:border-red-400 hover:text-red-600 hover:bg-red-50'
+              }`}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Fail</span>
+            </button>
+          </div>
+        </td>
+
+        {/* Title */}
+        <td className="px-3 py-3">
+          <span className={`text-sm text-warm-900 ${status === 'pass' ? 'line-through text-warm-400' : ''}`}>
+            {tc.title}
+          </span>
+        </td>
+
+        {/* Category */}
+        <td className="px-3 py-3 w-32">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium border capitalize ${catMeta.badge}`}>
+            {catMeta.label}
+          </span>
+        </td>
+
+        {/* Priority */}
+        <td className="px-3 py-3 w-24">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${priMeta.badge}`}>
+            {priMeta.label}
+          </span>
+        </td>
+
+        {/* Actions */}
+        <td className="pr-4 py-3 w-16">
+          <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}
+              disabled={deleting}
+              className="p-1 text-warm-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+            >
+              {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            </button>
+            <ChevronRight className="w-4 h-4 text-warm-300" />
+          </div>
+        </td>
+      </tr>
+    </>
+  )
+}
+
+// ── Project context hook ───────────────────────────────────────
+function useProjectContext(defaultProjectId) {
+  const [pid,    setPid]    = useState(defaultProjectId || '')
+  const [topics, setTopics] = useState([])
+  const [tasks,  setTasks]  = useState([])
+
+  useEffect(() => {
+    if (!pid) return
+    Promise.all([
+      topicsApi.list(pid).then(r => setTopics(r.data.data || [])).catch(() => setTopics([])),
+      tasksApi.list({ projectId: pid }).then(r => setTasks((r.data.data || []).filter(t => t.type !== 'test_case'))).catch(() => setTasks([])),
+    ])
+  }, [pid])
+
+  return { pid, setPid, topics, tasks }
+}
+
+// ── Add Manual Modal ──────────────────────────────────────────
+function AddManualModal({ projects, defaultProjectId, onClose, onSaved }) {
+  const { pid, setPid, tasks } = useProjectContext(defaultProjectId)
+  const [taskId,    setTaskId]    = useState('')
+  const [title,     setTitle]     = useState('')
+  const [category,  setCategory]  = useState('happy_path')
+  const [priority,  setPriority]  = useState('medium')
+  const [expected,  setExpected]  = useState('')
+  const [stepsText, setStepsText] = useState('')
+  const [saving,    setSaving]    = useState(false)
+
+  async function handleSave() {
+    if (!title.trim()) return toast.error('Title is required')
+    if (!pid) return toast.error('Select a project')
+    setSaving(true)
+    try {
+      const steps = stepsText.split('\n').map(s => s.trim()).filter(Boolean)
+      await testCasesApi.save({
+        projectId: pid, taskId: taskId || undefined,
+        testCases: [{ title: title.trim(), category, priority, steps, expected_result: expected.trim() }],
+      })
+      toast.success('Test case added')
+      onSaved(); onClose()
+    } catch { toast.error('Failed to save') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-warm-100">
+          <h2 className="text-base font-semibold text-warm-900">Add Test Case</h2>
+          <button onClick={onClose} className="p-1 text-warm-400 hover:text-warm-700 rounded-lg"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Project</label>
+              <select value={pid} onChange={e => { setPid(e.target.value); setTaskId('') }} className="input">
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Task (optional)</label>
+              <select value={taskId} onChange={e => setTaskId(e.target.value)} className="input text-sm">
+                <option value="">— None —</option>
+                {tasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="label">Title *</label>
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. User can login with valid credentials" className="input" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Category</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="input">
+                {CATEGORIES.slice(1).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Priority</label>
+              <select value={priority} onChange={e => setPriority(e.target.value)} className="input">
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="label">Steps (one per line)</label>
+            <textarea value={stepsText} onChange={e => setStepsText(e.target.value)}
+              placeholder={"Go to login page\nEnter valid credentials\nClick Login"}
+              rows={4} className="input resize-none font-mono text-xs" />
+          </div>
+          <div>
+            <label className="label">Expected Result</label>
+            <input value={expected} onChange={e => setExpected(e.target.value)}
+              placeholder="e.g. User is redirected to dashboard" className="input" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-warm-100 bg-warm-50">
+          <button onClick={onClose} className="btn btn-secondary btn-sm">Cancel</button>
+          <button onClick={handleSave} disabled={saving || !title.trim() || !pid} className="btn btn-primary btn-sm">
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Save Test Case
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
-// ── Test Case Card ────────────────────────────────────────────
-function TestCaseCard({ tc, selected, onToggle, onDelete, onEdit }) {
-  const [expanded, setExpanded] = useState(false)
-  const [editing,  setEditing]  = useState(false)
-  const [draft,    setDraft]    = useState(tc.title)
-  const p = PRIORITY_STYLE[tc.priority] || PRIORITY_STYLE.medium
-  const borderClass = CATEGORY_BORDER[tc.category] || 'border-l-4 border-warm-200'
+// ── AI Generate Modal ─────────────────────────────────────────
+function AIGenerateModal({ projects, defaultProjectId, onClose, onSaved }) {
+  const { pid, setPid, tasks } = useProjectContext(defaultProjectId)
+  const [taskId,    setTaskId]    = useState('')
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDesc,  setTaskDesc]  = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [generated, setGenerated] = useState([])
+  const [selected,  setSelected]  = useState(new Set())
+  const [saving,    setSaving]    = useState(false)
 
-  function saveEdit() {
-    if (draft.trim()) onEdit(tc.id, draft.trim())
-    setEditing(false)
+  useEffect(() => {
+    if (taskId) {
+      const t = tasks.find(t => t.id === taskId)
+      if (t) setTaskTitle(t.title)
+    }
+  }, [taskId, tasks])
+
+  async function handleGenerate() {
+    if (!taskTitle.trim()) return toast.error('Enter what needs to be tested')
+    setLoading(true); setGenerated([]); setSelected(new Set())
+    try {
+      const res = await testCasesApi.generate({ projectId: pid, taskId: taskId || undefined, taskTitle: taskTitle.trim(), taskDescription: taskDesc.trim() })
+      const cases = res.data.data || []
+      setGenerated(cases)
+      setSelected(new Set(cases.map((_, i) => i)))
+    } catch { toast.error('AI generation failed') }
+    finally { setLoading(false) }
+  }
+
+  function toggleSelect(i) {
+    setSelected(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })
+  }
+
+  async function handleSave() {
+    const toSave = generated.filter((_, i) => selected.has(i))
+    if (!toSave.length) return toast.error('Select at least one test case')
+    setSaving(true)
+    try {
+      await testCasesApi.save({ projectId: pid, taskId: taskId || undefined, testCases: toSave })
+      toast.success(`${toSave.length} test case${toSave.length !== 1 ? 's' : ''} saved`)
+      onSaved(); onClose()
+    } catch { toast.error('Failed to save') }
+    finally { setSaving(false) }
   }
 
   return (
-    <div className={`card overflow-hidden ${borderClass} ${selected ? 'ring-1 ring-primary-300' : ''}`}>
-      {/* Header row */}
-      <div className="flex items-start gap-3 px-4 py-3">
-        {/* Select checkbox */}
-        <button onClick={() => onToggle(tc.id)} className="mt-0.5 flex-shrink-0">
-          {selected
-            ? <CheckSquare2 className="w-4 h-4 text-primary-600" />
-            : <Square className="w-4 h-4 text-warm-300" />
-          }
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-warm-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-primary-100 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary-600" />
+            </div>
+            <h2 className="text-base font-semibold text-warm-900">Generate with AI</h2>
+          </div>
+          <button onClick={onClose} className="p-1 text-warm-400 hover:text-warm-700 rounded-lg"><X className="w-5 h-5" /></button>
+        </div>
 
-        {/* Title / edit */}
-        <div className="flex-1 min-w-0">
-          {editing ? (
-            <div className="flex items-center gap-2">
-              <input
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
-                className="input flex-1"
-                autoFocus
-              />
-              <button onClick={saveEdit} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
-                <Check className="w-4 h-4" />
-              </button>
-              <button onClick={() => setEditing(false)} className="p-1 text-warm-400 hover:bg-warm-100 rounded">
-                <X className="w-4 h-4" />
+        <div className="px-6 py-4 space-y-4 border-b border-warm-100">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Project</label>
+              <select value={pid} onChange={e => setPid(e.target.value)} className="input">
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Task (optional)</label>
+              <select value={taskId} onChange={e => setTaskId(e.target.value)} className="input text-sm">
+                <option value="">— None —</option>
+                {tasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="label">What needs to be tested?</label>
+            <input value={taskTitle} onChange={e => setTaskTitle(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !loading && handleGenerate()}
+              placeholder="e.g. User login with OAuth — or pick a task above"
+              className="input" />
+          </div>
+          <div>
+            <label className="label">Additional context (optional)</label>
+            <textarea value={taskDesc} onChange={e => setTaskDesc(e.target.value)}
+              placeholder="Describe edge cases, requirements, or constraints..."
+              rows={2} className="input resize-none text-sm" />
+          </div>
+          <button onClick={handleGenerate} disabled={loading || !taskTitle.trim() || !pid}
+            className="btn btn-primary btn-sm w-full justify-center">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {loading ? 'Generating test cases…' : 'Generate with AI'}
+          </button>
+        </div>
+
+        {generated.length > 0 && (
+          <>
+            <div className="flex-1 overflow-y-auto">
+              <div className="px-6 py-2.5 border-b border-warm-100 flex items-center justify-between">
+                <p className="text-xs text-warm-500">{selected.size} of {generated.length} selected</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setSelected(new Set(generated.map((_, i) => i)))} className="text-xs text-primary-600 hover:text-primary-700">Select all</button>
+                  <button onClick={() => setSelected(new Set())} className="text-xs text-warm-500 hover:text-warm-700">Clear</button>
+                </div>
+              </div>
+              {generated.map((tc, i) => {
+                const catMeta = CAT_META[tc.category] || CAT_META.happy_path
+                const priMeta = PRIORITY_META[tc.priority] || PRIORITY_META.medium
+                const isSelected = selected.has(i)
+                return (
+                  <div key={i} onClick={() => toggleSelect(i)}
+                    className={`flex items-center gap-3 px-6 py-3 border-b border-warm-50 cursor-pointer transition-colors ${isSelected ? 'bg-primary-50/40' : 'hover:bg-warm-50 opacity-50 hover:opacity-70'}`}>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-primary-500 bg-primary-500' : 'border-warm-300'}`}>
+                      {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                    <span className="flex-1 text-sm text-warm-900">{tc.title}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium border capitalize ${catMeta.badge}`}>
+                        {catMeta.label}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${priMeta.badge}`}>
+                        {priMeta.label}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-warm-100 bg-warm-50">
+              <button onClick={onClose} className="btn btn-secondary btn-sm">Cancel</button>
+              <button onClick={handleSave} disabled={saving || !selected.size} className="btn btn-primary btn-sm">
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save {selected.size > 0 ? selected.size : ''} Test Case{selected.size !== 1 ? 's' : ''}
               </button>
             </div>
-          ) : (
-            <p className="text-sm font-medium text-warm-900">{tc.title}</p>
-          )}
-        </div>
-
-        {/* Priority badge */}
-        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0 ${p.cls}`}>{p.label}</span>
-
-        {/* Actions */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={() => setEditing(true)} className="p-1.5 text-warm-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="Edit title">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => onDelete(tc.id)} className="p-1.5 text-warm-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Remove">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => setExpanded(x => !x)} className="p-1.5 text-warm-400 hover:bg-warm-100 rounded-lg">
-            {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+          </>
+        )}
       </div>
-
-      {/* Expanded: steps + expected result */}
-      {expanded && (
-        <div className="border-t border-warm-100 px-4 py-3 space-y-3">
-          {tc.steps?.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-warm-400 mb-1.5 uppercase tracking-wide">Steps</p>
-              <ol className="space-y-1">
-                {tc.steps.map((s, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-warm-900">
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-warm-100 text-warm-500 text-xs font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
-                    {s}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-          {tc.expected_result && (
-            <div>
-              <p className="text-xs font-semibold text-warm-400 mb-1 uppercase tracking-wide">Expected Result</p>
-              <p className="text-sm text-warm-900 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">{tc.expected_result}</p>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
 
 // ── Main Page ─────────────────────────────────────────────────
-export default function TestCaseGenerator() {
-  const { taskId: prefilledTaskId } = useParams()
-  const navigate = useNavigate()
-  const { projects } = useProjectStore()
+export default function TestCases() {
+  const [projects,     setProjects]     = useState([])
+  const [projectId,    setProjectId]    = useState('')
+  const [testCases,    setTestCases]    = useState([])
+  const [loading,      setLoading]      = useState(true) // start true to avoid empty-state flash
+  const [activeTab,    setActiveTab]    = useState('all')
+  const [showManual,   setShowManual]   = useState(false)
+  const [showAIGen,    setShowAIGen]    = useState(false)
+  const [selectedTc,   setSelectedTc]  = useState(null)
 
-  // Input state
-  const [projectId,      setProjectId]      = useState('')
-  const [tasks,          setTasks]          = useState([])
-  const [selectedTaskId, setSelectedTaskId] = useState(prefilledTaskId || '')
-  const [manualTitle,    setManualTitle]    = useState('')
-  const [manualDesc,     setManualDesc]     = useState('')
-  const [useManual,      setUseManual]      = useState(!prefilledTaskId)
-  const [loadingTasks,   setLoadingTasks]   = useState(false)
-
-  // Generation state
-  const [generating,  setGenerating]  = useState(false)
-  const [loadingStep, setLoadingStep] = useState(0)
-  const [generated,   setGenerated]   = useState(null)
-  const [cards,       setCards]       = useState([])
-  const [selectedIds, setSelectedIds] = useState(new Set())
-  const [activeTab,   setActiveTab]   = useState('all')
-  const [saving,      setSaving]      = useState(false)
-  const [saved,       setSaved]       = useState(false)
-
-  // If prefilled task, try to detect its project
   useEffect(() => {
-    if (prefilledTaskId && projects.length > 0) {
-      setSelectedTaskId(prefilledTaskId)
-      setUseManual(false)
-    }
-  }, [prefilledTaskId, projects])
-
-  // Load tasks when project changes
-  useEffect(() => {
-    if (!projectId) { setTasks([]); return }
-    setLoadingTasks(true)
-    tasksApi.list({ project_id: projectId })
-      .then(r => setTasks((r.data.data || []).filter(t => t.type !== 'test_case')))
-      .catch(() => {})
-      .finally(() => setLoadingTasks(false))
-  }, [projectId])
-
-  // Animate loading steps during generation
-  useEffect(() => {
-    if (!generating) { setLoadingStep(0); return }
-    let step = 0
-    const id = setInterval(() => {
-      step = Math.min(step + 1, LOADING_STEPS.length - 2)
-      setLoadingStep(step)
-    }, 900)
-    return () => clearInterval(id)
-  }, [generating])
-
-  const canGenerate = useManual ? manualTitle.trim().length > 0 : !!selectedTaskId
-
-  async function handleGenerate() {
-    if (!canGenerate) return
-    setGenerating(true)
-    setSaved(false)
-    setGenerated(null)
-    setLoadingStep(0)
-
-    try {
-      const selectedTask = tasks.find(t => t.id === selectedTaskId)
-      const payload = {
-        projectId:       projectId || undefined,
-        taskId:          useManual ? undefined : selectedTaskId,
-        taskTitle:       useManual ? manualTitle.trim() : (selectedTask?.title || manualTitle.trim()),
-        taskDescription: useManual ? manualDesc.trim() : '',
+    projectsApi.list().then(r => {
+      const list = r.data.data || []
+      setProjects(list)
+      if (list.length) {
+        setProjectId(list[0].id)
+        // loadTestCases will be triggered by the projectId useEffect below
+      } else {
+        setLoading(false) // no projects → nothing to load
       }
+    }).catch(() => setLoading(false))
+  }, [])
 
-      const res = await testCasesApi.generate(payload)
-      const data = res.data.data
+  useEffect(() => { if (projectId) loadTestCases() }, [projectId]) // eslint-disable-line
 
-      setLoadingStep(LOADING_STEPS.length - 1)
-      await new Promise(r => setTimeout(r, 400))
-
-      const withIds = (data.test_cases || []).map((tc, i) => ({ ...tc, id: `tc-${i}-${Date.now()}` }))
-      setCards(withIds)
-      setSelectedIds(new Set(withIds.map(tc => tc.id)))
-      setGenerated({ summary: data.summary, provider: data.provider })
-      setActiveTab('all')
-    } catch (err) {
-      toast.error('Failed to generate test cases. Please try again.')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  function toggleSelect(id) {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  function deleteCard(id) {
-    setCards(cs => cs.filter(c => c.id !== id))
-    setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n })
-  }
-
-  function editCard(id, title) {
-    setCards(cs => cs.map(c => c.id === id ? { ...c, title } : c))
-  }
-
-  function selectAll()   { setSelectedIds(new Set(cards.map(c => c.id))) }
-  function deselectAll() { setSelectedIds(new Set()) }
-
-  const filtered      = activeTab === 'all' ? cards : cards.filter(c => c.category === activeTab)
-  const selectedCount = selectedIds.size
-
-  async function handleSave() {
-    if (selectedCount === 0) { toast.error('Select at least one test case to save'); return }
-    if (!projectId) { toast.error('Please select a project first'); return }
-
-    setSaving(true)
+  async function loadTestCases() {
+    setLoading(true)
     try {
-      const toSave = cards.filter(c => selectedIds.has(c.id)).map(c => ({
-        title:           c.title,
-        category:        c.category,
-        steps:           c.steps,
-        expected_result: c.expected_result,
-        priority:        c.priority,
-      }))
+      const res = await testCasesApi.list(projectId)
+      setTestCases(res.data.data || [])
+    } catch { toast.error('Failed to load test cases') }
+    finally { setLoading(false) }
+  }
 
-      const res = await testCasesApi.save({
-        projectId,
-        taskId:    useManual ? undefined : selectedTaskId,
-        testCases: toSave,
-      })
+  function handleDelete(id) {
+    setTestCases(tc => tc.filter(t => t.id !== id))
+    if (selectedTc?.id === id) setSelectedTc(null)
+  }
 
-      toast.success(`${res.data.count} test case${res.data.count !== 1 ? 's' : ''} saved!`)
-      setSaved(true)
+  async function handleStatusChange(id, newStatus) {
+    // Optimistic update
+    setTestCases(tc => tc.map(t => t.id === id ? { ...t, status: newStatus } : t))
+    if (selectedTc?.id === id) setSelectedTc(s => ({ ...s, status: newStatus }))
+    try {
+      await testCasesApi.updateStatus(id, newStatus)
     } catch {
-      toast.error('Failed to save test cases')
-    } finally {
-      setSaving(false)
+      // Revert on error
+      setTestCases(tc => tc.map(t => t.id === id ? { ...t, status: normalizeStatus(t.status) } : t))
+      toast.error('Failed to update status')
     }
   }
 
-  function copyAsText() {
-    const text = cards
-      .filter(c => selectedIds.has(c.id))
-      .map((c, i) => {
-        const steps = (c.steps || []).map((s, j) => `  ${j + 1}. ${s}`).join('\n')
-        return `${i + 1}. [${(c.category || '').replace('_', ' ').toUpperCase()}] ${c.title}\n${steps}\n  Expected: ${c.expected_result}`
-      })
-      .join('\n\n')
-
-    navigator.clipboard.writeText(text)
-      .then(() => toast.success('Copied to clipboard!'))
-      .catch(() => toast.error('Failed to copy'))
-  }
+  const filtered = activeTab === 'all' ? testCases : testCases.filter(tc => tc.category === activeTab)
+  const passCount    = testCases.filter(t => normalizeStatus(t.status) === 'pass').length
+  const failCount    = testCases.filter(t => normalizeStatus(t.status) === 'fail').length
+  const pendingCount = testCases.filter(t => normalizeStatus(t.status) === 'pending').length
+  const total        = testCases.length
+  const passRate     = total > 0 ? Math.round((passCount / total) * 100) : 0
 
   return (
-    <div className="h-full flex flex-col px-6 py-6 gap-6 min-h-0">
-      {/* Page header */}
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <button onClick={() => navigate(-1)} className="btn-ghost p-1.5">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-3">
-          <FlaskConical className="w-6 h-6 text-primary-600" />
-          <h1 className="text-2xl font-bold text-warm-900">Test Case Generator</h1>
-          <span className="badge badge-purple">AI-Powered</span>
+    <div className="px-6 py-8 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-warm-900 flex items-center gap-2.5">
+            <FlaskConical className="w-6 h-6 text-primary-600" />
+            Test Cases
+          </h1>
+          <p className="text-sm text-warm-500 mt-1">Track test runs across your project. Mark pass or fail directly on the table.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowAIGen(true)} className="btn btn-primary btn-sm">
+            <Sparkles className="w-4 h-4" /> Generate with AI
+          </button>
+          <button onClick={() => setShowManual(true)} className="btn btn-secondary btn-sm">
+            <Plus className="w-4 h-4" /> Add Manually
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 grid lg:grid-cols-3 gap-6 min-h-0 overflow-auto">
+      {/* Project + Stats */}
+      <div className="flex items-center gap-4 mb-5 flex-wrap">
+        {projects.length > 1 ? (
+          <select value={projectId} onChange={e => setProjectId(e.target.value)} className="input text-sm w-auto">
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        ) : projects.length === 1 ? (
+          <span className="text-sm font-medium text-warm-700 bg-warm-100 px-3 py-2 rounded-xl">{projects[0].name}</span>
+        ) : null}
 
-        {/* ── Left: Config panel ───────────────────────────────── */}
-        <div className="lg:col-span-1 space-y-4 flex flex-col">
-          <div className="card p-5 space-y-4">
-            <h2 className="section-title">Configure</h2>
-
-            {/* Project selector */}
-            <div>
-              <label className="label">Project</label>
-              <select
-                value={projectId}
-                onChange={e => { setProjectId(e.target.value); setSelectedTaskId('') }}
-                className="input"
-              >
-                <option value="">Select project…</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Source toggle pill buttons */}
-            <div>
-              <label className="label mb-2">Source</label>
-              <div className="flex rounded-xl overflow-hidden border border-warm-200 text-sm">
-                <button
-                  onClick={() => setUseManual(false)}
-                  className={`tab-pill flex-1 rounded-none border-none ${!useManual ? 'active' : 'inactive'}`}
-                >
-                  From Task
-                </button>
-                <button
-                  onClick={() => setUseManual(true)}
-                  className={`tab-pill flex-1 rounded-none border-none ${useManual ? 'active' : 'inactive'}`}
-                >
-                  Manual
-                </button>
+        {total > 0 && (
+          <div className="flex-1 bg-white border border-warm-100 rounded-xl px-4 py-2.5 flex items-center gap-5">
+            <div className="flex-1 min-w-[100px]">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-warm-500 font-medium">Pass rate</span>
+                <span className="text-xs font-bold text-warm-800">{passRate}%</span>
+              </div>
+              <div className="h-1.5 bg-warm-100 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all"
+                  style={{ width: `${passRate}%` }} />
               </div>
             </div>
-
-            {!useManual ? (
-              <div>
-                <label className="label">Select Task</label>
-                {loadingTasks ? (
-                  <div className="flex items-center gap-2 text-xs text-warm-400 py-2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading tasks…
-                  </div>
-                ) : (
-                  <select
-                    value={selectedTaskId}
-                    onChange={e => setSelectedTaskId(e.target.value)}
-                    className="input"
-                  >
-                    <option value="">Choose a task…</option>
-                    {tasks.map(t => (
-                      <option key={t.id} value={t.id}>{t.title}</option>
-                    ))}
-                  </select>
-                )}
-                {!projectId && (
-                  <p className="text-xs text-warm-400 mt-1">↑ Select a project to see tasks</p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div>
-                  <label className="label">Title <span className="text-red-400">*</span></label>
-                  <input
-                    value={manualTitle}
-                    onChange={e => setManualTitle(e.target.value)}
-                    placeholder="e.g. User login with email and password"
-                    className="input"
-                  />
+            <div className="flex gap-5 flex-shrink-0">
+              {[
+                { label: 'Pass', val: passCount, color: 'text-green-600' },
+                { label: 'Fail', val: failCount, color: 'text-red-500' },
+                { label: 'Pending', val: pendingCount, color: 'text-warm-400' },
+                { label: 'Total', val: total, color: 'text-warm-800' },
+              ].map(({ label, val, color }) => (
+                <div key={label} className="text-center">
+                  <p className={`text-lg font-bold leading-none ${color}`}>{val}</p>
+                  <p className="text-xs text-warm-400 mt-0.5">{label}</p>
                 </div>
-                <div>
-                  <label className="label">Description</label>
-                  <textarea
-                    value={manualDesc}
-                    onChange={e => setManualDesc(e.target.value)}
-                    rows={3}
-                    placeholder="Describe the feature or behavior to test…"
-                    className="input resize-none"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Generate button */}
-            <button
-              onClick={handleGenerate}
-              disabled={!canGenerate || generating}
-              className="btn-primary btn-lg w-full flex items-center justify-center gap-2"
-            >
-              {generating
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
-                : <><span>✨</span> Generate Test Cases</>
-              }
-            </button>
+              ))}
+            </div>
           </div>
-
-          {/* Tips */}
-          {!generated && !generating && (
-            <div className="bg-primary-50 border border-primary-100 rounded-xl p-4">
-              <p className="text-xs font-semibold text-primary-700 mb-2">💡 Tips</p>
-              <ul className="text-xs text-primary-600 space-y-1.5">
-                <li>• Select a specific task for better AI context</li>
-                <li>• Add a description for more accurate test cases</li>
-                <li>• Review and edit titles before saving</li>
-                <li>• Deselect test cases you don't need</li>
-              </ul>
-            </div>
-          )}
-
-          {/* Coverage stats after generation */}
-          {generated && (
-            <div className="card p-4 space-y-2">
-              <p className="section-title">Coverage</p>
-              {CATEGORIES.slice(1).map(cat => {
-                const count = cards.filter(c => c.category === cat.key).length
-                if (count === 0) return null
-                return (
-                  <div key={cat.key} className="flex items-center justify-between text-xs">
-                    <span className="text-warm-500">{cat.emoji} {cat.label}</span>
-                    <span className="font-semibold text-warm-900">{count}</span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* ── Right: Results ────────────────────────────────────── */}
-        <div className="lg:col-span-2 flex flex-col min-h-0">
-          {generating && <LoadingSteps step={loadingStep} />}
-
-          {!generating && !generated && (
-            <div className="empty-state h-full">
-              <div className="w-16 h-16 bg-warm-100 rounded-2xl flex items-center justify-center mb-4 mx-auto">
-                <FlaskConical className="w-8 h-8 text-warm-300" />
-              </div>
-              <p className="text-warm-500 font-medium">No test cases yet</p>
-              <p className="text-sm text-warm-400 mt-1">Configure your task and click Generate</p>
-            </div>
-          )}
-
-          {!generating && generated && (
-            <div className="flex flex-col gap-4 min-h-0">
-              {/* Summary + actions bar */}
-              <div className="card px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-warm-900">{generated.summary}</p>
-                  <p className="text-xs text-warm-400 mt-0.5">
-                    {cards.length} generated · {selectedCount} selected
-                    {generated.provider && ` · via ${generated.provider}`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button onClick={selectAll} className="text-xs text-primary-600 hover:underline">Select All</button>
-                  <span className="text-warm-200">|</span>
-                  <button onClick={deselectAll} className="text-xs text-warm-500 hover:underline">Deselect All</button>
-                </div>
-              </div>
-
-              {/* Category tab pills */}
-              <div className="flex gap-1.5 flex-wrap">
-                {CATEGORIES.filter(cat => cat.key === 'all' || cards.some(c => c.category === cat.key)).map(cat => (
-                  <button
-                    key={cat.key}
-                    onClick={() => setActiveTab(cat.key)}
-                    className={`tab-pill flex items-center gap-1.5 ${activeTab === cat.key ? 'active' : 'inactive'}`}
-                  >
-                    <span>{cat.emoji}</span>
-                    <span>{cat.label}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                      activeTab === cat.key ? 'bg-primary-500 text-white' : 'bg-warm-100 text-warm-500'
-                    }`}>
-                      {cat.key === 'all' ? cards.length : cards.filter(c => c.category === cat.key).length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Cards list */}
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                {filtered.length === 0 && (
-                  <p className="text-sm text-warm-400 text-center py-8">No test cases in this category</p>
-                )}
-                {filtered.map(tc => (
-                  <TestCaseCard
-                    key={tc.id}
-                    tc={tc}
-                    selected={selectedIds.has(tc.id)}
-                    onToggle={toggleSelect}
-                    onDelete={deleteCard}
-                    onEdit={editCard}
-                  />
-                ))}
-              </div>
-
-              {/* Bottom action bar */}
-              <div className="flex items-center gap-3 pt-2 border-t border-warm-100 flex-wrap">
-                <button
-                  onClick={handleSave}
-                  disabled={saving || selectedCount === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
-                >
-                  {saving
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
-                    : <><Save className="w-4 h-4" /> Save Selected ({selectedCount})</>
-                  }
-                </button>
-
-                <button
-                  onClick={handleGenerate}
-                  className="btn-secondary flex items-center gap-2"
-                >
-                  <RefreshCw className="w-4 h-4" /> Regenerate
-                </button>
-
-                <button
-                  onClick={copyAsText}
-                  className="btn-ghost flex items-center gap-2"
-                >
-                  <Copy className="w-4 h-4" /> Copy as Text
-                </button>
-
-                {saved && (
-                  <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-medium ml-2">
-                    <Check className="w-4 h-4" /> Saved to project!
-                  </span>
-                )}
-
-                {!projectId && (
-                  <span className="flex items-center gap-1.5 text-xs text-amber-600">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Select a project to save
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
+
+      {/* Category tabs */}
+      <div className="flex gap-2 flex-wrap mb-4">
+        {CATEGORIES.map(c => {
+          const count = c.key === 'all' ? testCases.length : testCases.filter(t => t.category === c.key).length
+          return (
+            <button key={c.key} onClick={() => setActiveTab(c.key)}
+              className={`tab-pill ${activeTab === c.key ? 'active' : 'inactive'}`}>
+              {c.label}
+              {count > 0 && (
+                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${activeTab === c.key ? 'bg-white/20' : 'bg-warm-100 text-warm-500'}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state border border-dashed border-warm-200 rounded-2xl py-20">
+          <div className="text-4xl mb-3">🧪</div>
+          <p className="empty-state-title">{testCases.length === 0 ? 'No test cases yet' : 'None in this category'}</p>
+          <p className="empty-state-sub">
+            {testCases.length === 0
+              ? 'Auto-generated when AI processes a discussion, or add one manually.'
+              : 'Switch to a different category above.'}
+          </p>
+          {testCases.length === 0 && (
+            <button onClick={() => setShowAIGen(true)} className="btn btn-primary btn-sm mt-4">
+              <Sparkles className="w-4 h-4" /> Generate with AI
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white border border-warm-100 rounded-2xl overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-warm-100 bg-warm-50">
+                <th className="pl-4 py-2.5 text-left w-28">
+                  <span className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Status</span>
+                </th>
+                <th className="px-3 py-2.5 text-left">
+                  <span className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Test Case</span>
+                </th>
+                <th className="px-3 py-2.5 text-left w-32">
+                  <span className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Category</span>
+                </th>
+                <th className="px-3 py-2.5 text-left w-24">
+                  <span className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Priority</span>
+                </th>
+                <th className="pr-4 py-2.5 w-16" />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(tc => (
+                <TestCaseRow
+                  key={tc.id}
+                  tc={tc}
+                  onSelect={setSelectedTc}
+                  onStatusChange={handleStatusChange}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Detail side panel */}
+      {selectedTc && (
+        <DetailPanel
+          tc={selectedTc}
+          onClose={() => setSelectedTc(null)}
+          onDelete={handleDelete}
+          onStatusChange={handleStatusChange}
+        />
+      )}
+
+      {showManual && (
+        <AddManualModal projects={projects} defaultProjectId={projectId}
+          onClose={() => setShowManual(false)} onSaved={loadTestCases} />
+      )}
+      {showAIGen && (
+        <AIGenerateModal projects={projects} defaultProjectId={projectId}
+          onClose={() => setShowAIGen(false)} onSaved={loadTestCases} />
+      )}
     </div>
   )
 }

@@ -1,52 +1,43 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProjectStore } from '../stores/useProjectStore'
 import { tasksApi, groupsApi } from '../services/api'
-import { supabase } from '../config/supabase'
 import {
-  CheckSquare, FlaskConical, Rocket, Archive, ListChecks,
-  Plus, Trash2, ChevronDown, Search, Loader2,
-  Tag, Calendar, AlertTriangle, Square, CheckSquare2,
-  ArrowUpDown, X, RefreshCw, Pencil, Check, UserCircle, Users,
+  LayoutGrid, List, Plus, ChevronDown, X, Loader2,
+  RefreshCw, Calendar, Tag, UserCircle, Trash2, Check,
+  AlertTriangle, Clock, UserPlus,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import GenerateTestCasesButton from '../components/shared/GenerateTestCasesButton'
-import {
-  PageShell, PageHeader, PageToolbar, SearchInput,
-  FilterPills, SortSelect, ProjectSelect, PageLoader, EmptyState,
-} from '../components/ui'
 
-// ── Constants ─────────────────────────────────────────────────
-const TABS = [
-  { key: 'task',             label: 'Pending Tasks',   icon: CheckSquare,  emptyMsg: "No pending tasks! You're all caught up 🎉" },
-  { key: 'test_case',        label: 'Test Cases',      icon: FlaskConical, emptyMsg: 'No test cases yet.' },
-  { key: 'deployment_check', label: 'Post Deployment', icon: Rocket,       emptyMsg: 'No post-deployment checks.' },
-  { key: 'backlog',          label: 'Backlog',         icon: Archive,      emptyMsg: 'Backlog is empty.' },
+// ── Workflow statuses ─────────────────────────────────────────
+const WORKFLOW = [
+  { key: 'todo',         label: 'To Do',        headerBg: 'bg-warm-100',    dotColor: 'bg-warm-400',   textColor: 'text-warm-600',   badgeBg: 'bg-warm-100 text-warm-600'     },
+  { key: 'in_progress',  label: 'In Progress',  headerBg: 'bg-blue-100',    dotColor: 'bg-blue-500',   textColor: 'text-blue-700',   badgeBg: 'bg-blue-100 text-blue-700'     },
+  { key: 'blocked',      label: 'Blocked',      headerBg: 'bg-red-100',     dotColor: 'bg-red-500',    textColor: 'text-red-700',    badgeBg: 'bg-red-100 text-red-700'       },
+  { key: 'in_review',    label: 'In Review',    headerBg: 'bg-violet-100',  dotColor: 'bg-violet-500', textColor: 'text-violet-700', badgeBg: 'bg-violet-100 text-violet-700' },
+  { key: 'done',         label: 'Done',         headerBg: 'bg-green-100',   dotColor: 'bg-green-500',  textColor: 'text-green-700',  badgeBg: 'bg-green-100 text-green-700'   },
+  { key: 'pending_uat',  label: 'Pending UAT',  headerBg: 'bg-amber-100',   dotColor: 'bg-amber-500',  textColor: 'text-amber-700',  badgeBg: 'bg-amber-100 text-amber-700'   },
+  { key: 'pending_prod', label: 'Pending Prod', headerBg: 'bg-orange-100',  dotColor: 'bg-orange-500', textColor: 'text-orange-700', badgeBg: 'bg-orange-100 text-orange-700' },
+  { key: 'released',     label: 'Released',     headerBg: 'bg-teal-100',    dotColor: 'bg-teal-500',   textColor: 'text-teal-700',   badgeBg: 'bg-teal-100 text-teal-700'     },
 ]
 
+const WORKFLOW_MAP = Object.fromEntries(WORKFLOW.map(w => [w.key, w]))
+
+function normalizeStatus(s) {
+  if (s === 'pending') return 'todo'
+  return s || 'todo'
+}
+
+// ── Priority meta ─────────────────────────────────────────────
 const PRIORITY_META = {
-  high:   { label: 'High',   color: 'text-red-600 bg-red-50 border-red-200' },
-  medium: { label: 'Medium', color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
-  low:    { label: 'Low',    color: 'text-warm-500 bg-warm-100 border-warm-200' },
+  high:   { label: 'High',   dot: 'bg-red-500',    badge: 'bg-red-50 text-red-600 border border-red-200'       },
+  medium: { label: 'Med',    dot: 'bg-yellow-400', badge: 'bg-yellow-50 text-yellow-600 border border-yellow-200' },
+  low:    { label: 'Low',    dot: 'bg-warm-300',   badge: 'bg-warm-100 text-warm-500 border border-warm-200'   },
 }
 
-const PRIORITY_DOT = {
-  high:   'bg-red-500',
-  medium: 'bg-yellow-400',
-  low:    'bg-warm-300',
-}
-
-const SORT_OPTIONS = [
-  { value: 'due_date:asc',    label: 'Due date (soonest)' },
-  { value: 'due_date:desc',   label: 'Due date (latest)' },
-  { value: 'priority:desc',   label: 'Priority (high first)' },
-  { value: 'created_at:desc', label: 'Newest first' },
-  { value: 'created_at:asc',  label: 'Oldest first' },
-]
-
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
-
+// ── Helpers ───────────────────────────────────────────────────
 function isOverdue(due_date) {
   if (!due_date) return false
   return new Date(due_date) < new Date(new Date().toDateString())
@@ -65,497 +56,874 @@ function formatDue(due_date) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// ── Member avatar ─────────────────────────────────────────────
-function MemberAvatar({ member, size = 6 }) {
-  if (!member) return null
-  const name = member.name || member.users?.name || '?'
-  const avatarUrl = member.avatar_url || member.users?.avatar_url
-  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+function getInitials(name) {
+  if (!name) return '?'
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
+// ── Avatar ────────────────────────────────────────────────────
+function Avatar({ name, size = 6 }) {
   const sz = `w-${size} h-${size}`
-  if (avatarUrl) {
-    return <img src={avatarUrl} className={`${sz} rounded-full object-cover flex-shrink-0`} alt={name} title={name} />
-  }
   return (
     <div className={`${sz} rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-semibold flex-shrink-0`} title={name}>
-      {initials}
+      {getInitials(name)}
     </div>
   )
 }
 
-// ── Assignee cell with dropdown ───────────────────────────────
-function AssigneeCell({ task, groupMembers, onAssign }) {
-  const [open, setOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const ref = useRef()
+// ── Portal Dropdown — renders above overflow:hidden containers ─
+function PortalDropdown({ anchorRef, open, minWidth = 160, children }) {
+  const [pos, setPos] = useState({ top: 0, left: 0 })
 
   useEffect(() => {
-    function handleClick(e) {
+    if (open && anchorRef.current) {
+      const r = anchorRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - r.bottom
+      const dropH = 320 // max estimated height
+      const top = spaceBelow > dropH ? r.bottom + 4 : r.top - dropH - 4
+      setPos({ top, left: r.left })
+    }
+  }, [open, anchorRef])
+
+  if (!open) return null
+  return createPortal(
+    <div
+      style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth, zIndex: 9999 }}
+      className="bg-white border border-warm-200 rounded-xl shadow-xl py-1"
+    >
+      {children}
+    </div>,
+    document.body
+  )
+}
+
+function useDropdown() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef()
+  useEffect(() => {
+    function handler(e) {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false)
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
+  return { open, setOpen, ref }
+}
 
-  const assignedUser = task.assigned_user
-  const hasMembers = groupMembers && groupMembers.length > 0
-
-  async function pick(memberId) {
-    setOpen(false)
-    if (memberId === (assignedUser?.id || null)) return
-    setSaving(true)
-    try {
-      await onAssign(task.id, memberId)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (!hasMembers) {
-    if (!assignedUser) return <span className="text-xs text-warm-300">—</span>
-    return (
-      <div className="flex items-center gap-1.5">
-        <MemberAvatar member={assignedUser} size={5} />
-        <span className="text-xs text-warm-500 truncate max-w-[80px]">{assignedUser.name}</span>
-      </div>
-    )
-  }
+// ── Status Badge (clickable dropdown) ────────────────────────
+function StatusBadge({ status, onChange, disabled }) {
+  const { open, setOpen, ref } = useDropdown()
+  const wf = WORKFLOW_MAP[normalizeStatus(status)] || WORKFLOW_MAP.todo
 
   return (
-    <div className="relative" ref={ref}>
+    <div ref={ref}>
       <button
-        onClick={() => setOpen(o => !o)}
-        disabled={saving}
-        className="flex items-center gap-1.5 group hover:bg-warm-100 rounded-lg px-1.5 py-1 transition-colors"
-        title="Assign member"
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
+        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${wf.badgeBg} ${disabled ? 'cursor-default' : 'cursor-pointer hover:opacity-80'}`}
       >
-        {saving ? (
-          <Loader2 className="w-4 h-4 text-primary-500 animate-spin" />
-        ) : assignedUser ? (
-          <>
-            <MemberAvatar member={assignedUser} size={5} />
-            <span className="text-xs text-warm-500 truncate max-w-[80px] hidden lg:block">{assignedUser.name}</span>
-          </>
-        ) : (
-          <>
-            <UserCircle className="w-5 h-5 text-warm-300 group-hover:text-warm-400" />
-            <span className="text-xs text-warm-300 hidden lg:block">Assign</span>
-          </>
-        )}
-        <ChevronDown className="w-3 h-3 text-warm-300 opacity-0 group-hover:opacity-100" />
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${wf.dotColor}`} />
+        {wf.label}
+        {!disabled && <ChevronDown className="w-3 h-3 opacity-60" />}
       </button>
-
-      {open && (
-        <div className="absolute left-0 top-8 bg-white border border-warm-200 rounded-xl shadow-xl z-30 min-w-[180px] py-1">
+      <PortalDropdown anchorRef={ref} open={open} minWidth={160}>
+        {WORKFLOW.map(w => (
           <button
-            onClick={() => pick(null)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-warm-500 hover:bg-warm-50"
+            key={w.key}
+            onClick={() => { onChange(w.key); setOpen(false) }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-warm-50 ${w.key === normalizeStatus(status) ? 'bg-warm-50 font-medium' : 'text-warm-800'}`}
           >
-            <UserCircle className="w-5 h-5 text-warm-300" />
-            Unassigned
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${w.dotColor}`} />
+            <span className={w.textColor}>{w.label}</span>
+            {w.key === normalizeStatus(status) && <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />}
           </button>
-          <div className="border-t border-warm-100 my-1" />
-          {groupMembers.map(m => {
-            const u = m.users || m
-            return (
-              <button
-                key={u.id}
-                onClick={() => pick(u.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-primary-50 ${
-                  assignedUser?.id === u.id ? 'bg-primary-50 text-primary-700 font-medium' : 'text-warm-900'
-                }`}
-              >
-                <MemberAvatar member={u} size={5} />
-                <span className="truncate">{u.name || u.email}</span>
-                {assignedUser?.id === u.id && <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />}
-              </button>
-            )
-          })}
-        </div>
-      )}
+        ))}
+      </PortalDropdown>
     </div>
   )
 }
 
-// ── Priority badge ────────────────────────────────────────────
+// ── Priority Badge (static) ───────────────────────────────────
 function PriorityBadge({ priority }) {
   const m = PRIORITY_META[priority] || PRIORITY_META.medium
-  const dot = PRIORITY_DOT[priority] || PRIORITY_DOT.medium
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs px-1.5 py-0.5 rounded border font-medium ${m.color}`}>
-      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${m.badge}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${m.dot}`} />
       {m.label}
     </span>
   )
 }
 
-// ── Quick Add Form ────────────────────────────────────────────
-function QuickAddRow({ projects, activeType, groupMembers, onAdd, onCancel }) {
-  const [title, setTitle]         = useState('')
-  const [priority, setPriority]   = useState('medium')
-  const [projectId, setProjectId] = useState(projects[0]?.id || '')
-  const [dueDate, setDueDate]     = useState('')
-  const [assignedTo, setAssignedTo] = useState('')
-  const [saving, setSaving]       = useState(false)
+// ── Priority Select (inline editable) ────────────────────────
+function PrioritySelect({ priority, onChange }) {
+  const { open, setOpen, ref } = useDropdown()
+  const m = PRIORITY_META[priority] || PRIORITY_META.medium
+
+  return (
+    <div ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${m.badge}`}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${m.dot}`} />
+        {m.label}
+        <ChevronDown className="w-3 h-3 opacity-60" />
+      </button>
+      <PortalDropdown anchorRef={ref} open={open} minWidth={130}>
+        {Object.entries(PRIORITY_META).map(([key, pm]) => (
+          <button
+            key={key}
+            onClick={() => { onChange(key); setOpen(false) }}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-warm-50 ${key === priority ? 'bg-warm-50 font-medium' : 'text-warm-800'}`}
+          >
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${pm.dot}`} />
+            <span>{pm.label}</span>
+            {key === priority && <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />}
+          </button>
+        ))}
+      </PortalDropdown>
+    </div>
+  )
+}
+
+// ── Assignee Select (inline editable) ────────────────────────
+function AssigneeSelect({ task, groupMembers, onChange }) {
+  const { open, setOpen, ref } = useDropdown()
+  const assigned = task.assigned_user
+
+  return (
+    <div ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 text-xs text-warm-600 hover:text-primary-600 group/assign"
+      >
+        {assigned ? (
+          <>
+            <Avatar name={assigned.name} size={5} />
+            <span className="truncate max-w-[80px]">{assigned.name}</span>
+          </>
+        ) : (
+          <span className="text-warm-300 group-hover/assign:text-primary-500 flex items-center gap-1">
+            <UserPlus className="w-3.5 h-3.5" />
+            Assign
+          </span>
+        )}
+        <ChevronDown className="w-3 h-3 opacity-40 flex-shrink-0" />
+      </button>
+      <PortalDropdown anchorRef={ref} open={open} minWidth={180}>
+        <button
+          onClick={() => { onChange(null); setOpen(false) }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-warm-500 hover:bg-warm-50"
+        >
+          <span className="w-5 h-5 rounded-full border-2 border-dashed border-warm-300 flex-shrink-0" />
+          Unassigned
+          {!assigned && <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />}
+        </button>
+        {groupMembers.map(m => {
+          const u = m.users || m
+          return (
+            <button
+              key={u.id}
+              onClick={() => { onChange(u.id); setOpen(false) }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-warm-50 ${u.id === (task.assigned_user?.id || task.assigned_to) ? 'bg-warm-50 font-medium' : 'text-warm-800'}`}
+            >
+              <Avatar name={u.name || u.email} size={5} />
+              <span className="truncate">{u.name || u.email}</span>
+              {u.id === (task.assigned_user?.id || task.assigned_to) && <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />}
+            </button>
+          )
+        })}
+      </PortalDropdown>
+    </div>
+  )
+}
+
+// ── Due Date Picker (inline) ──────────────────────────────────
+function DueDatePicker({ dueDate, onChange }) {
   const inputRef = useRef()
+  const overdue = isOverdue(dueDate)
+  const label = formatDue(dueDate)
 
-  useEffect(() => { inputRef.current?.focus() }, [])
+  return (
+    <div className="relative">
+      <button
+        onClick={() => inputRef.current?.showPicker?.() || inputRef.current?.click()}
+        className={`flex items-center gap-1 text-xs hover:text-primary-600 transition-colors ${
+          overdue ? 'text-red-500 font-medium' : dueDate ? 'text-warm-500' : 'text-warm-300 hover:text-primary-500'
+        }`}
+      >
+        {overdue ? <AlertTriangle className="w-3 h-3 flex-shrink-0" /> : <Calendar className="w-3 h-3 flex-shrink-0" />}
+        {label || 'Set date'}
+      </button>
+      <input
+        ref={inputRef}
+        type="date"
+        value={dueDate ? dueDate.slice(0, 10) : ''}
+        onChange={e => onChange(e.target.value || null)}
+        className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
+        tabIndex={-1}
+      />
+    </div>
+  )
+}
 
-  async function submit(e) {
-    e?.preventDefault()
-    if (!title.trim()) return
+// ── Add Task Modal ────────────────────────────────────────────
+function AddTaskModal({ projects, groupMembers, initialStatus = 'todo', onClose, onSave }) {
+  const [title, setTitle]       = useState('')
+  const [projectId, setProjectId] = useState(projects[0]?.id || '')
+  const [status, setStatus]     = useState(initialStatus)
+  const [priority, setPriority] = useState('medium')
+  const [assignedTo, setAssignedTo] = useState('')
+  const [dueDate, setDueDate]   = useState('')
+  const [type, setType]         = useState('task')
+  const [saving, setSaving]     = useState(false)
+  const titleRef = useRef()
+
+  useEffect(() => { titleRef.current?.focus() }, [])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!title.trim() || !projectId) return
     setSaving(true)
     try {
-      await tasksApi.create({
-        title: title.trim(), type: activeType, priority,
-        project_id: projectId, due_date: dueDate || null,
+      await onSave({
+        title: title.trim(),
+        project_id: projectId,
+        status,
+        priority,
         assigned_to: assignedTo || null,
+        due_date: dueDate || null,
+        type,
       })
-      toast.success('Task added!')
-      onAdd()
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to create task')
+      onClose()
     } finally {
       setSaving(false)
     }
   }
 
-  function onKey(e) {
-    if (e.key === 'Enter') submit()
-    if (e.key === 'Escape') onCancel()
-  }
-
   return (
-    <tr className="bg-primary-50/50 border-t-2 border-primary-200">
-      <td className="pl-4 py-2.5 w-8" />
-      <td className="px-3 py-2.5" colSpan={2}>
-        <input
-          ref={inputRef}
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onKeyDown={onKey}
-          placeholder="Task title…"
-          className="input w-full text-sm py-1.5"
-        />
-      </td>
-      <td className="px-2 py-2.5 w-28 hidden sm:table-cell">
-        <select value={priority} onChange={e => setPriority(e.target.value)}
-          className="input text-xs py-1 w-full">
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-      </td>
-      <td className="px-2 py-2.5 w-32 hidden md:table-cell">
-        <select value={projectId} onChange={e => setProjectId(e.target.value)}
-          className="input text-xs py-1 w-full">
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </td>
-      {groupMembers.length > 0 && (
-        <td className="px-2 py-2.5 w-32 hidden lg:table-cell">
-          <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-            className="input text-xs py-1 w-full">
-            <option value="">Unassigned</option>
-            {groupMembers.map(m => {
-              const u = m.users || m
-              return <option key={u.id} value={u.id}>{u.name || u.email}</option>
-            })}
-          </select>
-        </td>
-      )}
-      <td className="px-2 py-2.5 w-28 hidden lg:table-cell">
-        <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-          onClick={e => e.target.showPicker?.()}
-          className="input text-xs py-1 w-full cursor-pointer" />
-      </td>
-      <td className="pr-4 py-2.5 w-20">
-        <div className="flex gap-1">
-          <button onClick={submit} disabled={!title.trim() || saving}
-            className="btn-primary btn-sm">
-            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-            Add
-          </button>
-          <button onClick={onCancel} className="p-1 text-warm-400 hover:text-warm-900 hover:bg-warm-100 rounded">
-            <X className="w-3 h-3" />
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-warm-200">
+          <h2 className="text-base font-semibold text-warm-900">New Task</h2>
+          <button onClick={onClose} className="p-1 text-warm-400 hover:text-warm-900 rounded-lg hover:bg-warm-100">
+            <X className="w-4 h-4" />
           </button>
         </div>
-      </td>
-    </tr>
-  )
-}
-
-// ── Task Row ──────────────────────────────────────────────────
-function TaskRow({ task, selected, onSelect, onToggleDone, onDelete, onUpdate, onAssign, onNavigateTopic, groupMembers }) {
-  const overdue = isOverdue(task.due_date)
-  const dueLabel = formatDue(task.due_date)
-  const done = task.status === 'done'
-
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft]     = useState({ title: task.title, priority: task.priority, due_date: task.due_date || '' })
-  const [saving, setSaving]   = useState(false)
-  const editRef = useRef()
-
-  useEffect(() => { if (editing) editRef.current?.focus() }, [editing])
-
-  async function saveEdit() {
-    if (!draft.title.trim()) return
-    setSaving(true)
-    try {
-      await onUpdate(task.id, { title: draft.title.trim(), priority: draft.priority, due_date: draft.due_date || null })
-      setEditing(false)
-    } finally { setSaving(false) }
-  }
-
-  function cancelEdit() {
-    setDraft({ title: task.title, priority: task.priority, due_date: task.due_date || '' })
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <tr className="bg-primary-50/40 border-l-2 border-primary-400">
-        <td className="pl-4 pr-2 py-2.5 w-10" />
-        <td className="px-3 py-2.5" colSpan={2}>
-          <input ref={editRef} value={draft.title}
-            onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
-            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit() }}
-            className="input w-full text-sm py-1.5" />
-        </td>
-        <td className="px-2 py-2.5 w-28 hidden md:table-cell">
-          <select value={draft.priority} onChange={e => setDraft(d => ({ ...d, priority: e.target.value }))}
-            className="input text-xs py-1 w-full">
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </td>
-        <td className="px-2 py-2.5 w-28 hidden lg:table-cell">
-          <input type="date" value={draft.due_date} onChange={e => setDraft(d => ({ ...d, due_date: e.target.value }))}
-            onClick={e => e.target.showPicker?.()}
-            className="input text-xs py-1 w-full cursor-pointer" />
-        </td>
-        {groupMembers.length > 0 && <td className="px-2 py-2.5 hidden xl:table-cell" />}
-        <td className="px-2 py-2.5 hidden xl:table-cell" />
-        <td className="pr-4 py-2.5">
-          <div className="flex gap-1">
-            <button onClick={saveEdit} disabled={!draft.title.trim() || saving}
-              className="btn-primary btn-sm">
-              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-              Save
-            </button>
-            <button onClick={cancelEdit} className="text-xs text-warm-500 px-2 py-1 rounded hover:bg-warm-100">Cancel</button>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Title */}
+          <div>
+            <label className="label">Title <span className="text-red-500">*</span></label>
+            <input
+              ref={titleRef}
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Task title…"
+              className="input w-full"
+              required
+            />
           </div>
-        </td>
-      </tr>
-    )
-  }
-
-  return (
-    <tr className={`group transition-colors ${overdue && !done ? 'border-l-4 border-red-400' : ''} ${done ? 'bg-warm-50/50' : 'hover:bg-warm-50'}`}>
-      {/* Checkbox */}
-      <td className="pl-4 pr-2 py-3 w-10">
-        {selected ? (
-          <button onClick={() => onSelect(task.id)} title="Deselect">
-            <CheckSquare2 className="w-5 h-5 rounded accent-primary-600 cursor-pointer text-primary-600" />
-          </button>
-        ) : (
-          <div className="relative w-5 h-5">
-            <button onClick={() => onToggleDone(task)} title={done ? 'Mark pending' : 'Mark done'}
-              className="absolute inset-0 transition-opacity group-hover:opacity-0">
-              {done ? <CheckSquare2 className="w-5 h-5 rounded accent-primary-600 cursor-pointer text-green-500" /> : <Square className="w-5 h-5 rounded accent-primary-600 cursor-pointer text-warm-300" />}
-            </button>
-            <button onClick={() => onSelect(task.id)} title="Select for bulk action"
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Square className="w-5 h-5 rounded accent-primary-600 cursor-pointer text-primary-400 hover:text-primary-600" />
-            </button>
+          {/* Project */}
+          <div>
+            <label className="label">Project <span className="text-red-500">*</span></label>
+            <select value={projectId} onChange={e => setProjectId(e.target.value)} className="input w-full" required>
+              <option value="">Select project…</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
-        )}
-      </td>
-
-      {/* Title */}
-      <td className="px-3 py-3">
-        <div className="min-w-0">
-          <span className={`text-sm leading-snug ${done ? 'line-through text-warm-400' : 'text-warm-900'}`}>
-            {task.title}
-          </span>
-          {task.assigned_to_name && !task.assigned_user && (
-            <span className="ml-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-              → {task.assigned_to_name}
-            </span>
-          )}
-          <div className="flex flex-wrap items-center gap-1.5 mt-1 sm:hidden">
-            <PriorityBadge priority={task.priority} />
-            {task.projects && <span className="text-xs text-warm-400">{task.projects.name}</span>}
+          {/* Status + Priority row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Status</label>
+              <select value={status} onChange={e => setStatus(e.target.value)} className="input w-full">
+                {WORKFLOW.map(w => <option key={w.key} value={w.key}>{w.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Priority</label>
+              <select value={priority} onChange={e => setPriority(e.target.value)} className="input w-full">
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
           </div>
-        </div>
-      </td>
-
-      {/* Priority */}
-      <td className="px-3 py-3 w-24 hidden sm:table-cell">
-        <PriorityBadge priority={task.priority} />
-      </td>
-
-      {/* Project */}
-      <td className="px-3 py-3 w-32 hidden md:table-cell">
-        {task.projects && (
-          <span className="text-xs text-warm-500 bg-warm-100 px-2 py-0.5 rounded-full line-clamp-1">
-            {task.projects.name}
-          </span>
-        )}
-      </td>
-
-      {/* Assignee (team mode) */}
-      {groupMembers.length > 0 && (
-        <td className="px-2 py-3 w-32 hidden lg:table-cell">
-          <AssigneeCell task={task} groupMembers={groupMembers} onAssign={onAssign} />
-        </td>
-      )}
-
-      {/* Due date */}
-      <td className="px-3 py-3 w-28 hidden lg:table-cell">
-        {dueLabel ? (
-          <span className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-medium' : 'text-warm-400'}`}>
-            {overdue && <AlertTriangle className="w-3 h-3" />}
-            {dueLabel}
-          </span>
-        ) : (
-          <span className="text-xs text-warm-300">—</span>
-        )}
-      </td>
-
-      {/* Topic */}
-      <td className="px-3 py-3 w-28 hidden xl:table-cell">
-        {task.topics ? (
-          <button onClick={() => onNavigateTopic(task.topics.id)}
-            className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline truncate max-w-[100px]">
-            <Tag className="w-3 h-3 flex-shrink-0" />
-            <span className="truncate">{task.topics.title}</span>
-          </button>
-        ) : (
-          <span className="text-xs text-warm-300">—</span>
-        )}
-      </td>
-
-      {/* Edit + Delete + Generate Tests */}
-      <td className="pr-4 py-3 w-32">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-          {task.type !== 'test_case' && (
-            <GenerateTestCasesButton taskId={task.id} label="" size="sm" variant="ghost" />
-          )}
-          <button onClick={() => setEditing(true)} title="Edit task"
-            className="p-1 text-warm-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => onDelete(task.id)} title="Delete task"
-            className="p-1 text-warm-400 hover:text-red-400 hover:bg-red-50 rounded transition-colors">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </td>
-    </tr>
-  )
-}
-
-// ── Bulk action bar ───────────────────────────────────────────
-function BulkBar({ count, onMarkDone, onPriority, onClear }) {
-  const [priorityOpen, setPriorityOpen] = useState(false)
-  const ref = useRef()
-
-  useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setPriorityOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
-  return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-600 text-white text-sm rounded-2xl mb-3">
-      <span className="font-medium">{count} selected</span>
-      <div className="flex gap-2 ml-auto">
-        <button onClick={onMarkDone}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium">
-          <CheckSquare2 className="w-3.5 h-3.5" /> Mark Done
-        </button>
-        <div className="relative" ref={ref}>
-          <button onClick={() => setPriorityOpen(o => !o)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium">
-            Priority <ChevronDown className={`w-3 h-3 transition-transform ${priorityOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {priorityOpen && (
-            <div className="absolute right-0 top-9 bg-white rounded-xl shadow-xl border border-warm-200 py-1 z-30 min-w-[110px]">
-              {[{ value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }].map(p => (
-                <button key={p.value} onClick={() => { onPriority(p.value); setPriorityOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-sm text-warm-900 hover:bg-primary-50 hover:text-primary-700">
-                  {p.label}
-                </button>
-              ))}
+          {/* Assignee */}
+          {groupMembers.length > 0 && (
+            <div>
+              <label className="label">Assignee</label>
+              <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="input w-full">
+                <option value="">Unassigned</option>
+                {groupMembers.map(m => {
+                  const u = m.users || m
+                  return <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                })}
+              </select>
             </div>
           )}
-        </div>
-        <button onClick={onClear} className="p-1.5 hover:bg-white/20 rounded-lg"><X className="w-3.5 h-3.5" /></button>
+          {/* Due date + Type row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Due Date</label>
+              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                onClick={e => e.target.showPicker?.()}
+                className="input w-full cursor-pointer" />
+            </div>
+            <div>
+              <label className="label">Type</label>
+              <select value={type} onChange={e => setType(e.target.value)} className="input w-full">
+                <option value="task">Task</option>
+                <option value="deployment_check">Post Deploy</option>
+                <option value="backlog">Backlog</option>
+              </select>
+            </div>
+          </div>
+          {/* Actions */}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
+            <button type="submit" disabled={!title.trim() || !projectId || saving} className="btn btn-primary">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Create Task
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
 }
 
-// ── Main ──────────────────────────────────────────────────────
-export default function Lists() {
-  const { user } = useAuth()
-  const { projects, fetchProjects } = useProjectStore()
+// ── Delete Confirm Modal ──────────────────────────────────────
+function DeleteConfirmModal({ title, onConfirm, onCancel }) {
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95">
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+          <Trash2 className="w-6 h-6 text-red-500" />
+        </div>
+        <h3 className="text-base font-semibold text-warm-900 text-center mb-1">Delete task?</h3>
+        <p className="text-sm text-warm-500 text-center mb-6 line-clamp-2">"{title}"</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 btn btn-secondary"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 btn bg-red-500 text-white hover:bg-red-600 border-red-500"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ── Detail Panel ──────────────────────────────────────────────
+function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete, onStatusChange }) {
+  const [title, setTitle]       = useState(task.title)
+  const [priority, setPriority] = useState(task.priority || 'medium')
+  const [dueDate, setDueDate]   = useState(task.due_date ? task.due_date.slice(0, 10) : '')
+  const [description, setDescription] = useState(task.description || '')
+  const [assignedTo, setAssignedTo]   = useState(task.assigned_user?.id || task.assigned_to || '')
+  const [saving, setSaving]     = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
 
-  const [activeTab, setActiveTab]     = useState('task')
-  const [assigneeFilter, setAssigneeFilter] = useState('all')
-  const [tasks, setTasks]             = useState([])
-  const [loading, setLoading]         = useState(false)
-  const [filterProject, setFilterProject] = useState('')
-  const [filterPriority, setFilterPriority] = useState('')
-  const [sort, setSort]               = useState('priority:desc')
-  const [search, setSearch]           = useState('')
-  const [showDone, setShowDone]       = useState(false)
-  const [selected, setSelected]       = useState(new Set())
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [groupMembers, setGroupMembers] = useState([])
-  const [userMode, setUserMode]       = useState(null)
+  const wf = WORKFLOW_MAP[normalizeStatus(task.status)] || WORKFLOW_MAP.todo
 
+  async function save() {
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      await onUpdate(task.id, {
+        title: title.trim(),
+        priority,
+        due_date: dueDate || null,
+        description: description || null,
+      })
+      if (assignedTo !== (task.assigned_user?.id || task.assigned_to || '')) {
+        await onUpdate(task.id, { assigned_to: assignedTo || null })
+      }
+      toast.success('Task saved')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleDelete() {
+    // Calls requestDelete in parent which shows the custom modal
+    onDelete(task.id, task.title)
+  }
+
+  return (
+    <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-warm-200 shadow-2xl z-50 flex flex-col">
+      {/* Panel header */}
+      <div className={`px-5 py-4 border-b border-warm-200 ${wf.headerBg}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${wf.dotColor}`} />
+            <span className={`text-xs font-semibold uppercase tracking-wide ${wf.textColor}`}>{wf.label}</span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/10 text-warm-500 hover:text-warm-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {/* Status dropdown */}
+        <StatusBadge
+          status={task.status}
+          onChange={newStatus => onStatusChange(task.id, newStatus)}
+        />
+      </div>
+
+      {/* Panel body */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {/* Title */}
+        <div>
+          <label className="label">Title</label>
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="input w-full font-medium"
+          />
+        </div>
+
+        {/* Priority */}
+        <div>
+          <label className="label">Priority</label>
+          <select value={priority} onChange={e => setPriority(e.target.value)} className="input w-full">
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+
+        {/* Assignee */}
+        {groupMembers.length > 0 && (
+          <div>
+            <label className="label">Assignee</label>
+            <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="input w-full">
+              <option value="">Unassigned</option>
+              {groupMembers.map(m => {
+                const u = m.users || m
+                return <option key={u.id} value={u.id}>{u.name || u.email}</option>
+              })}
+            </select>
+          </div>
+        )}
+
+        {/* Due date */}
+        <div>
+          <label className="label">Due Date</label>
+          <input
+            type="date"
+            value={dueDate}
+            onChange={e => setDueDate(e.target.value)}
+            onClick={e => e.target.showPicker?.()}
+            className="input w-full cursor-pointer"
+          />
+        </div>
+
+        {/* Project */}
+        {task.projects && (
+          <div>
+            <label className="label">Project</label>
+            <div className="text-sm text-warm-700 px-2 py-1.5 bg-warm-50 border border-warm-200 rounded-lg">
+              {task.projects.name}
+            </div>
+          </div>
+        )}
+
+        {/* Topic link */}
+        {task.topics && (
+          <div>
+            <label className="label">Topic</label>
+            <button
+              onClick={() => navigate(`/topics/${task.topics.id}`)}
+              className="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 hover:underline"
+            >
+              <Tag className="w-3.5 h-3.5 flex-shrink-0" />
+              {task.topics.title}
+            </button>
+          </div>
+        )}
+
+        {/* Description */}
+        <div>
+          <label className="label">Description</label>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            rows={4}
+            placeholder="Add a description…"
+            className="input w-full resize-none"
+          />
+        </div>
+      </div>
+
+      {/* Panel footer */}
+      <div className="px-5 py-4 border-t border-warm-200 flex items-center gap-2">
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="btn btn-sm text-red-600 hover:bg-red-50 border border-red-200"
+        >
+          {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+          Delete
+        </button>
+        <div className="flex-1" />
+        <button onClick={onClose} className="btn btn-secondary btn-sm">Cancel</button>
+        <button
+          onClick={save}
+          disabled={!title.trim() || saving}
+          className="btn btn-primary btn-sm"
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+          Save
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Board Card ────────────────────────────────────────────────
+function BoardCard({ task, onClick, onDragStart }) {
+  const overdue = isOverdue(task.due_date)
+  const dueLabel = formatDue(task.due_date)
+  const status = normalizeStatus(task.status)
+  const pm = PRIORITY_META[task.priority] || PRIORITY_META.medium
+
+  const borderAccent =
+    status === 'blocked'     ? 'border-l-4 border-l-red-400'  :
+    status === 'in_progress' ? 'border-l-4 border-l-blue-400' :
+    ''
+
+  return (
+    <div
+      draggable
+      onDragStart={e => { e.dataTransfer.setData('taskId', task.id); e.dataTransfer.effectAllowed = 'move'; onDragStart?.() }}
+      onClick={() => onClick(task)}
+      className={`bg-white rounded-xl border border-warm-200 p-3 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-all ${borderAccent}`}
+    >
+      {/* Title */}
+      <p className="text-sm font-medium text-warm-900 line-clamp-2 mb-2 leading-snug">{task.title}</p>
+
+      {/* Tags row */}
+      <div className="flex flex-wrap items-center gap-1 mb-2">
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${pm.badge}`}>
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${pm.dot}`} />
+          {pm.label}
+        </span>
+        {task.topics && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-primary-50 text-primary-600 border border-primary-100">
+            <Tag className="w-2.5 h-2.5" />
+            <span className="truncate max-w-[80px]">{task.topics.title}</span>
+          </span>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between gap-1 mt-1">
+        {/* Project */}
+        {task.projects && (
+          <span className="text-xs text-warm-400 truncate max-w-[100px]">{task.projects.name}</span>
+        )}
+        <div className="flex items-center gap-1.5 ml-auto">
+          {/* Due date */}
+          {dueLabel && (
+            <span className={`flex items-center gap-0.5 text-xs ${overdue ? 'text-red-500 font-medium' : 'text-warm-400'}`}>
+              {overdue ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+              {dueLabel}
+            </span>
+          )}
+          {/* Assignee avatar */}
+          {task.assigned_user && (
+            <Avatar name={task.assigned_user.name} size={5} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Board Column ──────────────────────────────────────────────
+function BoardColumn({ workflow, tasks, onCardClick, onStatusChange }) {
+  const wf = workflow
+  const count = tasks.length
+  const [dragOver, setDragOver] = useState(false)
+
+  function handleDragOver(e) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOver(true)
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setDragOver(false)
+    const taskId = e.dataTransfer.getData('taskId')
+    if (taskId) onStatusChange(taskId, wf.key)
+  }
+
+  return (
+    <div className="min-w-[260px] max-w-[260px] flex flex-col bg-warm-50 rounded-2xl border border-warm-200 overflow-hidden">
+      {/* Column header */}
+      <div className={`sticky top-0 z-10 px-3 py-2.5 ${wf.headerBg} border-b border-warm-200`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${wf.dotColor}`} />
+            <span className={`text-xs font-semibold uppercase tracking-wide ${wf.textColor}`}>{wf.label}</span>
+          </div>
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${wf.badgeBg}`}>{count}</span>
+        </div>
+      </div>
+
+      {/* Cards drop zone */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px] transition-colors ${dragOver ? 'bg-primary-50/60' : ''}`}
+      >
+        {tasks.map(task => (
+          <BoardCard key={task.id} task={task} onClick={onCardClick} />
+        ))}
+        {dragOver && tasks.length === 0 && (
+          <div className="h-16 border-2 border-dashed border-primary-300 rounded-xl flex items-center justify-center text-xs text-primary-400">
+            Drop here
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── List View Table ───────────────────────────────────────────
+function ListView({ tasks, groupMembers, filterProject, setFilterProject, filterStatus, setFilterStatus, filterPriority, setFilterPriority, projects, onStatusChange, onUpdate, onDelete, onCardClick, selectedIds, toggleSelect, toggleSelectAll, onBulkStatusChange, onBulkDelete }) {
+  const allSelected = tasks.length > 0 && selectedIds.size === tasks.length
+
+  return (
+    <div>
+      {/* Status filter pills — list-view only (project/priority/search live in the top bar) */}
+      <div className="flex flex-wrap items-center gap-1 mb-4">
+        <button
+          onClick={() => setFilterStatus([])}
+          className={`tab-pill text-xs ${filterStatus.length === 0 ? 'active' : 'inactive'}`}
+        >All Statuses</button>
+        {WORKFLOW.map(w => (
+          <button
+            key={w.key}
+            onClick={() => setFilterStatus(prev =>
+              prev.includes(w.key) ? prev.filter(s => s !== w.key) : [...prev, w.key]
+            )}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all ${
+              filterStatus.includes(w.key)
+                ? `${w.badgeBg} ring-2 ring-offset-1 ring-current`
+                : 'bg-warm-100 text-warm-500 hover:bg-warm-200'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${w.dotColor}`} />
+            {w.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-600 text-white text-sm rounded-2xl mb-3">
+          <span className="font-medium">{selectedIds.size} selected</span>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            {WORKFLOW.slice(0, 4).map(w => (
+              <button
+                key={w.key}
+                onClick={() => onBulkStatusChange(w.key)}
+                className="flex items-center gap-1 px-2.5 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium"
+              >
+                → {w.label}
+              </button>
+            ))}
+            <button
+              onClick={onBulkDelete}
+              className="flex items-center gap-1 px-2.5 py-1 bg-red-500/40 hover:bg-red-500/60 rounded-lg text-xs font-medium"
+            >
+              <Trash2 className="w-3 h-3" /> Delete
+            </button>
+            <button onClick={() => toggleSelectAll(false)} className="p-1.5 hover:bg-white/20 rounded-lg">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-warm-50 border-b border-warm-200">
+              <tr>
+                <th className="pl-4 pr-2 py-3 w-10">
+                  <button onClick={() => toggleSelectAll(!allSelected)} className="text-warm-300 hover:text-primary-600">
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${allSelected ? 'bg-primary-600 border-primary-600' : 'border-warm-300'}`}>
+                      {allSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                    </div>
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wide">Title</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wide w-36">Status</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wide w-24 hidden sm:table-cell">Priority</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wide w-32 hidden md:table-cell">Project</th>
+                {groupMembers.length > 0 && <th className="px-3 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wide w-32 hidden lg:table-cell">Assignee</th>}
+                <th className="px-3 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wide w-28 hidden lg:table-cell">Due Date</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wide w-28 hidden xl:table-cell">Topic</th>
+                <th className="pr-4 w-10" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-warm-100">
+              {tasks.map(task => {
+                const isSelected = selectedIds.has(task.id)
+                return (
+                  <tr
+                    key={task.id}
+                    className={`group transition-colors hover:bg-warm-50 ${isSelected ? 'bg-primary-50/30' : ''}`}
+                  >
+                    <td className="pl-4 pr-2 py-3 w-10">
+                      <button onClick={() => toggleSelect(task.id)} className="text-warm-300 hover:text-primary-600">
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-primary-600 border-primary-600' : 'border-warm-300 group-hover:border-primary-400'}`}>
+                          {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                      </button>
+                    </td>
+                    <td className="px-3 py-3">
+                      <button
+                        onClick={() => onCardClick(task)}
+                        className="text-sm text-warm-900 hover:text-primary-600 font-medium text-left line-clamp-1 max-w-[280px]"
+                      >
+                        {task.title}
+                      </button>
+                    </td>
+                    <td className="px-3 py-3 w-36">
+                      <StatusBadge
+                        status={task.status}
+                        onChange={newStatus => onStatusChange(task.id, newStatus)}
+                      />
+                    </td>
+                    <td className="px-3 py-3 w-24 hidden sm:table-cell">
+                      <PrioritySelect
+                        priority={task.priority}
+                        onChange={val => onUpdate(task.id, { priority: val })}
+                      />
+                    </td>
+                    <td className="px-3 py-3 w-32 hidden md:table-cell">
+                      {task.projects && (
+                        <span className="text-xs text-warm-500 bg-warm-100 px-2 py-0.5 rounded-full truncate max-w-[110px] block">
+                          {task.projects.name}
+                        </span>
+                      )}
+                    </td>
+                    {groupMembers.length > 0 && (
+                      <td className="px-3 py-3 w-36 hidden lg:table-cell">
+                        <AssigneeSelect
+                          task={task}
+                          groupMembers={groupMembers}
+                          onChange={userId => onUpdate(task.id, { assigned_to: userId })}
+                        />
+                      </td>
+                    )}
+                    <td className="px-3 py-3 w-28 hidden lg:table-cell">
+                      <DueDatePicker
+                        dueDate={task.due_date}
+                        onChange={val => onUpdate(task.id, { due_date: val })}
+                      />
+                    </td>
+                    <td className="px-3 py-3 w-28 hidden xl:table-cell">
+                      {task.topics ? (
+                        <span className="flex items-center gap-1 text-xs text-primary-600 truncate max-w-[100px]">
+                          <Tag className="w-3 h-3 flex-shrink-0" />
+                          {task.topics.title}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-warm-300">—</span>
+                      )}
+                    </td>
+                    <td className="pr-4 py-3 w-10">
+                      <button
+                        onClick={() => {
+                          onDelete(task.id, task.title)
+                        }}
+                        className="p-1 text-warm-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"
+                        title="Delete task"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          {tasks.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="text-warm-400 text-sm">No tasks match your filters.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────
+export default function Lists() {
+  const { user } = useAuth()
+  const { projects, loading: projectsLoading, fetchProjects } = useProjectStore()
+
+  const [view, setView]           = useState('board') // 'board' | 'list'
+  const [tasks, setTasks]         = useState([])
+  const [loading, setLoading]     = useState(false)
+  const [groupMembers, setGroupMembers] = useState([])
+
+  // Filters
+  const [filterProject, setFilterProject]   = useState('')
+  const [filterStatus, setFilterStatus]     = useState([])   // list view multi-status
+  const [filterPriority, setFilterPriority] = useState('')
+  const [search, setSearch]                 = useState('')
+
+  // UI state
+  const [showAddModal, setShowAddModal]     = useState(false)
+  const [addModalStatus, setAddModalStatus] = useState('todo')
+  const [showStatusPicker, setShowStatusPicker] = useState(false)
+  const [selectedTask, setSelectedTask]     = useState(null)
+  const [selectedIds, setSelectedIds]       = useState(new Set())
+  const [deleteTarget, setDeleteTarget]     = useState(null) // { id, title }
+
+  // Click-outside to close status picker
+  const addBtnRef = useRef(null)
+  useEffect(() => {
+    function handleOutside(e) {
+      if (addBtnRef.current && !addBtnRef.current.contains(e.target)) setShowStatusPicker(false)
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [])
+
+  // Load data on mount
   useEffect(() => {
     if (!user) return
-    if (!projects.length) fetchProjects(user.id)
-
-    async function loadGroupContext() {
-      const { data: profile } = await supabase
-        .from('users').select('mode').eq('id', user.id).single()
-      setUserMode(profile?.mode)
-
-      if (profile?.mode === 'team' || profile?.mode === 'org') {
-        try {
-          const res = await groupsApi.list()
-          const groups = res.data.data || []
-          if (groups.length > 0) {
-            const groupRes = await groupsApi.getGroupMembers(groups[0].id)
-            const members = groupRes.data.data?.members || []
-            setGroupMembers(members)
-          }
-        } catch { /* non-fatal */ }
-      }
-    }
-    loadGroupContext()
+    fetchProjects(user.id)
+    loadTasks()
+    loadGroupMembers()
   }, [user]) // eslint-disable-line
-
-  useEffect(() => { loadTasks() }, [activeTab, filterProject, showDone, assigneeFilter]) // eslint-disable-line
 
   async function loadTasks() {
     setLoading(true)
-    setSelected(new Set())
-    setShowAddForm(false)
     try {
-      const params = { type: activeTab, show_done: showDone ? 'true' : 'false' }
-      if (filterProject) params.project_id = filterProject
-      if (assigneeFilter === 'mine')  params.mine = 'true'
-      if (assigneeFilter === 'by_me') params.assigned_by_me = 'true'
-      const res = await tasksApi.list(params)
-      setTasks(res.data.data || [])
+      const res = await tasksApi.list({ excludeTestCases: true })
+      const all = res.data.data || []
+      // Filter out test_case on frontend
+      setTasks(all.filter(t => t.type !== 'test_case'))
     } catch {
       toast.error('Failed to load tasks')
     } finally {
@@ -563,258 +931,358 @@ export default function Lists() {
     }
   }
 
-  const displayed = useMemo(() => {
-    let list = tasks.filter(t => {
-      if (filterPriority && t.priority !== filterPriority) return false
-      if (search) {
-        const q = search.toLowerCase()
-        return t.title.toLowerCase().includes(q) || t.projects?.name.toLowerCase().includes(q)
+  async function loadGroupMembers() {
+    try {
+      const res = await groupsApi.list()
+      const groups = res.data.data || []
+      if (groups.length > 0) {
+        const groupRes = await groupsApi.get(groups[0].id)
+        const members = groupRes.data.data?.members || []
+        setGroupMembers(members)
       }
-      return true
-    })
-    const [field, dir] = sort.split(':')
-    list = [...list].sort((a, b) => {
-      let av = field === 'priority' ? PRIORITY_ORDER[a.priority] ?? 1 : a[field]
-      let bv = field === 'priority' ? PRIORITY_ORDER[b.priority] ?? 1 : b[field]
-      if (av == null) return 1
-      if (bv == null) return -1
-      if (av < bv) return dir === 'asc' ? -1 : 1
-      if (av > bv) return dir === 'asc' ? 1 : -1
-      return 0
-    })
-    return list
-  }, [tasks, filterPriority, search, sort])
-
-  function toggleSelect(id) {
-    setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-  }
-  function toggleSelectAll() {
-    if (selected.size === displayed.length) setSelected(new Set())
-    else setSelected(new Set(displayed.map(t => t.id)))
+    } catch { /* non-fatal */ }
   }
 
-  async function toggleDone(task) {
-    const newStatus = task.status === 'done' ? 'pending' : 'done'
+  // Status change with optimistic update
+  const handleStatusChange = useCallback(async (taskId, newStatus) => {
+    const prev = tasks.find(t => t.id === taskId)
+    if (!prev) return
+    // Optimistic
+    setTasks(ts => ts.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    if (selectedTask?.id === taskId) {
+      setSelectedTask(s => s ? { ...s, status: newStatus } : null)
+    }
     try {
-      await tasksApi.update(task.id, { status: newStatus })
-      if (!showDone && newStatus === 'done') setTasks(ts => ts.filter(t => t.id !== task.id))
-      else setTasks(ts => ts.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
-    } catch { toast.error('Failed to update task') }
-  }
+      // 'todo' is a frontend alias for DB value 'pending'
+      const dbStatus = newStatus === 'todo' ? 'pending' : newStatus
+      await tasksApi.update(taskId, { status: dbStatus })
+    } catch {
+      // Revert
+      setTasks(ts => ts.map(t => t.id === taskId ? prev : t))
+      if (selectedTask?.id === taskId) setSelectedTask(prev)
+      toast.error('Failed to update status')
+    }
+  }, [tasks, selectedTask])
 
-  async function deleteTask(id) {
-    try {
-      await tasksApi.delete(id)
-      setTasks(ts => ts.filter(t => t.id !== id))
-      setSelected(s => { const n = new Set(s); n.delete(id); return n })
-      toast.success('Task deleted')
-    } catch { toast.error('Failed to delete task') }
-  }
-
-  async function updateTask(taskId, patch) {
+  async function handleUpdate(taskId, patch) {
+    // Optimistic update so UI responds instantly
+    let optimisticExtra = {}
+    if ('assigned_to' in patch) {
+      const member = groupMembers.find(m => (m.users || m)?.id === patch.assigned_to)
+      const u = member ? (member.users || member) : null
+      optimisticExtra.assigned_user = u ? { id: u.id, name: u.name || u.email, avatar_url: u.avatar_url || null } : null
+    }
+    setTasks(ts => ts.map(t => t.id === taskId ? { ...t, ...patch, ...optimisticExtra } : t))
+    if (selectedTask?.id === taskId) setSelectedTask(s => s ? { ...s, ...patch, ...optimisticExtra } : null)
     try {
       const res = await tasksApi.update(taskId, patch)
-      setTasks(ts => ts.map(t => t.id === taskId ? { ...t, ...res.data.data } : t))
-      toast.success('Task updated')
+      const updated = res.data.data
+      if (updated) {
+        setTasks(ts => ts.map(t => t.id === taskId ? { ...t, ...updated } : t))
+        if (selectedTask?.id === taskId) setSelectedTask(s => s ? { ...s, ...updated } : null)
+      }
     } catch {
       toast.error('Failed to update task')
-      throw new Error('update failed')
+      // revert
+      setTasks(ts => ts.map(t => t.id === taskId ? { ...t, ...Object.fromEntries(Object.keys(patch).map(k => [k, t[k]])) } : t))
     }
   }
 
-  async function assignTask(taskId, memberId) {
-    try {
-      const res = await tasksApi.assign(taskId, memberId)
-      setTasks(ts => ts.map(t => t.id === taskId ? { ...t, ...res.data.data } : t))
-      toast.success(memberId ? 'Task assigned' : 'Assignee removed')
-    } catch { toast.error('Failed to assign task') }
+  // Show custom modal; actual delete fires on confirm
+  function requestDelete(taskId, taskTitle) {
+    setDeleteTarget({ id: taskId, title: taskTitle || 'this task' })
+    if (selectedTask?.id === taskId) setSelectedTask(null) // close detail panel
   }
 
-  async function bulkMarkDone() {
-    const ids = [...selected]
+  async function handleDeleteConfirmed() {
+    if (!deleteTarget) return
+    const { id } = deleteTarget
+    setDeleteTarget(null)
     try {
-      await tasksApi.bulk({ task_ids: ids, updates: { status: 'done' } })
-      toast.success(`${ids.length} tasks marked done`)
-      if (!showDone) setTasks(ts => ts.filter(t => !ids.includes(t.id)))
-      else setTasks(ts => ts.map(t => ids.includes(t.id) ? { ...t, status: 'done' } : t))
-      setSelected(new Set())
-    } catch { toast.error('Bulk update failed') }
+      await tasksApi.delete(id)
+      setTasks(ts => ts.filter(t => t.id !== id))
+      setSelectedIds(s => { const n = new Set(s); n.delete(id); return n })
+      toast.success('Task deleted')
+    } catch {
+      toast.error('Failed to delete task')
+    }
   }
 
-  async function bulkPriority(priority) {
-    const ids = [...selected]
+  async function handleBulkDeleteConfirmed() {
+    const ids = [...selectedIds]
+    setDeleteTarget(null)
     try {
-      await tasksApi.bulk({ task_ids: ids, updates: { priority } })
-      setTasks(ts => ts.map(t => ids.includes(t.id) ? { ...t, priority } : t))
-      toast.success(`Updated ${ids.length} tasks to ${priority} priority`)
-      setSelected(new Set())
-    } catch { toast.error('Bulk update failed') }
+      await Promise.all(ids.map(id => tasksApi.delete(id)))
+      setTasks(ts => ts.filter(t => !ids.includes(t.id)))
+      setSelectedIds(new Set())
+      toast.success(`${ids.length} tasks deleted`)
+    } catch {
+      toast.error('Delete failed')
+    }
   }
 
-  const pendingCount = tasks.filter(t => t.status !== 'done').length
-  const overdueCount = tasks.filter(t => isOverdue(t.due_date) && t.status !== 'done').length
-  const isTeamMode = userMode === 'team' || userMode === 'org'
+  // Normalize 'todo' alias to DB value 'pending' before saving
+  function toDbStatus(s) { return s === 'todo' ? 'pending' : (s || 'pending') }
+
+  async function handleCreate(payload) {
+    try {
+      const status = toDbStatus(payload.status || addModalStatus)
+      const res = await tasksApi.create({ ...payload, status })
+      const created = res.data.data
+      if (created) setTasks(ts => [created, ...ts])
+      toast.success('Task created!')
+    } catch {
+      toast.error('Failed to create task')
+      throw new Error('create failed')
+    }
+  }
+
+  // Bulk actions
+  async function handleBulkStatusChange(newStatus) {
+    const ids = [...selectedIds]
+    const prevTasks = [...tasks]
+    const dbStatus = toDbStatus(newStatus)
+    setTasks(ts => ts.map(t => ids.includes(t.id) ? { ...t, status: newStatus } : t))
+    try {
+      await Promise.all(ids.map(id => tasksApi.update(id, { status: dbStatus })))
+      toast.success(`${ids.length} tasks updated`)
+      setSelectedIds(new Set())
+    } catch {
+      setTasks(prevTasks)
+      toast.error('Bulk update failed')
+    }
+  }
+
+  function handleBulkDelete() {
+    setDeleteTarget({ id: '__bulk__', title: `${selectedIds.size} selected tasks` })
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  function toggleSelectAll(selectAll) {
+    if (selectAll) setSelectedIds(new Set(filteredTasks.map(t => t.id)))
+    else setSelectedIds(new Set())
+  }
+
+  // Filtered tasks
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (filterProject && t.project_id !== filterProject) return false
+      if (filterPriority && t.priority !== filterPriority) return false
+      if (filterStatus.length > 0 && !filterStatus.includes(normalizeStatus(t.status))) return false
+      if (search) {
+        const q = search.toLowerCase()
+        return (
+          t.title.toLowerCase().includes(q) ||
+          (t.projects?.name || '').toLowerCase().includes(q)
+        )
+      }
+      return true
+    })
+  }, [tasks, filterProject, filterPriority, filterStatus, search])
+
+  // Group tasks by status for board view
+  const tasksByStatus = useMemo(() => {
+    const map = {}
+    WORKFLOW.forEach(w => { map[w.key] = [] })
+    filteredTasks.forEach(t => {
+      const s = normalizeStatus(t.status)
+      if (map[s]) map[s].push(t)
+      else map['todo'].push(t)
+    })
+    return map
+  }, [filteredTasks])
+
+  const totalCount = tasks.length
+  const projectCount = useMemo(() => new Set(tasks.map(t => t.project_id).filter(Boolean)).size, [tasks])
 
   return (
-    <PageShell>
-      <PageHeader
-        title="Task Lists"
-        subtitle={
-          <>
-            {pendingCount} pending
-            {overdueCount > 0 && <span className="text-red-500 ml-2">· {overdueCount} overdue</span>}
-          </>
-        }
-        actions={
-          <>
-            <button onClick={loadTasks} disabled={loading} className="btn-secondary btn-sm">
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-            </button>
-            <button onClick={() => setShowAddForm(true)} className="btn-primary btn-sm">
-              <Plus className="w-4 h-4" /> Add Task
-            </button>
-          </>
-        }
-      />
-
-      <FilterPills
-        value={activeTab}
-        onChange={key => { setActiveTab(key); setSearch('') }}
-        options={TABS.map(t => ({
-          value: t.key,
-          label: t.label,
-          icon: t.icon,
-          count: tasks.filter(t2 => t2.type === t.key && t2.status !== 'done').length,
-        }))}
-        className="mb-6"
-      />
-
-      {isTeamMode && (
-        <div className="mb-4">
-          <FilterPills
-            value={assigneeFilter}
-            onChange={setAssigneeFilter}
-            options={[
-              { value: 'all',   label: 'All Tasks',     icon: ListChecks },
-              { value: 'mine',  label: 'My Tasks',      icon: UserCircle },
-              { value: 'by_me', label: 'Assigned by Me', icon: Users },
-            ]}
-          />
-        </div>
-      )}
-
-      <PageToolbar className="mb-4">
-        <ProjectSelect
-          value={filterProject}
-          onChange={setFilterProject}
-          projects={projects}
-          showAll
-        />
-        <FilterPills
-          value={filterPriority}
-          onChange={setFilterPriority}
-          options={[
-            { value: '', label: 'All' },
-            { value: 'high', label: 'High' },
-            { value: 'medium', label: 'Med' },
-            { value: 'low', label: 'Low' },
-          ]}
-        />
-        <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} />
-        <button onClick={() => setShowDone(d => !d)}
-          className={`tab-pill ${showDone ? 'active' : 'inactive'}`}>
-          <CheckSquare2 className="w-3.5 h-3.5" /> Show Done
-        </button>
-        <SearchInput value={search} onChange={setSearch} placeholder="Search tasks…" className="w-64 flex-none" />
-      </PageToolbar>
-
-      {selected.size > 0 && (
-        <BulkBar count={selected.size} onMarkDone={bulkMarkDone} onPriority={bulkPriority} onClear={() => setSelected(new Set())} />
-      )}
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-sm">
-        {loading ? (
-          <PageLoader className="py-16" />
-        ) : displayed.length === 0 && !showAddForm ? (
-          (() => { const T = TABS.find(t => t.key === activeTab); const Icon = T.icon; return (
-            <div className="empty-state">
-              <div className="empty-state-icon"><Icon className="w-8 h-8" /></div>
-              <p className="empty-state-title">{T.emptyMsg}</p>
-              <button onClick={() => setShowAddForm(true)}
-                className="btn-primary btn-sm mt-4">
-                <Plus className="w-3.5 h-3.5" /> Add one manually
+    <div className="flex flex-col h-full min-h-0">
+      {/* ── Page Header ─── */}
+      <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-warm-200 bg-white">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-warm-900">Task Lists</h1>
+            <p className="text-sm text-warm-400 mt-0.5">
+              {totalCount} tasks across {projectCount} project{projectCount !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* View toggle */}
+            <div className="flex items-center bg-warm-100 rounded-xl p-1 gap-0.5">
+              <button
+                onClick={() => setView('board')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === 'board' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-500 hover:text-warm-700'}`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Board
+              </button>
+              <button
+                onClick={() => setView('list')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === 'list' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-500 hover:text-warm-700'}`}
+              >
+                <List className="w-4 h-4" />
+                List
               </button>
             </div>
-          )})()
-        ) : (
-          <table className="w-full">
-            <thead className="bg-warm-50 border-b border-warm-200">
-              <tr>
-                <th className="pl-4 pr-2 py-2.5 w-10">
-                  <button onClick={toggleSelectAll} className="text-warm-300 hover:text-primary-600">
-                    {selected.size === displayed.length && displayed.length > 0
-                      ? <CheckSquare2 className="w-4 h-4 text-primary-600" />
-                      : <Square className="w-4 h-4" />
-                    }
-                  </button>
-                </th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500">Task</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-24 hidden sm:table-cell">Priority</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-32 hidden md:table-cell">Project</th>
-                {isTeamMode && <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-32 hidden lg:table-cell">Assignee</th>}
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-28 hidden lg:table-cell">Due</th>
-                <th className="px-3 py-2.5 text-left text-xs font-medium text-warm-500 w-28 hidden xl:table-cell">Topic</th>
-                <th className="pr-4 w-10" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-warm-100">
-              {displayed.map(task => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  selected={selected.has(task.id)}
-                  groupMembers={groupMembers}
-                  onSelect={toggleSelect}
-                  onToggleDone={toggleDone}
-                  onDelete={deleteTask}
-                  onUpdate={updateTask}
-                  onAssign={assignTask}
-                  onNavigateTopic={id => navigate(`/topics/${id}`)}
-                />
-              ))}
-              {showAddForm && (
-                <QuickAddRow
-                  projects={projects}
-                  activeType={activeTab}
-                  groupMembers={groupMembers}
-                  onAdd={() => { setShowAddForm(false); loadTasks() }}
-                  onCancel={() => setShowAddForm(false)}
-                />
-              )}
-            </tbody>
-          </table>
-        )}
-
-        {!loading && displayed.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-warm-100 bg-warm-50 text-xs text-warm-400 flex items-center justify-between">
-            <span>
-              {displayed.length} task{displayed.length !== 1 ? 's' : ''}
-              {search && ` matching "${search}"`}
-              {overdueCount > 0 && <span className="text-red-500 ml-2">· {overdueCount} overdue</span>}
-            </span>
-            {showAddForm ? (
-              <button onClick={() => setShowAddForm(false)} className="text-warm-400 hover:text-warm-900 flex items-center gap-1">
-                <X className="w-3 h-3" /> Cancel add
+            {/* Refresh */}
+            <button
+              onClick={loadTasks}
+              disabled={loading}
+              className="btn btn-secondary btn-sm"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            {/* Add Task — status picker popover */}
+            <div className="relative" ref={addBtnRef}>
+              <button
+                onClick={() => setShowStatusPicker(p => !p)}
+                className="btn btn-primary btn-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add Task
               </button>
-            ) : (
-              <button onClick={() => setShowAddForm(true)} className="text-primary-600 hover:text-primary-700 flex items-center gap-1">
-                <Plus className="w-3 h-3" /> Add task
+              {showStatusPicker && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-warm-200 rounded-xl shadow-lg z-50 py-1.5 min-w-[190px]">
+                  <p className="px-3 py-1 text-[11px] font-semibold text-warm-400 uppercase tracking-wide">Add to column</p>
+                  {WORKFLOW.map(wf => (
+                    <button
+                      key={wf.key}
+                      onClick={() => { setAddModalStatus(wf.key); setShowStatusPicker(false); setShowAddModal(true) }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-warm-700 hover:bg-warm-50 transition-colors"
+                    >
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${wf.dotColor}`} />
+                      {wf.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Compact single-row filter bar */}
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          {/* Project inline select */}
+          <select
+            value={filterProject}
+            onChange={e => setFilterProject(e.target.value)}
+            className="input text-sm py-1.5 max-w-[160px]"
+          >
+            <option value="">All Projects</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {/* Search */}
+          <div className="relative flex-1 min-w-[160px] max-w-xs">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search tasks…"
+              className="input w-full py-1.5 pl-3 pr-8 text-sm"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-warm-400 hover:text-warm-700">
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
+          {/* Priority pills */}
+          <div className="flex items-center gap-1">
+            {[{ v: '', l: 'All' }, { v: 'high', l: 'High' }, { v: 'medium', l: 'Med' }, { v: 'low', l: 'Low' }].map(p => (
+              <button
+                key={p.v}
+                onClick={() => setFilterPriority(p.v)}
+                className={`tab-pill text-xs ${filterPriority === p.v ? 'active' : 'inactive'}`}
+              >{p.l}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Body ─── */}
+      <div className="flex-1 min-h-0 overflow-auto px-6 py-4">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+          </div>
+        ) : view === 'board' ? (
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {WORKFLOW.map(wf => (
+              <BoardColumn
+                key={wf.key}
+                workflow={wf}
+                tasks={tasksByStatus[wf.key] || []}
+                onCardClick={task => setSelectedTask(task)}
+                onStatusChange={handleStatusChange}
+              />
+            ))}
+          </div>
+        ) : (
+          <ListView
+            tasks={filteredTasks}
+            groupMembers={groupMembers}
+            filterProject={filterProject}
+            setFilterProject={setFilterProject}
+            filterStatus={filterStatus}
+            setFilterStatus={setFilterStatus}
+            filterPriority={filterPriority}
+            setFilterPriority={setFilterPriority}
+            projects={projects}
+            onStatusChange={handleStatusChange}
+            onUpdate={handleUpdate}
+            onDelete={requestDelete}
+            onCardClick={task => setSelectedTask(task)}
+            selectedIds={selectedIds}
+            toggleSelect={toggleSelect}
+            toggleSelectAll={toggleSelectAll}
+            onBulkStatusChange={handleBulkStatusChange}
+            onBulkDelete={handleBulkDelete}
+          />
         )}
       </div>
-    </PageShell>
+
+      {/* ── Add Task Modal ─── */}
+      {showAddModal && (
+        <AddTaskModal
+          projects={projects}
+          groupMembers={groupMembers}
+          initialStatus={addModalStatus}
+          onClose={() => setShowAddModal(false)}
+          onSave={handleCreate}
+        />
+      )}
+
+      {/* ── Detail Panel ─── */}
+      {selectedTask && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/20 z-40"
+            onClick={() => setSelectedTask(null)}
+          />
+          <DetailPanel
+            task={selectedTask}
+            groupMembers={groupMembers}
+            projects={projects}
+            onClose={() => setSelectedTask(null)}
+            onUpdate={handleUpdate}
+            onDelete={requestDelete}
+            onStatusChange={handleStatusChange}
+          />
+        </>
+      )}
+
+      {/* ── Delete Confirm Modal ─── */}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title={deleteTarget.title}
+          onConfirm={deleteTarget.id === '__bulk__' ? handleBulkDeleteConfirmed : handleDeleteConfirmed}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </div>
   )
 }

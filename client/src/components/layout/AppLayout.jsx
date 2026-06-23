@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { supabase } from '../../config/supabase'
 import { notificationsApi } from '../../services/api'
 import {
-  LayoutDashboard, MessageSquarePlus, FolderOpen, ListChecks,
+  LayoutDashboard, FolderOpen, ListChecks,
   CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
   Bell, CheckCheck, ClipboardList, BarChart3, Shield, FlaskConical,
 } from 'lucide-react'
@@ -16,7 +16,6 @@ import toast from 'react-hot-toast'
 function getNavItems(mode) {
   const items = [
     { to: '/dashboard',  icon: LayoutDashboard,  label: 'Dashboard' },
-    { to: '/log',        icon: MessageSquarePlus, label: 'Log Discussion' },
     { to: '/topics',     icon: Tag,               label: 'Topics' },
     { to: '/projects',   icon: FolderOpen,        label: 'Projects' },
     { to: '/lists',      icon: ListChecks,        label: 'Lists' },

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { projectsApi, topicsApi, tasksApi, timelineApi, discussionsApi, publishApi } from '../services/api'
-import GenerateTestCasesButton from '../components/shared/GenerateTestCasesButton'
 import { useProjectStore } from '../stores/useProjectStore'
 import {
   ArrowLeft, FolderOpen, CheckSquare2, Tag, AlertTriangle,
@@ -252,9 +251,6 @@ function TasksTab({ projectId }) {
                   {t.due_date ? new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                 </td>
                 <td className="px-4 py-3">
-                  {t.type !== 'test_case' && (
-                    <GenerateTestCasesButton taskId={t.id} label="" size="sm" variant="ghost" />
-                  )}
                 </td>
               </tr>
             )
