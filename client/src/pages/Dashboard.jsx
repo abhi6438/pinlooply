@@ -457,8 +457,10 @@ export default function Dashboard() {
       .catch(() => {})
   }, [userMode])
 
+  const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
   const highPriorityTasks = tasks
-    .filter(t => t.priority === 'high' && t.status !== 'done')
+    .filter(t => t.status !== 'done' && t.status !== 'released')
+    .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1))
     .slice(0, 5)
 
   const taskCountByProject = tasks.reduce((acc, t) => {
@@ -507,7 +509,7 @@ export default function Dashboard() {
 
           <div className="card">
             <h2 className="section-title mb-1">Today's Priorities</h2>
-            <p className="text-xs text-warm-400 mb-4">High priority tasks across all projects</p>
+            <p className="text-xs text-warm-400 mb-4">Open tasks across all projects, sorted by priority</p>
             {highPriorityTasks.length > 0 ? (
               highPriorityTasks.map(task => (
                 <PriorityTask key={task.id} task={task} onToggle={updateTaskStatus} />
@@ -516,7 +518,7 @@ export default function Dashboard() {
               <div className="empty-state py-8">
                 <CheckCircle2 className="empty-state-icon w-10 h-10 mx-auto mb-2" />
                 <p className="empty-state-title">All clear!</p>
-                <p className="empty-state-sub">No high priority tasks right now.</p>
+                <p className="empty-state-sub">No open tasks right now.</p>
               </div>
             )}
           </div>

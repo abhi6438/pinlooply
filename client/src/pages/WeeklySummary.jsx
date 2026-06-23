@@ -52,8 +52,8 @@ function formatAsText(data) {
   for (const p of data.projects || []) {
     out += `📋 ${p.project_name}\n`
     if (p.completed?.length) out += `  ✅ Completed: ${p.completed.join(', ')}\n`
-    if (p.changed?.length) out += `  🔄 Changed: ${p.changed.join(', ')}\n`
-    if (p.pending?.length) out += `  ⏳ Pending: ${p.pending.join(', ')}\n`
+    if (p.changed?.length)   out += `  🔄 Changed: ${p.changed.join(', ')}\n`
+    if (p.pending?.length)   out += `  ⏳ Pending: ${p.pending.join(', ')}\n`
     if (p.conflicts?.length) out += `  ⚠️ Conflicts: ${p.conflicts.join(', ')}\n`
     out += '\n'
   }
@@ -87,11 +87,10 @@ function Section({ icon, label, items, color }) {
 // ── Per-project card ──────────────────────────────────────────
 function ProjectCard({ project }) {
   const [collapsed, setCollapsed] = useState(false)
-  const hasConflicts   = project.conflicts?.length > 0
-  const totalActivity  = (project.completed?.length || 0) + (project.changed?.length || 0)
+  const hasConflicts = project.conflicts?.length > 0
 
   return (
-    <div className="card-hover overflow-hidden">
+    <div className="card overflow-hidden">
       <div
         className="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-warm-50 transition-colors select-none"
         onClick={() => setCollapsed(c => !c)}
@@ -152,17 +151,26 @@ function StatBox({ icon: Icon, value, label, iconBg, iconColor }) {
 
 // ── Right panel ───────────────────────────────────────────────
 function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
-  if (!data && !loading) return null
-
   return (
     <div className="card space-y-4 p-5">
       {/* Stats grid */}
-      {data && (
+      {data ? (
         <div className="grid grid-cols-2 gap-3">
           <StatBox icon={CheckCircle2}  value={data.stats.totalCompleted}  label="Completed"   iconBg="bg-emerald-100" iconColor="text-emerald-600" />
           <StatBox icon={MessageSquare} value={data.stats.totalDiscussions} label="Discussions" iconBg="bg-primary-100" iconColor="text-primary-600" />
           <StatBox icon={Clock}         value={data.stats.totalPending}     label="Pending"     iconBg="bg-warm-100"    iconColor="text-warm-500" />
           <StatBox icon={AlertCircle}   value={data.stats.totalConflicts}   label="Conflicts"   iconBg="bg-amber-100"   iconColor="text-amber-600" />
+        </div>
+      ) : (
+        /* Skeleton stats while loading */
+        <div className="grid grid-cols-2 gap-3">
+          {[0,1,2,3].map(i => (
+            <div key={i} className="bg-warm-50 rounded-xl p-4 border border-warm-100 animate-pulse">
+              <div className="w-8 h-8 rounded-lg bg-warm-100 mb-2" />
+              <div className="h-6 w-10 bg-warm-100 rounded mb-1" />
+              <div className="h-3 w-16 bg-warm-100 rounded" />
+            </div>
+          ))}
         </div>
       )}
 
@@ -178,12 +186,19 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
       )}
 
       {/* Overall summary */}
-      {data?.overall_summary && (
+      {data?.overall_summary ? (
         <div className="bg-primary-50 rounded-xl p-4">
           <p className="text-[11px] font-semibold text-primary-600 uppercase tracking-wide mb-2">AI Summary</p>
           <p className="text-sm text-primary-900 leading-relaxed">{data.overall_summary}</p>
         </div>
-      )}
+      ) : loading ? (
+        <div className="bg-warm-50 rounded-xl p-4 animate-pulse space-y-2">
+          <div className="h-3 w-20 bg-warm-100 rounded" />
+          <div className="h-4 bg-warm-100 rounded w-full" />
+          <div className="h-4 bg-warm-100 rounded w-5/6" />
+          <div className="h-4 bg-warm-100 rounded w-4/6" />
+        </div>
+      ) : null}
 
       {/* Highlights */}
       {data?.highlights?.length > 0 && (
@@ -237,12 +252,83 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
   )
 }
 
+// ── Full-width loading skeleton ───────────────────────────────
+function LoadingSkeleton() {
+  return (
+    <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
+      {/* Left skeleton */}
+      <div className="lg:col-span-2 space-y-4">
+        {[0, 1, 2].map(i => (
+          <div key={i} className="card p-5 animate-pulse">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-warm-100" />
+              <div className="flex-1">
+                <div className="h-4 bg-warm-100 rounded w-40 mb-1.5" />
+                <div className="h-3 bg-warm-100 rounded w-24" />
+              </div>
+              <div className="h-5 w-16 bg-warm-100 rounded-full" />
+            </div>
+            <div className="space-y-3 pt-2 border-t border-warm-100">
+              {[0, 1].map(j => (
+                <div key={j} className="flex gap-3">
+                  <div className="h-3 w-16 bg-warm-100 rounded" />
+                  <div className="flex-1 h-3 bg-warm-100 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Right skeleton */}
+      <div className="lg:col-span-1">
+        <div className="card p-5 animate-pulse space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {[0,1,2,3].map(i => (
+              <div key={i} className="bg-warm-50 rounded-xl p-4 border border-warm-100">
+                <div className="w-8 h-8 rounded-lg bg-warm-100 mb-2" />
+                <div className="h-6 w-10 bg-warm-100 rounded mb-1" />
+                <div className="h-3 w-16 bg-warm-100 rounded" />
+              </div>
+            ))}
+          </div>
+          <div className="bg-warm-50 rounded-xl p-4 space-y-2">
+            <div className="h-3 w-20 bg-warm-100 rounded" />
+            <div className="h-4 bg-warm-100 rounded w-full" />
+            <div className="h-4 bg-warm-100 rounded w-5/6" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── No-activity empty state ───────────────────────────────────
+function NoActivityState({ onRegenerate }) {
+  return (
+    <div className="flex-1 flex items-center justify-center py-8">
+      <div className="max-w-md w-full card p-10 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-warm-100 flex items-center justify-center mx-auto mb-4">
+          <BarChart3 className="w-8 h-8 text-warm-300" />
+        </div>
+        <h3 className="text-lg font-semibold text-warm-900 mb-2">No activity this week</h3>
+        <p className="text-sm text-warm-500 leading-relaxed mb-6">
+          Log discussions or complete tasks this week to see a summary here. Activity is tracked in real-time.
+        </p>
+        <button onClick={onRegenerate} className="btn-secondary flex items-center gap-2 mx-auto">
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────
 export default function WeeklySummary() {
   const thisWeek = currentWeekStr()
   const [week, setWeek]       = useState(thisWeek)
   const [data, setData]       = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [copied, setCopied]   = useState(false)
 
   const isCurrentWeek = week === thisWeek
@@ -286,19 +372,27 @@ export default function WeeklySummary() {
   return (
     <div className="h-full flex flex-col px-6 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div className="flex items-center justify-between mb-6 flex-shrink-0 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-warm-900">Weekly Summary 📊</h1>
-          {range && (
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-warm-900">Weekly Summary</h1>
+            <span className="badge badge-purple">AI</span>
+          </div>
+          {range ? (
             <div className="flex items-center gap-1.5 mt-0.5 text-sm text-warm-400">
               <Calendar className="w-3.5 h-3.5" />
               <span>{range}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 mt-0.5 text-sm text-warm-400">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{isCurrentWeek ? 'This week' : week}</span>
             </div>
           )}
         </div>
 
         {/* Week navigator */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
           <button
             onClick={prevWeek}
             className="btn-ghost btn-sm flex items-center gap-1"
@@ -306,7 +400,7 @@ export default function WeeklySummary() {
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="font-semibold text-warm-900 text-sm min-w-[90px] text-center">
+          <span className="text-sm font-semibold text-warm-900 min-w-[80px] text-center px-2">
             {isCurrentWeek ? 'This week' : week}
           </span>
           <button
@@ -320,44 +414,32 @@ export default function WeeklySummary() {
         </div>
       </div>
 
-      {/* Two-column layout */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
-        {/* Left — project cards (lg:col-span-2) */}
-        <div className="lg:col-span-2 overflow-y-auto pr-1 space-y-4">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-full py-24">
-              <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center mb-4">
-                <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
-              </div>
-              <p className="text-sm text-warm-500">Generating weekly summary…</p>
-            </div>
-          ) : !data ? null
-          : data.projects.length === 0 ? (
-            <div className="empty-state card">
-              <FolderOpen className="w-10 h-10 text-warm-200 mb-3 mx-auto" />
-              <p className="text-sm font-medium text-warm-500 mb-1">No activity this week</p>
-              <p className="text-xs text-warm-400">Log discussions or complete tasks to see a summary here</p>
-            </div>
-          ) : (
-            <>
-              {data.projects.map((p, i) => (
-                <ProjectCard key={i} project={p} />
-              ))}
-            </>
-          )}
-        </div>
+      {/* Content */}
+      {loading ? (
+        <LoadingSkeleton />
+      ) : !data || data.projects?.length === 0 ? (
+        <NoActivityState onRegenerate={() => load(week)} />
+      ) : (
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
+          {/* Left — project cards */}
+          <div className="lg:col-span-2 overflow-y-auto pr-1 space-y-4">
+            {data.projects.map((p, i) => (
+              <ProjectCard key={i} project={p} />
+            ))}
+          </div>
 
-        {/* Right — stats + summary panel (lg:col-span-1) */}
-        <div className="lg:col-span-1 overflow-y-auto">
-          <SummaryPanel
-            data={data}
-            loading={loading}
-            copied={copied}
-            onCopy={copyToClipboard}
-            onRegenerate={() => load(week)}
-          />
+          {/* Right — stats + summary panel */}
+          <div className="lg:col-span-1 overflow-y-auto">
+            <SummaryPanel
+              data={data}
+              loading={loading}
+              copied={copied}
+              onCopy={copyToClipboard}
+              onRegenerate={() => load(week)}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

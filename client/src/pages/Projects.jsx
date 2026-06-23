@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { projectsApi } from '../services/api'
 import {
@@ -12,6 +13,26 @@ import {
 } from '../components/ui'
 
 const FREE_PROJECT_LIMIT = 3
+
+// ── Confirm Modal ─────────────────────────────────────────────
+function ConfirmModal({ icon: Icon = Archive, iconBg = 'bg-amber-50', iconColor = 'text-amber-500', title, message, confirmLabel = 'Confirm', confirmClass = 'bg-amber-500 text-white hover:bg-amber-600 border-amber-500', onConfirm, onCancel }) {
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mx-auto mb-4`}>
+          <Icon className={`w-6 h-6 ${iconColor}`} />
+        </div>
+        <h3 className="text-base font-semibold text-warm-900 text-center mb-1">{title}</h3>
+        {message && <p className="text-sm text-warm-500 text-center mb-6">{message}</p>}
+        <div className="flex gap-3 mt-6">
+          <button onClick={onCancel} className="flex-1 btn btn-secondary">Cancel</button>
+          <button onClick={onConfirm} className={`flex-1 btn border ${confirmClass}`}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
 
 const COLORS = [
   '#7C3AED', '#2563eb', '#0d9488', '#16a34a',
@@ -219,8 +240,15 @@ export default function Projects() {
     setModal('create')
   }
 
+  const [archiveTarget, setArchiveTarget] = useState(null)
+
   async function handleArchive(project) {
-    if (!confirm(`Archive "${project.name}"? It will be hidden from your workspace.`)) return
+    setArchiveTarget(project)
+  }
+
+  async function doArchive() {
+    const project = archiveTarget
+    setArchiveTarget(null)
     try {
       await projectsApi.archive(project.id)
       toast.success('Project archived')
@@ -272,6 +300,15 @@ export default function Projects() {
           project={modal !== 'create' ? modal : null}
           onClose={() => setModal(null)}
           onSave={handleSave}
+        />
+      )}
+      {archiveTarget && (
+        <ConfirmModal
+          title={`Archive "${archiveTarget.name}"?`}
+          message="The project will be hidden from your workspace. All data is preserved."
+          confirmLabel="Archive"
+          onConfirm={doArchive}
+          onCancel={() => setArchiveTarget(null)}
         />
       )}
     </PageShell>

@@ -1,14 +1,35 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { projectsApi, topicsApi, tasksApi, timelineApi, discussionsApi, publishApi } from '../services/api'
 import { useProjectStore } from '../stores/useProjectStore'
 import {
   ArrowLeft, FolderOpen, CheckSquare2, Tag, AlertTriangle,
   Users, Settings, LayoutDashboard, Clock, Loader2,
-  MessageSquare, Zap, Archive, Globe, Copy, CheckCheck, EyeOff,
+  MessageSquare, Zap, Archive, Globe, Copy, CheckCheck, EyeOff, Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, SectionTabs, PageLoader } from '../components/ui'
+
+// ── Confirm Modal ─────────────────────────────────────────────────
+function ConfirmModal({ icon: Icon = Trash2, iconBg = 'bg-red-50', iconColor = 'text-red-500', title, message, confirmLabel = 'Confirm', confirmClass = 'bg-red-500 text-white hover:bg-red-600 border-red-500', onConfirm, onCancel }) {
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mx-auto mb-4`}>
+          <Icon className={`w-6 h-6 ${iconColor}`} />
+        </div>
+        <h3 className="text-base font-semibold text-warm-900 text-center mb-1">{title}</h3>
+        {message && <p className="text-sm text-warm-500 text-center mb-6">{message}</p>}
+        <div className="flex gap-3 mt-6">
+          <button onClick={onCancel} className="flex-1 btn btn-secondary">Cancel</button>
+          <button onClick={onConfirm} className={`flex-1 btn border ${confirmClass}`}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
 
 // ── Health config ─────────────────────────────────────────────────
 const HEALTH = {
@@ -501,7 +522,7 @@ function SettingsTab({ project, onUpdate, onArchive }) {
         <h3 className="text-sm font-semibold text-red-600 mb-2">Danger Zone</h3>
         <p className="text-xs text-warm-500 mb-3">Archiving hides the project from your workspace. Data is preserved.</p>
         <button onClick={onArchive}
-          className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 text-sm rounded-xl hover:bg-red-50">
+          className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 text-sm rounded-xl hover:bg-red-50 transition-colors">
           <Archive className="w-4 h-4" /> Archive Project
         </button>
       </div>
@@ -550,8 +571,10 @@ export default function ProjectDetail() {
     setProject(p => ({ ...p, ...payload }))
   }
 
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+
   async function handleArchive() {
-    if (!confirm('Archive this project?')) return
+    setShowArchiveConfirm(false)
     await projectsApi.archive(projectId)
     toast.success('Project archived')
     navigate('/projects')
@@ -597,8 +620,21 @@ export default function ProjectDetail() {
           {tab === 'tasks'     && <TasksTab    projectId={projectId} />}
           {tab === 'timeline'  && <TimelineTab projectId={projectId} />}
           {tab === 'members'   && <MembersTab  stats={stats} />}
-          {tab === 'settings'  && <SettingsTab project={project ?? {}} onUpdate={handleUpdate} onArchive={handleArchive} />}
+          {tab === 'settings'  && <SettingsTab project={project ?? {}} onUpdate={handleUpdate} onArchive={() => setShowArchiveConfirm(true)} />}
         </>
+      )}
+      {showArchiveConfirm && (
+        <ConfirmModal
+          icon={Archive}
+          iconBg="bg-amber-50"
+          iconColor="text-amber-500"
+          title="Archive this project?"
+          message="The project will be hidden from your workspace. All data is preserved and can be restored."
+          confirmLabel="Archive Project"
+          confirmClass="bg-amber-500 text-white hover:bg-amber-600 border-amber-500"
+          onConfirm={handleArchive}
+          onCancel={() => setShowArchiveConfirm(false)}
+        />
       )}
     </PageShell>
   )
