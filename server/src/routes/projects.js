@@ -192,26 +192,30 @@ router.get('/:projectId/stats', requireAuth, async (req, res) => {
     supabaseAdmin.from('project_members').select('id, role, users(id, name, avatar_url)').eq('project_id', projectId),
   ])
 
-  const pendingTasks = (tasks || []).filter(t => t.status !== 'done' && t.type !== 'test_case')
+  // Work tasks only (exclude test_case type)
+  const workTasks    = (tasks || []).filter(t => t.type !== 'test_case')
+  const pendingTasks = workTasks.filter(t => t.status !== 'done' && t.status !== 'released')
+  const doneTasks    = workTasks.filter(t => t.status === 'done' || t.status === 'released')
   const overdueTasks = pendingTasks.filter(t => t.due_date && t.due_date < now)
   const deadlineSoon = pendingTasks.some(t => t.due_date && t.due_date >= now && t.due_date <= in3days)
+  const testCases    = (tasks || []).filter(t => t.type === 'test_case')
 
   res.json({
     success: true,
     data: {
       health:         calcHealth(overdueTasks.length, deadlineSoon),
-      tasks_total:    (tasks || []).length,
-      tasks_pending:  pendingTasks.length,
-      tasks_done:     (tasks || []).filter(t => t.status === 'done').length,
+      tasks_total:    workTasks.length,           // all work tasks (all statuses)
+      tasks_pending:  pendingTasks.length,        // open work tasks
+      tasks_done:     doneTasks.length,           // completed work tasks
       tasks_overdue:  overdueTasks.length,
-      test_cases:     (tasks || []).filter(t => t.type === 'test_case').length,
+      test_cases:     testCases.length,
       topics_total:   (topics || []).length,
       topics_open:    (topics || []).filter(t => t.status !== 'resolved').length,
       conflicts_open: (conflicts || []).length,
       members:        members || [],
       recent_discussions: discs || [],
       recent_conflicts:   conflicts || [],
-      high_priority_tasks: (tasks || []).filter(t => t.priority === 'high' && t.status !== 'done'),
+      high_priority_tasks: workTasks.filter(t => t.priority === 'high' && t.status !== 'done' && t.status !== 'released'),
     }
   })
 })

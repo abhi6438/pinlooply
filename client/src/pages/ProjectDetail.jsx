@@ -105,10 +105,10 @@ function OverviewTab({ projectId, stats, project }) {
     <div className="space-y-6">
       {/* Stats grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Tag}           label="Topics"        value={stats.topics_total   ?? 0} sub={`${stats.topics_open ?? 0} open`}     color="#7c3aed" />
-        <StatCard icon={CheckSquare2}  label="Tasks"         value={stats.tasks_total    ?? 0} sub={`${stats.tasks_pending ?? 0} pending`} color="#2563eb" />
-        <StatCard icon={AlertTriangle} label="Conflicts"     value={stats.conflicts_open ?? 0} sub="unresolved"                             color="#ea580c" />
-        <StatCard icon={CheckSquare2}  label="Completed"     value={stats.tasks_done     ?? 0} sub="tasks done"                            color="#16a34a" />
+        <StatCard icon={Tag}           label="Topics"    value={stats.topics_total   ?? 0} sub={`${stats.topics_open ?? 0} open`}              color="#7c3aed" />
+        <StatCard icon={CheckSquare2}  label="Open Tasks" value={stats.tasks_pending  ?? 0} sub={`${stats.tasks_total ?? 0} total work tasks`}  color="#2563eb" />
+        <StatCard icon={AlertTriangle} label="Conflicts"  value={stats.conflicts_open ?? 0} sub="unresolved"                                    color="#ea580c" />
+        <StatCard icon={CheckSquare2}  label="Completed"  value={stats.tasks_done     ?? 0} sub={`${stats.test_cases ?? 0} test cases`}         color="#16a34a" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -225,8 +225,9 @@ function TasksTab({ projectId }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    tasksApi.list({ project_id: projectId })
-      .then(r => setTasks(r.data.data || []))
+    // Exclude test_cases — they have their own dedicated page
+    tasksApi.list({ project_id: projectId, show_done: 'true' })
+      .then(r => setTasks((r.data.data || []).filter(t => t.type !== 'test_case')))
       .catch(() => toast.error('Failed to load tasks'))
       .finally(() => setLoading(false))
   }, [projectId])
