@@ -262,8 +262,100 @@ function UserStatsTab({ stats }) {
   )
 }
 
+// ── Mini stacked bar chart (pure SVG, no deps) ───────────────
+function BarChart({ data, keys, colors, height = 140 }) {
+  if (!data?.length) return <p className="text-xs text-warm-400 py-4 text-center">No data yet</p>
+  const maxVal = Math.max(...data.map(d => keys.reduce((s, k) => s + (d[k] || 0), 0)), 1)
+  const barW   = Math.max(16, Math.min(48, Math.floor(560 / data.length) - 8))
+  const gap    = 8
+  const totalW = data.length * (barW + gap)
+  return (
+    <div className="overflow-x-auto">
+      <svg width={Math.max(totalW, 400)} height={height + 32} className="block mx-auto">
+        {data.map((d, i) => {
+          const x = i * (barW + gap) + gap / 2
+          // Build segments bottom-up
+          let segments = []
+          let yOff = height
+          for (let ki = 0; ki < keys.length; ki++) {
+            const val = d[keys[ki]] || 0
+            const h   = Math.round((val / maxVal) * height)
+            yOff -= h
+            segments.push({ key: keys[ki], val, h, y: yOff, color: colors[ki] })
+          }
+          return (
+            <g key={i}>
+              {segments.map(({ key, val, h, y, color }) => (
+                <g key={key}>
+                  <rect x={x} y={y} width={barW} height={h} fill={color} rx={3} opacity={0.85} />
+                  {h > 14 && (
+                    <text x={x + barW / 2} y={y + h / 2 + 4} textAnchor="middle" fontSize={9} fill="#fff" fontWeight="600">{val}</text>
+                  )}
+                </g>
+              ))}
+              <text x={x + barW / 2} y={height + 20} textAnchor="middle" fontSize={9} fill="#9ca3af">
+                {String(d.label || '').slice(0, 10)}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+// ── Horizontal progress bar ───────────────────────────────────
+function HBar({ label, sub, value, max, color = 'bg-primary-500' }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0
+  return (
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-medium text-warm-900 truncate max-w-[180px]">{label}</span>
+          {sub && <span className="text-[11px] text-warm-400 hidden sm:inline">{sub}</span>}
+        </div>
+        <span className="text-xs font-bold text-warm-900 ml-2 shrink-0">{value}</span>
+      </div>
+      <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Chart legend ─────────────────────────────────────────────
+function Legend({ items }) {
+  return (
+    <div className="flex flex-wrap gap-3 mt-3">
+      {items.map(({ color, label }) => (
+        <div key={label} className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: color }} />
+          <span className="text-[11px] text-warm-500">{label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Tab 3: Usage Stats ────────────────────────────────────────
+const CHART_COLORS = {
+  tasks:       '#6366f1',
+  discussions: '#10b981',
+  topics:      '#f59e0b',
+}
+
 function UsageStatsTab({ stats }) {
+  const [subTab,     setSubTab]     = useState('overview')
+  const [detail,     setDetail]     = useState(null)
+  const [detLoading, setDetLoading] = useState(true)
+
+  useEffect(() => {
+    adminApi.getDetailedUsage()
+      .then(r => setDetail(r.data.data))
+      .catch(() => {})
+      .finally(() => setDetLoading(false))
+  }, [])
+
   if (!stats) return (
     <div className="flex justify-center py-20">
       <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
@@ -271,48 +363,267 @@ function UsageStatsTab({ stats }) {
   )
 
   const { content, users } = stats
-
-  const paidUsers    = users?.byPlan?.paid || 0
+  const paidUsers    = users?.byPlan?.paid  || 0
   const freeUsers    = (users?.total || 0) - paidUsers
   const estPaidCalls = paidUsers * 10
   const estFreeCalls = freeUsers * 10
   const estCostUSD   = (estPaidCalls * 2 * 0.003).toFixed(2)
 
+  const SUB_TABS = [
+    { id: 'overview', label: 'Overview'   },
+    { id: 'user',     label: 'By User'    },
+    { id: 'project',  label: 'By Project' },
+    { id: 'trends',   label: 'Trends'     },
+  ]
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Content stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard label="Discussions" value={content.discussions || 0} icon={MessageSquare} iconBg="bg-primary-100"  iconColor="text-primary-600" />
-        <StatCard label="Tasks"       value={content.tasks        || 0} icon={CheckSquare2}  iconBg="bg-emerald-100"  iconColor="text-emerald-600" />
-        <StatCard label="Topics"      value={content.topics       || 0} icon={GitBranch}     iconBg="bg-primary-100"  iconColor="text-primary-600" />
-        <StatCard label="Projects"    value={content.projects     || 0} icon={FolderOpen}    iconBg="bg-warm-100"     iconColor="text-warm-500" />
-        <StatCard label="Conflicts"   value={content.conflicts    || 0} icon={AlertCircle}   iconBg="bg-red-100"      iconColor="text-red-500" />
+    <div className="space-y-5 animate-fade-in">
+      {/* Sub-tab pills */}
+      <div className="flex gap-1.5 flex-wrap">
+        {SUB_TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`tab-pill ${subTab === t.id ? 'active' : 'inactive'}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* AI usage estimate */}
-      <div className="card p-5">
-        <h3 className="section-title mb-4">AI Usage Estimate (This Month)</h3>
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="text-center p-3 bg-warm-50 rounded-xl border border-warm-100">
-            <p className="text-xl font-bold text-warm-900">{estFreeCalls}</p>
-            <p className="text-xs text-warm-500 mt-1">Est. AI calls (Free)</p>
-            <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Free tier</p>
+      {/* ── Overview ─────────────────────────────────────── */}
+      {subTab === 'overview' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatCard label="Discussions" value={content.discussions || 0} icon={MessageSquare} iconBg="bg-primary-100"  iconColor="text-primary-600" />
+            <StatCard label="Tasks"       value={content.tasks        || 0} icon={CheckSquare2}  iconBg="bg-emerald-100"  iconColor="text-emerald-600" />
+            <StatCard label="Topics"      value={content.topics       || 0} icon={GitBranch}     iconBg="bg-amber-100"    iconColor="text-amber-600" />
+            <StatCard label="Projects"    value={content.projects     || 0} icon={FolderOpen}    iconBg="bg-warm-100"     iconColor="text-warm-500" />
+            <StatCard label="Conflicts"   value={content.conflicts    || 0} icon={AlertCircle}   iconBg="bg-red-100"      iconColor="text-red-500" />
           </div>
-          <div className="text-center p-3 bg-amber-50 rounded-xl border border-amber-100">
-            <p className="text-xl font-bold text-warm-900">{estPaidCalls}</p>
-            <p className="text-xs text-warm-500 mt-1">Est. AI calls (Paid)</p>
-            <p className="text-[11px] text-amber-600 font-medium mt-0.5">Paid tier</p>
-          </div>
-          <div className="text-center p-3 bg-primary-50 rounded-xl border border-primary-100">
-            <p className="text-xl font-bold text-warm-900">${estCostUSD}</p>
-            <p className="text-xs text-warm-500 mt-1">Est. AI cost</p>
-            <p className="text-[11px] text-primary-600 font-medium mt-0.5">This month</p>
+
+          {/* Activity by mode */}
+          {detLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+          ) : detail && (
+            <div className="card p-5">
+              <h3 className="section-title mb-4">Activity by Mode (Last 8 Weeks)</h3>
+              {[
+                { key: 'personal', label: '👤 Personal', color: 'bg-warm-400'     },
+                { key: 'group',    label: '👥 Group',    color: 'bg-primary-500'  },
+                { key: 'team',     label: '🏢 Team',     color: 'bg-primary-700'  },
+                { key: 'org',      label: '🏗️ Org',      color: 'bg-amber-500'    },
+              ].map(({ key, label, color }) => {
+                const m      = detail.byMode?.[key] || {}
+                const tot    = (m.tasks || 0) + (m.discussions || 0) + (m.topics || 0)
+                const allTot = Object.values(detail.byMode || {}).reduce((s, mm) => s + (mm.tasks || 0) + (mm.discussions || 0) + (mm.topics || 0), 0)
+                return (
+                  <HBar key={key} label={label} value={tot} max={Math.max(allTot, 1)} color={color}
+                    sub={`Tasks:${m.tasks||0}  Discussions:${m.discussions||0}  Topics:${m.topics||0}`} />
+                )
+              })}
+            </div>
+          )}
+
+          {/* AI estimate */}
+          <div className="card p-5">
+            <h3 className="section-title mb-4">AI Usage Estimate (This Month)</h3>
+            <div className="grid grid-cols-3 gap-4 mb-3">
+              <div className="text-center p-3 bg-warm-50 rounded-xl border border-warm-100">
+                <p className="text-xl font-bold text-warm-900">{estFreeCalls}</p>
+                <p className="text-xs text-warm-500 mt-1">Est. AI calls (Free)</p>
+                <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Free tier</p>
+              </div>
+              <div className="text-center p-3 bg-amber-50 rounded-xl border border-amber-100">
+                <p className="text-xl font-bold text-warm-900">{estPaidCalls}</p>
+                <p className="text-xs text-warm-500 mt-1">Est. AI calls (Paid)</p>
+                <p className="text-[11px] text-amber-600 font-medium mt-0.5">Paid tier</p>
+              </div>
+              <div className="text-center p-3 bg-primary-50 rounded-xl border border-primary-100">
+                <p className="text-xl font-bold text-warm-900">${estCostUSD}</p>
+                <p className="text-xs text-warm-500 mt-1">Est. AI cost</p>
+                <p className="text-[11px] text-primary-600 font-medium mt-0.5">This month</p>
+              </div>
+            </div>
+            <p className="text-xs text-warm-400">
+              Estimates based on {users?.total || 0} users × ~10 AI calls/month × ~2k tokens/call.
+            </p>
           </div>
         </div>
-        <p className="text-xs text-warm-400">
-          Estimates based on {users?.total || 0} users × ~10 AI calls/week × ~2k tokens/call. Actual costs depend on real usage.
-        </p>
-      </div>
+      )}
+
+      {/* ── By User ──────────────────────────────────────── */}
+      {subTab === 'user' && (
+        <div className="space-y-5">
+          {detLoading ? (
+            <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+          ) : !detail?.byUser?.length ? (
+            <p className="text-center text-warm-400 py-16 text-sm">No activity data yet (last 8 weeks)</p>
+          ) : (
+            <>
+              <div className="card p-5">
+                <h3 className="section-title mb-3">Top Contributors (Last 8 Weeks)</h3>
+                <BarChart
+                  data={detail.byUser.slice(0, 10).map(u => ({
+                    label:       (u.name || u.email || '').split('@')[0].slice(0, 10),
+                    tasks:       u.tasks,
+                    discussions: u.discussions,
+                    topics:      u.topics,
+                  }))}
+                  keys={['tasks', 'discussions', 'topics']}
+                  colors={[CHART_COLORS.tasks, CHART_COLORS.discussions, CHART_COLORS.topics]}
+                />
+                <Legend items={[
+                  { color: CHART_COLORS.tasks,       label: 'Tasks' },
+                  { color: CHART_COLORS.discussions,  label: 'Discussions' },
+                  { color: CHART_COLORS.topics,       label: 'Topics' },
+                ]} />
+              </div>
+
+              <div className="card overflow-hidden">
+                <div className="px-5 py-3 border-b border-warm-100">
+                  <h3 className="section-title">All Users Activity</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-warm-50">
+                      <tr>
+                        {['User', 'Mode', 'Tasks', 'Discussions', 'Topics', 'Total'].map(h => (
+                          <th key={h} className="px-4 py-2.5 text-left font-semibold text-warm-500 uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-warm-100">
+                      {detail.byUser.map((u, idx) => (
+                        <tr key={u.userId} className={`hover:bg-warm-50 transition-colors ${idx % 2 === 1 ? 'bg-warm-50/40' : ''}`}>
+                          <td className="px-4 py-2.5">
+                            <p className="font-medium text-warm-900 truncate max-w-[160px]">{u.name || u.email}</p>
+                            {u.name && <p className="text-warm-400 text-[11px] truncate max-w-[160px]">{u.email}</p>}
+                          </td>
+                          <td className="px-4 py-2.5"><span className="badge capitalize">{u.mode}</span></td>
+                          <td className="px-4 py-2.5 font-semibold text-indigo-600">{u.tasks}</td>
+                          <td className="px-4 py-2.5 font-semibold text-emerald-600">{u.discussions}</td>
+                          <td className="px-4 py-2.5 font-semibold text-amber-600">{u.topics}</td>
+                          <td className="px-4 py-2.5 font-bold text-warm-900">{u.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── By Project ───────────────────────────────────── */}
+      {subTab === 'project' && (
+        <div className="space-y-5">
+          {detLoading ? (
+            <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+          ) : !detail?.byProject?.length ? (
+            <p className="text-center text-warm-400 py-16 text-sm">No activity data yet (last 8 weeks)</p>
+          ) : (
+            <>
+              <div className="card p-5">
+                <h3 className="section-title mb-3">Project Activity (Last 8 Weeks)</h3>
+                <BarChart
+                  data={detail.byProject.slice(0, 10).map(p => ({
+                    label:       (p.name || '').slice(0, 10),
+                    tasks:       p.tasks,
+                    discussions: p.discussions,
+                    topics:      p.topics,
+                  }))}
+                  keys={['tasks', 'discussions', 'topics']}
+                  colors={[CHART_COLORS.tasks, CHART_COLORS.discussions, CHART_COLORS.topics]}
+                />
+                <Legend items={[
+                  { color: CHART_COLORS.tasks,       label: 'Tasks' },
+                  { color: CHART_COLORS.discussions,  label: 'Discussions' },
+                  { color: CHART_COLORS.topics,       label: 'Topics' },
+                ]} />
+              </div>
+
+              <div className="card p-5">
+                <h3 className="section-title mb-4">All Projects</h3>
+                {detail.byProject.map(p => (
+                  <HBar
+                    key={p.projectId}
+                    label={p.name}
+                    value={p.total}
+                    max={detail.byProject[0]?.total || 1}
+                    color="bg-primary-500"
+                    sub={`Tasks:${p.tasks}  Discussions:${p.discussions}  Topics:${p.topics}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Trends ───────────────────────────────────────── */}
+      {subTab === 'trends' && (
+        <div className="space-y-5">
+          {detLoading ? (
+            <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+          ) : !detail?.trend?.length ? (
+            <p className="text-center text-warm-400 py-16 text-sm">No trend data yet</p>
+          ) : (
+            <>
+              <div className="card p-5">
+                <h3 className="section-title mb-1">Weekly Activity (Last 8 Weeks)</h3>
+                <p className="text-xs text-warm-400 mb-4">Tasks, discussions, and topics created per week</p>
+                <BarChart
+                  data={detail.trend}
+                  keys={['tasks', 'discussions', 'topics']}
+                  colors={[CHART_COLORS.tasks, CHART_COLORS.discussions, CHART_COLORS.topics]}
+                  height={160}
+                />
+                <Legend items={[
+                  { color: CHART_COLORS.tasks,       label: 'Tasks' },
+                  { color: CHART_COLORS.discussions,  label: 'Discussions' },
+                  { color: CHART_COLORS.topics,       label: 'Topics' },
+                ]} />
+              </div>
+
+              <div className="card overflow-hidden">
+                <div className="px-5 py-3 border-b border-warm-100">
+                  <h3 className="section-title">Week-by-Week Breakdown</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-warm-50">
+                      <tr>
+                        {['Week', 'Tasks', 'Discussions', 'Topics', 'Total'].map(h => (
+                          <th key={h} className="px-4 py-2.5 text-left font-semibold text-warm-500 uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-warm-100">
+                      {detail.trend.map((w, idx) => {
+                        const total  = w.tasks + w.discussions + w.topics
+                        const isLast = idx === detail.trend.length - 1
+                        return (
+                          <tr key={w.label} className={`hover:bg-warm-50 transition-colors ${idx % 2 === 1 ? 'bg-warm-50/40' : ''}`}>
+                            <td className="px-4 py-2.5 font-medium text-warm-900">
+                              {w.label} {isLast && <span className="badge text-[10px] px-1.5 ml-1">Current</span>}
+                            </td>
+                            <td className="px-4 py-2.5 font-semibold text-indigo-600">{w.tasks}</td>
+                            <td className="px-4 py-2.5 font-semibold text-emerald-600">{w.discussions}</td>
+                            <td className="px-4 py-2.5 font-semibold text-amber-600">{w.topics}</td>
+                            <td className="px-4 py-2.5 font-bold text-warm-900">{total}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

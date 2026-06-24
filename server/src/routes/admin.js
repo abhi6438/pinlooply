@@ -147,6 +147,148 @@ router.get('/stats', async (req, res) => {
   }
 })
 
+// ── GET /api/admin/usage-detail ──────────────────────────────
+router.get('/usage-detail', async (req, res) => {
+  try {
+    const weeksBack = 8
+    const since = new Date(Date.now() - weeksBack * 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    // Fetch raw data in parallel
+    const [
+      { data: tasks },
+      { data: discussions },
+      { data: topics },
+      { data: users },
+      { data: projects },
+    ] = await Promise.all([
+      supabaseAdmin.from('tasks').select('id, created_by, project_id, type, created_at').gte('created_at', since),
+      supabaseAdmin.from('discussions').select('id, created_by, project_id, created_at').gte('created_at', since),
+      supabaseAdmin.from('topics').select('id, created_by, project_id, created_at').gte('created_at', since),
+      supabaseAdmin.from('users').select('id, name, email, mode, plan'),
+      supabaseAdmin.from('projects').select('id, name'),
+    ])
+
+    const userMap    = {}
+    const projectMap = {}
+
+    for (const u of users    || []) userMap[u.id]    = u
+    for (const p of projects || []) projectMap[p.id] = p
+
+    // ── By User ─────────────────────────────────────────────
+    const userStats = {}
+
+    function ensureUser(id) {
+      if (!id) return
+      if (!userStats[id]) {
+        const u = userMap[id] || {}
+        userStats[id] = { userId: id, name: u.name || u.email || id, email: u.email || '', mode: u.mode || 'personal', tasks: 0, discussions: 0, topics: 0 }
+      }
+    }
+
+    for (const t of tasks || []) {
+      if (t.type === 'test_case') continue
+      ensureUser(t.created_by)
+      if (t.created_by) userStats[t.created_by].tasks++
+    }
+    for (const d of discussions || []) {
+      ensureUser(d.created_by)
+      if (d.created_by) userStats[d.created_by].discussions++
+    }
+    for (const t of topics || []) {
+      ensureUser(t.created_by)
+      if (t.created_by) userStats[t.created_by].topics++
+    }
+
+    const byUser = Object.values(userStats)
+      .map(u => ({ ...u, total: u.tasks + u.discussions + u.topics }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 20)
+
+    // ── By Project ──────────────────────────────────────────
+    const projStats = {}
+
+    function ensureProject(id) {
+      if (!id) return
+      if (!projStats[id]) {
+        const p = projectMap[id] || {}
+        projStats[id] = { projectId: id, name: p.name || `Project ${id.slice(0,8)}`, tasks: 0, discussions: 0, topics: 0 }
+      }
+    }
+
+    for (const t of tasks || []) {
+      if (t.type === 'test_case') continue
+      ensureProject(t.project_id)
+      if (t.project_id) projStats[t.project_id].tasks++
+    }
+    for (const d of discussions || []) {
+      ensureProject(d.project_id)
+      if (d.project_id) projStats[d.project_id].discussions++
+    }
+    for (const t of topics || []) {
+      ensureProject(t.project_id)
+      if (t.project_id) projStats[t.project_id].topics++
+    }
+
+    const byProject = Object.values(projStats)
+      .map(p => ({ ...p, total: p.tasks + p.discussions + p.topics }))
+      .sort((a, b) => b.total - a.total)
+
+    // ── By Mode ──────────────────────────────────────────────
+    const byMode = { personal: { tasks: 0, discussions: 0, topics: 0 }, group: { tasks: 0, discussions: 0, topics: 0 }, team: { tasks: 0, discussions: 0, topics: 0 }, org: { tasks: 0, discussions: 0, topics: 0 } }
+
+    function modeOf(createdBy) {
+      const u = userMap[createdBy]
+      return u?.mode || 'personal'
+    }
+
+    for (const t of tasks || []) {
+      if (t.type === 'test_case') continue
+      const m = modeOf(t.created_by)
+      if (byMode[m]) byMode[m].tasks++
+    }
+    for (const d of discussions || []) {
+      const m = modeOf(d.created_by)
+      if (byMode[m]) byMode[m].discussions++
+    }
+    for (const t of topics || []) {
+      const m = modeOf(t.created_by)
+      if (byMode[m]) byMode[m].topics++
+    }
+
+    // ── Weekly Trend ─────────────────────────────────────────
+    // Build 8 week buckets (Mon–Sun)
+    const weekBuckets = []
+    const now = new Date()
+    for (let i = weeksBack - 1; i >= 0; i--) {
+      const weekStart = new Date(now)
+      weekStart.setDate(now.getDate() - now.getDay() - i * 7)
+      weekStart.setHours(0, 0, 0, 0)
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 7)
+      weekBuckets.push({ label: `W${weeksBack - i}`, start: weekStart, end: weekEnd, tasks: 0, discussions: 0, topics: 0 })
+    }
+
+    function bucketDate(iso) {
+      const d = new Date(iso)
+      for (const b of weekBuckets) {
+        if (d >= b.start && d < b.end) return b
+      }
+      return null
+    }
+
+    for (const t of tasks || [])       { if (t.type !== 'test_case') { const b = bucketDate(t.created_at); if (b) b.tasks++ } }
+    for (const d of discussions || []) { const b = bucketDate(d.created_at); if (b) b.discussions++ }
+    for (const t of topics || [])      { const b = bucketDate(t.created_at); if (b) b.topics++ }
+
+    const trend = weekBuckets.map(b => ({ label: b.label, tasks: b.tasks, discussions: b.discussions, topics: b.topics }))
+
+    res.json({ success: true, data: { byUser, byProject, byMode, trend, since } })
+  } catch (err) {
+    console.error('Admin usage-detail error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── GET /api/admin/users ──────────────────────────────────────
 router.get('/users', async (req, res) => {
   try {

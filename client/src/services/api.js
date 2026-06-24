@@ -136,11 +136,12 @@ export const planApi = {
 }
 
 export const adminApi = {
-  getAiConfig:    ()             => api.get('/api/admin/ai-config'),
-  saveAiConfig:   (configs)      => api.put('/api/admin/ai-config', { configs }),
-  getStats:       ()             => api.get('/api/admin/stats'),
-  getUsers:       (search = '')  => api.get(`/api/admin/users${search ? `?search=${encodeURIComponent(search)}` : ''}`),
-  updateUserPlan: (userId, body) => api.patch(`/api/admin/users/${userId}/plan`, body),
+  getAiConfig:       ()             => api.get('/api/admin/ai-config'),
+  saveAiConfig:      (configs)      => api.put('/api/admin/ai-config', { configs }),
+  getStats:          ()             => api.get('/api/admin/stats'),
+  getDetailedUsage:  ()             => api.get('/api/admin/usage-detail'),
+  getUsers:          (search = '')  => api.get(`/api/admin/users${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  updateUserPlan:    (userId, body) => api.patch(`/api/admin/users/${userId}/plan`, body),
 }
 
 export const publishApi = {
