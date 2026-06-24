@@ -2,20 +2,21 @@ import { useState, useEffect } from 'react'
 import { planApi } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import {
-  Check, Zap, Users, Building2, Crown, Loader2,
-  ExternalLink, Star, ChevronRight, AlertCircle,
+  Check, Zap, Loader2, ExternalLink, Star,
+  ChevronRight, X, Coffee, Rocket,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../../components/ui'
 
-// ── Plan definitions (mirrors server constants) ───────────────
+// ── Plan definitions ──────────────────────────────────────────
+const BMC_URL = 'https://buymeacoffee.com/pinlooply'
+
 const PLANS = [
   {
     key:   'personal_free',
     label: 'Personal',
     badge: 'Free',
     icon:  '👤',
-    color: 'gray',
     features: [
       '3 projects',
       '90 days history',
@@ -23,15 +24,13 @@ const PLANS = [
       'Standup generator',
       'Weekly summary',
     ],
-    cta:      null,
-    ctaLabel: null,
+    cta: null,
   },
   {
     key:   'group_free',
     label: 'Group',
     badge: 'Free',
     icon:  '👥',
-    color: 'primary',
     features: [
       'Everything in Personal',
       'Up to 5 members',
@@ -39,15 +38,16 @@ const PLANS = [
       'Member notifications',
       'Team standup',
     ],
-    cta:      'upgrade_free',
-    ctaLabel: 'Upgrade Free →',
+    cta: 'upgrade_free',
+    ctaLabel: 'Switch to Group (Free)',
+    upgradeMode: 'group',
   },
   {
     key:   'team_paid',
     label: 'Team',
     badge: 'Paid',
     icon:  '🏢',
-    color: 'violet',
+    price: '$5 / month',
     features: [
       'Unlimited projects',
       'Up to 20 members',
@@ -55,16 +55,16 @@ const PLANS = [
       'Claude AI (better quality)',
       'Priority support',
     ],
-    cta:      'donate',
-    ctaLabel: 'Donate / Support →',
-    bmcUrl:   'https://buymeacoffee.com',
+    cta: 'donate',
+    ctaLabel: 'Upgrade to Team',
+    upgradeMode: 'team',
   },
   {
     key:   'org_paid',
     label: 'Org',
     badge: 'Paid',
     icon:  '🏗️',
-    color: 'amber',
+    price: 'Custom',
     features: [
       'Everything in Team',
       'Unlimited members',
@@ -72,15 +72,15 @@ const PLANS = [
       'Org dashboard',
       'Custom integrations',
     ],
-    cta:      'contact',
-    ctaLabel: 'Contact Us →',
+    cta: 'contact',
+    ctaLabel: 'Contact Us',
   },
 ]
 
 // ── Usage bar ─────────────────────────────────────────────────
 function UsageBar({ used, max, label }) {
-  const pct         = max === Infinity ? 0 : Math.min(100, Math.round((used / max) * 100))
   const isInfinity  = max === Infinity
+  const pct         = isInfinity ? 0 : Math.min(100, Math.round((used / max) * 100))
   const isNearLimit = pct >= 80
 
   return (
@@ -103,15 +103,100 @@ function UsageBar({ used, max, label }) {
   )
 }
 
+// ── Donate & Activate Modal ───────────────────────────────────
+function DonateModal({ plan, onClose, onActivate, activating }) {
+  const [step, setStep] = useState(1) // 1 = donate prompt, 2 = activate
+
+  function openBmc() {
+    window.open(BMC_URL, '_blank', 'noopener,noreferrer')
+    setStep(2)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="card w-full max-w-md p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1 rounded-lg hover:bg-warm-100 text-warm-400"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="text-center mb-6">
+          <span className="text-4xl">{plan.icon}</span>
+          <h2 className="text-lg font-bold text-warm-900 mt-2">Upgrade to {plan.label}</h2>
+          {plan.price && (
+            <p className="text-sm text-warm-500 mt-0.5">{plan.price} · billed monthly</p>
+          )}
+        </div>
+
+        {/* Steps */}
+        <div className="flex items-center gap-2 mb-6">
+          <div className={`flex-1 h-1.5 rounded-full ${step >= 1 ? 'bg-primary-500' : 'bg-warm-100'}`} />
+          <div className={`flex-1 h-1.5 rounded-full ${step >= 2 ? 'bg-primary-500' : 'bg-warm-100'}`} />
+        </div>
+
+        {step === 1 ? (
+          <>
+            <p className="text-sm text-warm-600 mb-5 text-center">
+              Pinlooply runs on community support. A one-time or recurring donation on Buy Me a Coffee
+              unlocks the Team plan.
+            </p>
+            <ul className="space-y-2 mb-6">
+              {plan.features.map((f, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm text-warm-600">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={openBmc}
+              className="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              <Coffee className="w-4 h-4" />
+              Support on Buy Me a Coffee
+              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+            </button>
+            <p className="text-center text-xs text-warm-400 mt-3">
+              After donating, come back here and click Activate.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-5 text-sm text-emerald-700">
+              Thank you for supporting Pinlooply! 🎉 Click below to activate your plan.
+            </div>
+            <button
+              onClick={() => onActivate(plan.upgradeMode)}
+              disabled={activating}
+              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 mb-3"
+            >
+              {activating
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Rocket className="w-4 h-4" />
+              }
+              {activating ? 'Activating…' : `Activate ${plan.label} Plan`}
+            </button>
+            <button
+              onClick={() => setStep(1)}
+              className="w-full text-center text-xs text-warm-400 hover:text-warm-600"
+            >
+              ← Back
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Plan card ─────────────────────────────────────────────────
-function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
+function PlanCard({ plan, isCurrent, onUpgrade, onOpenDonate, upgrading }) {
   return (
     <div className={`relative rounded-2xl p-5 flex flex-col gap-4 transition-all ${
-      isCurrent
-        ? 'card border-2 border-primary-500'
-        : 'card-hover'
+      isCurrent ? 'card border-2 border-primary-500' : 'card-hover'
     }`}>
-      {/* Current badge */}
       {isCurrent && (
         <span className="absolute -top-3 left-4 badge badge-purple shadow-sm">
           Current Plan
@@ -125,9 +210,7 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
           <div>
             <h3 className="text-sm font-bold text-warm-900">{plan.label}</h3>
             <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${
-              plan.badge === 'Paid'
-                ? 'bg-amber-100 text-amber-700'
-                : 'bg-warm-100 text-warm-500'
+              plan.badge === 'Paid' ? 'bg-amber-100 text-amber-700' : 'bg-warm-100 text-warm-500'
             }`}>
               {plan.badge}
             </span>
@@ -135,6 +218,10 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
         </div>
         {plan.badge === 'Paid' && <Star className="w-4 h-4 text-amber-400" />}
       </div>
+
+      {plan.price && (
+        <p className="text-lg font-bold text-warm-900 -mt-1">{plan.price}</p>
+      )}
 
       {/* Features */}
       <ul className="space-y-1.5 flex-1">
@@ -147,11 +234,11 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
       </ul>
 
       {/* CTA */}
-      {plan.cta && !isCurrent && (
+      {!isCurrent && plan.cta && (
         <>
           {plan.cta === 'upgrade_free' && (
             <button
-              onClick={() => onUpgrade('group')}
+              onClick={() => onUpgrade(plan.upgradeMode)}
               disabled={upgrading}
               className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
             >
@@ -160,15 +247,13 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
             </button>
           )}
           {plan.cta === 'donate' && (
-            <a
-              href={plan.bmcUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary w-full flex items-center justify-center gap-2"
+            <button
+              onClick={() => onOpenDonate(plan)}
+              className="btn-primary w-full flex items-center justify-center gap-2"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
+              <Coffee className="w-3.5 h-3.5" />
               {plan.ctaLabel}
-            </a>
+            </button>
           )}
           {plan.cta === 'contact' && (
             <a
@@ -194,28 +279,29 @@ function PlanCard({ plan, isCurrent, onUpgrade, upgrading }) {
 // ── Main ──────────────────────────────────────────────────────
 export default function Plan() {
   const { user } = useAuth()
-  const [info, setInfo]         = useState(null)
-  const [loading, setLoading]   = useState(true)
-  const [upgrading, setUpgrading] = useState(false)
+  const [info, setInfo]             = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [upgrading, setUpgrading]   = useState(false)
+  const [donateModal, setDonateModal] = useState(null) // plan object when open
 
   useEffect(() => {
-    planApi.get().then(res => {
-      setInfo(res.data.data)
-    }).catch(() => {
-      toast.error('Failed to load plan info')
-    }).finally(() => setLoading(false))
+    planApi.get().then(res => setInfo(res.data.data))
+      .catch(() => toast.error('Failed to load plan info'))
+      .finally(() => setLoading(false))
   }, [])
 
   async function handleUpgrade(mode) {
     setUpgrading(true)
     try {
       await planApi.upgrade(mode)
-      toast.success('Plan updated! Refreshing…')
+      toast.success('Plan updated!')
       const res = await planApi.get()
       setInfo(res.data.data)
+      setDonateModal(null)
       setTimeout(() => window.location.reload(), 800)
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Upgrade failed')
+      const msg = err.response?.data?.error || 'Upgrade failed'
+      toast.error(msg)
     } finally {
       setUpgrading(false)
     }
@@ -247,35 +333,25 @@ export default function Plan() {
             <p className="text-sm text-warm-500 mt-0.5 capitalize">{info.mode} mode · {info.plan}</p>
           </div>
           <div className="flex flex-col gap-3 sm:w-64">
-            <UsageBar
-              used={info.usage.projects.used}
-              max={info.usage.projects.max}
-              label="Projects"
-            />
-            {info.usage.group_members.max > 0 && (
-              <UsageBar
-                used={info.usage.group_members.used}
-                max={info.usage.group_members.max}
-                label="Team members"
-              />
+            <UsageBar used={info.usage.projects.used} max={info.usage.projects.max} label="Projects" />
+            {info.usage.group_members?.max > 0 && (
+              <UsageBar used={info.usage.group_members.used} max={info.usage.group_members.max} label="Team members" />
             )}
           </div>
         </div>
       )}
 
       {/* Near-limit warning */}
-      {info && info.usage.projects.max !== Infinity &&
-        info.usage.projects.used >= info.usage.projects.max - 1 && (
+      {info && info.usage.projects.max !== Infinity && info.usage.projects.used >= info.usage.projects.max - 1 && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
           <span className="text-lg">⚠️</span>
           <p className="text-sm text-amber-800">
-            You're using {info.usage.projects.used} of {info.usage.projects.max} projects.
-            Upgrade to add more.
+            You're using {info.usage.projects.used} of {info.usage.projects.max} projects. Upgrade to add more.
           </p>
         </div>
       )}
 
-      {/* Plan cards grid */}
+      {/* Plan cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {PLANS.map(plan => (
           <PlanCard
@@ -283,18 +359,28 @@ export default function Plan() {
             plan={plan}
             isCurrent={currentPlanKey === plan.key}
             onUpgrade={handleUpgrade}
+            onOpenDonate={setDonateModal}
             upgrading={upgrading}
           />
         ))}
       </div>
 
-      {/* Paid upgrade note */}
-      <div className="mt-6 text-center text-xs text-warm-400">
-        Paid plans (Team & Org) are activated after donation confirmation.
-        <a href="mailto:support@pinlooply.com" className="text-primary-600 hover:underline ml-1">
-          Contact us
-        </a> after donating.
-      </div>
+      <p className="mt-6 text-center text-xs text-warm-400">
+        Need help?{' '}
+        <a href="mailto:support@pinlooply.com" className="text-primary-600 hover:underline">
+          Contact support
+        </a>
+      </p>
+
+      {/* Donate modal */}
+      {donateModal && (
+        <DonateModal
+          plan={donateModal}
+          onClose={() => setDonateModal(null)}
+          onActivate={handleUpgrade}
+          activating={upgrading}
+        />
+      )}
     </PageShell>
   )
 }

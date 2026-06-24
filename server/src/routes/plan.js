@@ -16,23 +16,32 @@ router.get('/', requireAuth, async (req, res) => {
   }
 })
 
-// ── POST /api/plan/upgrade — upgrade mode (free tier only) ───
-// Allows personal → group upgrade (both free, just changes mode)
+// ── POST /api/plan/upgrade — upgrade mode ────────────────────
+// Free upgrades (personal ↔ group) allowed for everyone.
+// Paid upgrades (team / org) allowed for admin email only — others must contact support.
 router.post('/upgrade', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id
-    const { mode } = req.body
+    const userId    = req.user.id
+    const userEmail = req.user.email
+    const { mode }  = req.body
 
-    // Only allow free-tier mode changes (personal ↔ group)
-    // paid upgrades are handled out-of-band (donation confirmation)
-    const allowedFree = ['personal', 'group']
-    if (!allowedFree.includes(mode)) {
-      return res.status(400).json({ error: 'Paid upgrades require manual confirmation' })
+    const paidModes  = ['team', 'org']
+    const freeModes  = ['personal', 'group']
+    const adminEmail = process.env.ADMIN_EMAIL
+
+    if (paidModes.includes(mode)) {
+      // Only the admin (app owner) can self-activate paid plans
+      if (userEmail !== adminEmail) {
+        return res.status(403).json({ error: 'Paid upgrades require manual activation. Contact support after donating.' })
+      }
+    } else if (!freeModes.includes(mode)) {
+      return res.status(400).json({ error: 'Invalid plan mode' })
     }
 
+    const plan = paidModes.includes(mode) ? 'paid' : 'free'
     const { data, error } = await supabaseAdmin
       .from('users')
-      .update({ mode })
+      .update({ mode, plan })
       .eq('id', userId)
       .select('id, mode, plan')
       .single()

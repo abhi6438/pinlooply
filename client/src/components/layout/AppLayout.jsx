@@ -15,14 +15,14 @@ import toast from 'react-hot-toast'
 // ── Helpers ───────────────────────────────────────────────────
 function getNavItems(mode) {
   const items = [
-    { to: '/dashboard',  icon: LayoutDashboard,  label: 'Dashboard' },
-    { to: '/topics',     icon: Tag,               label: 'Topics' },
-    { to: '/projects',   icon: FolderOpen,        label: 'Projects' },
-    { to: '/lists',      icon: ListChecks,        label: 'Tasks' },
-    { to: '/timeline',   icon: CalendarDays,      label: 'Timeline' },
-    { to: '/standup',        icon: ClipboardList, label: 'Standup' },
-    { to: '/weekly-summary', icon: BarChart3,     label: 'Summary' },
-    { to: '/test-cases',     icon: FlaskConical,  label: 'Test Cases' },
+    { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard'  },
+    { to: '/projects',       icon: FolderOpen,      label: 'Projects'   },
+    { to: '/lists',          icon: ListChecks,      label: 'Tasks'      },
+    { to: '/timeline',       icon: CalendarDays,    label: 'Timeline'   },
+    { to: '/topics',         icon: Tag,             label: 'Topics'     },
+    { to: '/standup',        icon: ClipboardList,   label: 'Standup'    },
+    { to: '/weekly-summary', icon: BarChart3,       label: 'Summary'    },
+    { to: '/test-cases',     icon: FlaskConical,    label: 'Test Cases' },
   ]
   if (mode === 'team' || mode === 'org') {
     items.push({ to: '/team', icon: Users, label: 'Team' })

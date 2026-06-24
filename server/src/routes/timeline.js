@@ -6,8 +6,10 @@ const router = Router()
 
 // ── Helper: get user's project IDs ────────────────────────────
 async function getUserProjectIds(userId) {
-  const { data: owned }    = await supabaseAdmin.from('projects').select('id').eq('user_id', userId)
-  const { data: membered } = await supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId)
+  const [{ data: owned }, { data: membered }] = await Promise.all([
+    supabaseAdmin.from('projects').select('id').eq('user_id', userId),
+    supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId),
+  ])
   const ids = new Set([
     ...(owned    || []).map(p => p.id),
     ...(membered || []).map(m => m.project_id),

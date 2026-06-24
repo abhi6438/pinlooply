@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { processDiscussion, saveDiscussion } from '../services/ai/aiService.js'
+import { RateLimitError } from '../services/ai/groqService.js'
 import { supabaseAdmin } from '../config/supabase.js'
 
 const router = Router()
@@ -45,6 +46,9 @@ router.post('/process', requireAuth, async (req, res) => {
     const result = await processDiscussion(rawText, projectId, userId)
     return res.json({ success: true, data: result })
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return res.status(429).json({ error: err.message })
+    }
     console.error('[/process] AI error:', err)
     return res.status(500).json({ error: err.message || 'AI processing failed' })
   }

@@ -6,18 +6,13 @@ const router = Router()
 
 // ── Helper: get all project IDs the user owns or is a member of ──
 async function getUserProjectIds(userId) {
-  const { data: owned } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .eq('user_id', userId)
-
-  const { data: membered } = await supabaseAdmin
-    .from('project_members')
-    .select('project_id')
-    .eq('user_id', userId)
-
+  // Run both queries in parallel — cuts latency in half vs sequential
+  const [{ data: owned }, { data: membered }] = await Promise.all([
+    supabaseAdmin.from('projects').select('id').eq('user_id', userId),
+    supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId),
+  ])
   const ids = new Set([
-    ...(owned || []).map(p => p.id),
+    ...(owned    || []).map(p => p.id),
     ...(membered || []).map(m => m.project_id),
   ])
   return [...ids]

@@ -270,7 +270,13 @@ function QuickLogBox({ projects, onNewProject }) {
       })
     } catch (err) {
       clearInterval(interval)
-      toast.error(err?.response?.data?.error || err.message || 'Failed to process')
+      const status = err?.response?.status
+      const msg    = err?.response?.data?.error || err.message || 'Failed to process'
+      if (status === 429) {
+        toast.error(`⚠️ AI rate limit reached. ${msg}`, { duration: 6000 })
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setSaving(false)
       setStep(0)
