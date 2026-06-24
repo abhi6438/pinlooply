@@ -654,24 +654,50 @@ function BoardColumn({ workflow, tasks, onCardClick, onStatusChange }) {
   const wf = workflow
   const count = tasks.length
   const [dragOver, setDragOver] = useState(false)
+  // Counter pattern: increment on enter, decrement on leave.
+  // Only truly "left" the column when counter hits 0 — avoids false
+  // dragLeave events fired when cursor moves over child elements.
+  const dragCounter = useRef(0)
+
+  function handleDragEnter(e) {
+    e.preventDefault()
+    dragCounter.current += 1
+    if (dragCounter.current === 1) setDragOver(true)
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault()
+    dragCounter.current -= 1
+    if (dragCounter.current === 0) setDragOver(false)
+  }
 
   function handleDragOver(e) {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setDragOver(true)
   }
 
   function handleDrop(e) {
     e.preventDefault()
+    dragCounter.current = 0
     setDragOver(false)
     const taskId = e.dataTransfer.getData('taskId')
     if (taskId) onStatusChange(taskId, wf.key)
   }
 
   return (
-    <div className="min-w-[260px] max-w-[260px] flex flex-col bg-warm-50 rounded-2xl border border-warm-200 overflow-hidden">
+    // Make the ENTIRE column a drop target (not just the cards area)
+    // Remove overflow-hidden from outer so header doesn't block drops
+    <div
+      className={`min-w-[260px] max-w-[260px] flex flex-col rounded-2xl border-2 transition-colors ${
+        dragOver ? 'border-primary-400 bg-primary-50/30' : 'border-warm-200 bg-warm-50'
+      }`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {/* Column header */}
-      <div className={`sticky top-0 z-10 px-3 py-2.5 ${wf.headerBg} border-b border-warm-200`}>
+      <div className={`sticky top-0 z-10 px-3 py-2.5 ${wf.headerBg} border-b border-warm-200 rounded-t-2xl`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${wf.dotColor}`} />
@@ -681,13 +707,8 @@ function BoardColumn({ workflow, tasks, onCardClick, onStatusChange }) {
         </div>
       </div>
 
-      {/* Cards drop zone */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        className={`flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px] transition-colors ${dragOver ? 'bg-primary-50/60' : ''}`}
-      >
+      {/* Cards area */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px]">
         {tasks.map(task => (
           <BoardCard key={task.id} task={task} onClick={onCardClick} />
         ))}
