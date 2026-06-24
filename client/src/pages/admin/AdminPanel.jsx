@@ -295,12 +295,12 @@ function UsageStatsTab({ stats }) {
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="text-center p-3 bg-warm-50 rounded-xl border border-warm-100">
             <p className="text-xl font-bold text-warm-900">{estFreeCalls}</p>
-            <p className="text-xs text-warm-500 mt-1">Est. Groq calls</p>
+            <p className="text-xs text-warm-500 mt-1">Est. AI calls (Free)</p>
             <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Free tier</p>
           </div>
           <div className="text-center p-3 bg-amber-50 rounded-xl border border-amber-100">
             <p className="text-xl font-bold text-warm-900">{estPaidCalls}</p>
-            <p className="text-xs text-warm-500 mt-1">Est. Claude calls</p>
+            <p className="text-xs text-warm-500 mt-1">Est. AI calls (Paid)</p>
             <p className="text-[11px] text-amber-600 font-medium mt-0.5">Paid tier</p>
           </div>
           <div className="text-center p-3 bg-primary-50 rounded-xl border border-primary-100">

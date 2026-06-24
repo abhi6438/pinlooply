@@ -232,7 +232,7 @@ export default function AIConfirm() {
               {topics.length} topic{topics.length !== 1 ? 's' : ''} · {tasks.length} task{tasks.length !== 1 ? 's' : ''} selected
             </span>
             <span className="text-xs text-warm-400 bg-warm-100 px-2.5 py-1.5 rounded-full border border-warm-200">
-              via {aiResult.provider || 'AI'}
+              via Pinlooply AI
             </span>
           </div>
         }

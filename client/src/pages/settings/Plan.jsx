@@ -20,7 +20,7 @@ const PLANS = [
     features: [
       '3 projects',
       '90 days history',
-      'Groq AI (fast)',
+      'Fast AI processing',
       'Standup generator',
       'Weekly summary',
     ],
@@ -52,7 +52,7 @@ const PLANS = [
       'Unlimited projects',
       'Up to 20 members',
       'Unlimited history',
-      'Claude AI (better quality)',
+      'Advanced AI (better quality)',
       'Priority support',
     ],
     cta: 'donate',
