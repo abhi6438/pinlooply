@@ -237,11 +237,105 @@ function BottomNav({ mode }) {
   )
 }
 
+// ── Mobile drawer ─────────────────────────────────────────────
+function MobileDrawer({ open, onClose, user, userProfile, bellProps, onLogout }) {
+  const items = getNavItems(userProfile?.mode)
+
+  // Close on route change
+  useEffect(() => { if (open) onClose() }, []) // eslint-disable-line
+
+  if (!open) return null
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="md:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Drawer */}
+      <div className="md:hidden fixed top-0 left-0 bottom-0 w-72 bg-[#1E1B4B] z-50 flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between h-14 px-4 border-b border-[#312E81]">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary-500 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">P</span>
+            </div>
+            <span className="text-white font-bold">Pinlooply</span>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-purple-300 hover:text-white rounded-lg">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Nav items */}
+        <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-0.5">
+          {items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-primary-600 text-white'
+                    : 'text-purple-200 hover:bg-[#312E81] hover:text-white'
+                }`
+              }
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+          {/* Admin link */}
+          {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
+            <NavLink
+              to="/admin"
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'bg-primary-600 text-white' : 'text-purple-200 hover:bg-[#312E81] hover:text-white'
+                }`
+              }
+            >
+              <Shield className="w-5 h-5 flex-shrink-0" />
+              <span>Admin</span>
+            </NavLink>
+          )}
+        </nav>
+
+        {/* User + logout */}
+        <div className="px-3 py-4 border-t border-[#312E81]">
+          <div className="flex items-center gap-3 mb-3">
+            <Avatar user={user} size={9} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {userProfile?.name || user?.user_metadata?.full_name || 'You'}
+              </p>
+              {userProfile?.plan && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary-700 text-primary-200">
+                  {userProfile.plan}
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => { onClose(); onLogout() }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-purple-300 hover:text-red-400 hover:bg-[#312E81] rounded-lg transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign out
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Mobile header ─────────────────────────────────────────────
-function MobileHeader({ user, bellProps }) {
+function MobileHeader({ user, bellProps, onMenuOpen }) {
   return (
     <header className="md:hidden flex items-center justify-between h-14 px-4 bg-white shadow-warm-sm sticky top-0 z-30">
-      <button className="p-1.5 text-warm-600 rounded-lg">
+      <button onClick={onMenuOpen} className="p-1.5 text-warm-600 hover:text-warm-900 rounded-lg transition-colors">
         <Menu className="w-5 h-5" />
       </button>
       <span className="text-base font-bold text-warm-900">Pinlooply</span>
@@ -259,6 +353,7 @@ export default function AppLayout({ children }) {
   const { fetchProjects } = useProjectStore()
   const navigate = useNavigate()
   const [userProfile, setUserProfile] = useState(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // ── Notification state (single source of truth) ─────────────
   const [notifications, setNotifications] = useState([])
@@ -322,8 +417,16 @@ export default function AppLayout({ children }) {
   return (
     <div className="flex h-screen bg-warm-50 overflow-hidden">
       <Sidebar user={user} userProfile={userProfile} bellProps={bellProps} onLogout={handleLogout} />
+      <MobileDrawer
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        user={user}
+        userProfile={userProfile}
+        bellProps={bellProps}
+        onLogout={handleLogout}
+      />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <MobileHeader user={user} bellProps={bellProps} />
+        <MobileHeader user={user} bellProps={bellProps} onMenuOpen={() => setMobileMenuOpen(true)} />
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
           {children}
         </main>

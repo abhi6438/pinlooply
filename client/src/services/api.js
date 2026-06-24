@@ -30,8 +30,9 @@ api.interceptors.response.use(
           return api(original)
         }
       } catch {
-        // Refresh failed — sign out so user is prompted to log in again
+        // Refresh failed — sign out and redirect to login
         await supabase.auth.signOut()
+        window.location.href = '/login'
       }
     }
     return Promise.reject(error)

@@ -33,10 +33,14 @@ app.use(cors({
 app.use(helmet())
 app.use(express.json())
 
-// Rate limiting
+// Rate limiting — generous limit for authenticated SPA usage
+// Each page load triggers ~5-8 API calls; this allows ~125 page loads per 15 min per IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 1000,                 // was 100 — too low for multi-request SPA
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please slow down.' },
 })
 app.use('/api', limiter)
 
