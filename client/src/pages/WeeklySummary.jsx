@@ -35,20 +35,50 @@ function formatWeekRange(start, end) {
   if (!start || !end) return ''
   const s = parseISO(start)
   const e = parseISO(end)
-  const sameMonth = s.getMonth() === e.getMonth()
-  if (sameMonth) {
+  if (s.getMonth() === e.getMonth()) {
     return `${format(s, 'MMM d')} – ${format(e, 'd, yyyy')}`
   }
   return `${format(s, 'MMM d')} – ${format(e, 'MMM d, yyyy')}`
 }
 
-// ── Format summary as plain text ─────────────────────────────
-function formatAsText(data) {
-  if (!data) return ''
-  const range = formatWeekRange(data.dateRange?.start, data.dateRange?.end)
-  let out = `Weekly Summary — ${range}\n\n`
-  if (data.overall_summary) out += `${data.overall_summary}\n\n`
+// ── Month helpers ─────────────────────────────────────────────
+function currentMonthStr() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
 
+function monthOffset(monthStr, delta) {
+  const [yearStr, mStr] = monthStr.split('-')
+  const d = new Date(parseInt(yearStr, 10), parseInt(mStr, 10) - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function formatMonthLabel(monthStr) {
+  const [year, month] = monthStr.split('-')
+  return new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+// ── Convert a plain date → ISO week string ────────────────────
+function dateToWeekStr(dateStr) {
+  const d = new Date(dateStr)
+  const year = d.getFullYear()
+  const jan4 = new Date(year, 0, 4)
+  const jan4Day = jan4.getDay() || 7
+  const weekOneStart = new Date(jan4)
+  weekOneStart.setDate(jan4.getDate() - (jan4Day - 1))
+  const diff = d - weekOneStart
+  const week = Math.max(1, Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1)
+  return `${year}-W${String(week).padStart(2, '0')}`
+}
+
+// ── Format as plain text ──────────────────────────────────────
+function formatAsText(data, period) {
+  if (!data) return ''
+  const range = period === 'monthly'
+    ? formatMonthLabel(data.month)
+    : formatWeekRange(data.dateRange?.start, data.dateRange?.end)
+  let out = `${period === 'monthly' ? 'Monthly' : 'Weekly'} Summary — ${range}\n\n`
+  if (data.overall_summary) out += `${data.overall_summary}\n\n`
   for (const p of data.projects || []) {
     out += `📋 ${p.project_name}\n`
     if (p.completed?.length) out += `  ✅ Completed: ${p.completed.join(', ')}\n`
@@ -57,14 +87,13 @@ function formatAsText(data) {
     if (p.conflicts?.length) out += `  ⚠️ Conflicts: ${p.conflicts.join(', ')}\n`
     out += '\n'
   }
-
   if (data.highlights?.length) {
     out += `Highlights:\n${data.highlights.map(h => `  • ${h}`).join('\n')}\n`
   }
   return out.trim()
 }
 
-// ── Section component inside a project card ───────────────────
+// ── Section ───────────────────────────────────────────────────
 function Section({ icon, label, items, color }) {
   if (!items?.length) return null
   return (
@@ -84,7 +113,7 @@ function Section({ icon, label, items, color }) {
   )
 }
 
-// ── Per-project card ──────────────────────────────────────────
+// ── Project card ──────────────────────────────────────────────
 function ProjectCard({ project }) {
   const [collapsed, setCollapsed] = useState(false)
   const hasConflicts = project.conflicts?.length > 0
@@ -136,7 +165,7 @@ function ProjectCard({ project }) {
   )
 }
 
-// ── Stat card ─────────────────────────────────────────────────
+// ── Stat box ──────────────────────────────────────────────────
 function StatBox({ icon: Icon, value, label, iconBg, iconColor }) {
   return (
     <div className="bg-white rounded-xl p-4 border border-warm-100">
@@ -150,10 +179,9 @@ function StatBox({ icon: Icon, value, label, iconBg, iconColor }) {
 }
 
 // ── Right panel ───────────────────────────────────────────────
-function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
+function SummaryPanel({ data, period, loading, copied, onCopy, onRegenerate }) {
   return (
     <div className="card space-y-4 p-5">
-      {/* Stats grid */}
       {data ? (
         <div className="grid grid-cols-2 gap-3">
           <StatBox icon={CheckCircle2}  value={data.stats.totalCompleted}  label="Completed"   iconBg="bg-emerald-100" iconColor="text-emerald-600" />
@@ -162,7 +190,6 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
           <StatBox icon={AlertCircle}   value={data.stats.totalConflicts}   label="Conflicts"   iconBg="bg-amber-100"   iconColor="text-amber-600" />
         </div>
       ) : (
-        /* Skeleton stats while loading */
         <div className="grid grid-cols-2 gap-3">
           {[0,1,2,3].map(i => (
             <div key={i} className="bg-warm-50 rounded-xl p-4 border border-warm-100 animate-pulse">
@@ -174,7 +201,6 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
         </div>
       )}
 
-      {/* Most active */}
       {data?.stats.mostActiveProject && (
         <div className="bg-primary-50 border border-primary-100 rounded-xl px-4 py-3 flex items-center gap-3">
           <TrendingUp className="w-4 h-4 text-primary-600 flex-shrink-0" />
@@ -185,7 +211,6 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
         </div>
       )}
 
-      {/* Overall summary */}
       {data?.overall_summary ? (
         <div className="bg-primary-50 rounded-xl p-4">
           <p className="text-[11px] font-semibold text-primary-600 uppercase tracking-wide mb-2">AI Summary</p>
@@ -200,7 +225,6 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
         </div>
       ) : null}
 
-      {/* Highlights */}
       {data?.highlights?.length > 0 && (
         <div>
           <p className="text-[11px] font-semibold text-warm-500 uppercase tracking-wide mb-2">Highlights</p>
@@ -215,7 +239,6 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
         </div>
       )}
 
-      {/* Copy button */}
       {data && (
         <button
           onClick={onCopy}
@@ -230,7 +253,6 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
         </button>
       )}
 
-      {/* Regenerate */}
       {data && (
         <button
           onClick={onRegenerate}
@@ -242,7 +264,6 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
         </button>
       )}
 
-      {/* Generation time */}
       {data?.generatedAt && (
         <p className="text-center text-xs text-warm-400">
           Generated {format(parseISO(data.generatedAt), 'h:mm a, MMM d')}
@@ -252,11 +273,10 @@ function SummaryPanel({ data, loading, copied, onCopy, onRegenerate }) {
   )
 }
 
-// ── Full-width loading skeleton ───────────────────────────────
+// ── Loading skeleton ──────────────────────────────────────────
 function LoadingSkeleton() {
   return (
     <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
-      {/* Left skeleton */}
       <div className="lg:col-span-2 space-y-4">
         {[0, 1, 2].map(i => (
           <div key={i} className="card p-5 animate-pulse">
@@ -279,8 +299,6 @@ function LoadingSkeleton() {
           </div>
         ))}
       </div>
-
-      {/* Right skeleton */}
       <div className="lg:col-span-1">
         <div className="card p-5 animate-pulse space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -294,7 +312,7 @@ function LoadingSkeleton() {
           </div>
           <div className="bg-warm-50 rounded-xl p-4 space-y-2">
             <div className="h-3 w-20 bg-warm-100 rounded" />
-            <div className="h-4 bg-warm-100 rounded w-full" />
+            <div className="h-4 bg-warm-100 rounded" />
             <div className="h-4 bg-warm-100 rounded w-5/6" />
           </div>
         </div>
@@ -303,17 +321,19 @@ function LoadingSkeleton() {
   )
 }
 
-// ── No-activity empty state ───────────────────────────────────
-function NoActivityState({ onRegenerate }) {
+// ── No activity state ─────────────────────────────────────────
+function NoActivityState({ period, onRegenerate }) {
   return (
     <div className="flex-1 flex items-center justify-center py-8">
       <div className="max-w-md w-full card p-10 text-center">
         <div className="w-16 h-16 rounded-2xl bg-warm-100 flex items-center justify-center mx-auto mb-4">
           <BarChart3 className="w-8 h-8 text-warm-300" />
         </div>
-        <h3 className="text-lg font-semibold text-warm-900 mb-2">No activity this week</h3>
+        <h3 className="text-lg font-semibold text-warm-900 mb-2">
+          No activity {period === 'monthly' ? 'this month' : 'this week'}
+        </h3>
         <p className="text-sm text-warm-500 leading-relaxed mb-6">
-          Log discussions or complete tasks this week to see a summary here. Activity is tracked in real-time.
+          Log discussions or complete tasks to see a summary here.
         </p>
         <button onClick={onRegenerate} className="btn-secondary flex items-center gap-2 mx-auto">
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -324,20 +344,31 @@ function NoActivityState({ onRegenerate }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────
-export default function WeeklySummary() {
-  const thisWeek = currentWeekStr()
-  const [week, setWeek]       = useState(thisWeek)
-  const [data, setData]       = useState(null)
+export default function Summary() {
+  const today     = new Date().toISOString().slice(0, 10)
+  const thisWeek  = currentWeekStr()
+  const thisMonth = currentMonthStr()
+
+  // picker: 'date' | 'week' | 'month'
+  const [picker,  setPicker]  = useState('week')
+  const [date,    setDate]    = useState(today)          // YYYY-MM-DD
+  const [week,    setWeek]    = useState(thisWeek)       // YYYY-Www
+  const [month,   setMonth]   = useState(thisMonth)      // YYYY-MM
+  const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
-  const [copied, setCopied]   = useState(false)
+  const [copied,  setCopied]  = useState(false)
 
-  const isCurrentWeek = week === thisWeek
+  // Derive which API to call and with what key
+  const apiMode  = picker === 'month' ? 'monthly' : 'weekly'
+  const apiKey   = picker === 'month' ? month : (picker === 'date' ? dateToWeekStr(date) : week)
 
-  const load = useCallback(async (weekStr) => {
+  const load = useCallback(async (mode, key) => {
     setLoading(true)
     setData(null)
     try {
-      const res = await summaryApi.weekly(weekStr)
+      const res = mode === 'monthly'
+        ? await summaryApi.monthly(key)
+        : await summaryApi.weekly(key)
       setData(res.data.data)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to load summary')
@@ -346,13 +377,17 @@ export default function WeeklySummary() {
     }
   }, [])
 
-  useEffect(() => { load(week) }, [week, load])
+  useEffect(() => { load(apiMode, apiKey) }, [picker, date, week, month]) // eslint-disable-line
 
+  // Week navigation
   function prevWeek() { setWeek(w => weekOffset(w, -1)) }
   function nextWeek() { setWeek(w => weekOffset(w, +1)) }
+  // Month navigation
+  function prevMonth() { setMonth(m => monthOffset(m, -1)) }
+  function nextMonth() { setMonth(m => monthOffset(m, +1)) }
 
   async function copyToClipboard() {
-    const text = formatAsText(data)
+    const text = formatAsText(data, apiMode)
     try { await navigator.clipboard.writeText(text) }
     catch {
       const ta = document.createElement('textarea')
@@ -367,50 +402,119 @@ export default function WeeklySummary() {
     setTimeout(() => setCopied(false), 2500)
   }
 
-  const range = data ? formatWeekRange(data.dateRange?.start, data.dateRange?.end) : ''
+  // Dynamic title and subtitle
+  const titleLabel = picker === 'month' ? 'Monthly' : picker === 'date' ? 'Daily' : 'Weekly'
+  const subtitleLabel = picker === 'month'
+    ? formatMonthLabel(month)
+    : picker === 'date'
+      ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+      : data
+        ? formatWeekRange(data.dateRange?.start, data.dateRange?.end)
+        : (week === thisWeek ? 'This week' : week)
 
   return (
     <div className="h-full flex flex-col px-6 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 flex-shrink-0 flex-wrap gap-3">
+      <div className="flex items-center justify-between mb-6 flex-shrink-0 flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-warm-900">Weekly Summary</h1>
+            <h1 className="text-2xl font-bold text-warm-900">{titleLabel} Summary</h1>
             <span className="badge badge-purple">AI</span>
           </div>
-          {range ? (
-            <div className="flex items-center gap-1.5 mt-0.5 text-sm text-warm-400">
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{range}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 mt-0.5 text-sm text-warm-400">
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{isCurrentWeek ? 'This week' : week}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5 mt-0.5 text-sm text-warm-400">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>{subtitleLabel}</span>
+          </div>
         </div>
 
-        {/* Week navigator */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={prevWeek}
-            className="btn-ghost btn-sm flex items-center gap-1"
-            title="Previous week"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-sm font-semibold text-warm-900 min-w-[80px] text-center px-2">
-            {isCurrentWeek ? 'This week' : week}
-          </span>
-          <button
-            onClick={nextWeek}
-            disabled={isCurrentWeek}
-            className="btn-ghost btn-sm flex items-center gap-1 disabled:opacity-30"
-            title="Next week"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+        {/* Controls */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* 3-way picker toggle */}
+          <div className="flex items-center bg-warm-100 rounded-xl p-1 gap-0.5">
+            {[
+              { key: 'date',  label: 'Date' },
+              { key: 'week',  label: 'Week' },
+              { key: 'month', label: 'Month' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => { setPicker(key); setData(null) }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  picker === key
+                    ? 'bg-white text-primary-700 shadow-sm'
+                    : 'text-warm-500 hover:text-warm-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Date picker — always visible, styled input */}
+          {picker === 'date' && (
+            <div className="flex items-center gap-2 card px-3 py-2">
+              <Calendar className="w-4 h-4 text-warm-400 flex-shrink-0" />
+              <input
+                type="date"
+                value={date}
+                max={today}
+                onChange={e => e.target.value && setDate(e.target.value)}
+                className="text-sm font-medium text-warm-900 bg-transparent outline-none cursor-pointer"
+              />
+            </div>
+          )}
+
+          {/* Week picker — input type="week" + prev/next */}
+          {picker === 'week' && (
+            <div className="flex items-center gap-1 card px-2 py-1.5">
+              <button onClick={prevWeek} className="p-1 rounded hover:bg-warm-100 text-warm-500 hover:text-warm-800 transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-1.5 px-1">
+                <Calendar className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
+                <input
+                  type="week"
+                  value={week}
+                  max={thisWeek}
+                  onChange={e => e.target.value && setWeek(e.target.value)}
+                  className="text-sm font-medium text-warm-900 bg-transparent outline-none cursor-pointer"
+                />
+              </div>
+              <button
+                onClick={nextWeek}
+                disabled={week === thisWeek}
+                className="p-1 rounded hover:bg-warm-100 text-warm-500 hover:text-warm-800 transition-colors disabled:opacity-30"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Month picker — input type="month" + prev/next */}
+          {picker === 'month' && (
+            <div className="flex items-center gap-1 card px-2 py-1.5">
+              <button onClick={prevMonth} className="p-1 rounded hover:bg-warm-100 text-warm-500 hover:text-warm-800 transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-1.5 px-1">
+                <Calendar className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
+                <input
+                  type="month"
+                  value={month}
+                  max={thisMonth}
+                  onChange={e => e.target.value && setMonth(e.target.value)}
+                  className="text-sm font-medium text-warm-900 bg-transparent outline-none cursor-pointer"
+                />
+              </div>
+              <button
+                onClick={nextMonth}
+                disabled={month === thisMonth}
+                className="p-1 rounded hover:bg-warm-100 text-warm-500 hover:text-warm-800 transition-colors disabled:opacity-30"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -418,7 +522,7 @@ export default function WeeklySummary() {
       {loading ? (
         <LoadingSkeleton />
       ) : !data || data.projects?.length === 0 ? (
-        <NoActivityState onRegenerate={() => load(week)} />
+        <NoActivityState period={apiMode} onRegenerate={() => load(apiMode, apiKey)} />
       ) : (
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
           {/* Left — project cards */}
@@ -432,10 +536,11 @@ export default function WeeklySummary() {
           <div className="lg:col-span-1 overflow-y-auto">
             <SummaryPanel
               data={data}
+              period={apiMode}
               loading={loading}
               copied={copied}
               onCopy={copyToClipboard}
-              onRegenerate={() => load(week)}
+              onRegenerate={() => load(apiMode, apiKey)}
             />
           </div>
         </div>

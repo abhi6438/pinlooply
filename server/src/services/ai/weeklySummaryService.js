@@ -231,6 +231,19 @@ function buildFallback(weekData, start, end) {
   }
 }
 
+// ── Parse month string "2026-06" → { start, end } ─────────────
+export function parseMonth(monthStr) {
+  const [year, month] = monthStr.split('-').map(Number)
+  const start = new Date(year, month - 1, 1, 0, 0, 0, 0)
+  const end   = new Date(year, month, 0, 23, 59, 59, 999) // last day of month
+  return { start, end }
+}
+
+export function currentMonthStr() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 // ── Main: generate weekly summary ────────────────────────────
 export async function generateWeeklySummary(userId, userName, weekStr) {
   const { start, end } = parseWeek(weekStr)
@@ -298,6 +311,105 @@ export async function generateWeeklySummary(userId, userName, weekStr) {
       totalDiscussions: weekData.discussions.length,
       totalConflicts:   weekData.conflicts.length,
       totalPending:     weekData.pending.length,
+      projectCount:     projectGroups.length,
+      mostActiveProject: mostActive?.name || null,
+    },
+    generatedAt: new Date().toISOString(),
+  }
+}
+
+// ── Main: generate monthly summary ────────────────────────────
+export async function generateMonthlySummary(userId, userName, monthStr) {
+  const { start, end } = parseMonth(monthStr)
+
+  const { data: userData } = await supabaseAdmin
+    .from('users')
+    .select('plan')
+    .eq('id', userId)
+    .single()
+
+  const plan = userData?.plan || 'free'
+  const { data: aiConfig } = await supabaseAdmin
+    .from('ai_config')
+    .select('provider, model_name')
+    .eq('plan_type', plan)
+    .single()
+
+  const provider = aiConfig?.provider || 'groq'
+  const model    = aiConfig?.model_name
+
+  const monthData = await fetchWeekData(userId, start, end) // reuses same fetch
+  const projectGroups = groupByProject(monthData)
+
+  const dateRange = `${start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+  const projectSummaries = projectGroups.map(p => {
+    const lines = [`Project: ${p.name}`]
+    if (p.completed.length) lines.push(`  Completed (${p.completed.length}): ${p.completed.map(t => t.title).join(', ')}`)
+    if (p.pending.length) lines.push(`  Still pending: ${p.pending.slice(0, 8).map(t => t.title).join(', ')}`)
+    if (p.discussions.length) lines.push(`  Discussions logged: ${p.discussions.length}`)
+    if (p.topicChanges.length) lines.push(`  Topic changes: ${p.topicChanges.map(tv => tv.topics?.title || 'unknown').join(', ')}`)
+    if (p.conflicts.length) lines.push(`  Conflicts detected: ${p.conflicts.map(c => c.description).join('; ')}`)
+    return lines.join('\n')
+  }).join('\n\n')
+
+  const prompt = `You are Pinlooply AI. Generate a monthly summary for developer ${userName} for ${dateRange}.
+
+Data:
+${projectSummaries || 'No activity this month.'}
+
+Return ONLY valid JSON, no markdown:
+{
+  "projects": [
+    {
+      "project_name": "exact project name",
+      "completed": ["list of completed task titles"],
+      "changed": ["list of topic changes with brief description"],
+      "pending": ["list of still-pending task titles"],
+      "conflicts": ["list of conflict descriptions"],
+      "summary": "2-3 sentence project summary for the month"
+    }
+  ],
+  "overall_summary": "3-4 sentence overview of the whole month including progress and trends",
+  "highlights": ["top 5 achievements or notable events as short strings"]
+}`
+
+  let result
+  try {
+    if (provider === 'claude') {
+      result = await callClaude(prompt, model)
+    } else {
+      result = await callGroq(prompt, model)
+    }
+    if (Array.isArray(result.projects)) {
+      result.projects = result.projects.map(rp => {
+        const raw = projectGroups.find(pg => pg.name === rp.project_name)
+        return { ...rp, _raw: raw }
+      })
+    }
+  } catch (err) {
+    console.error('Monthly summary AI error, using fallback:', err.message)
+    result = buildFallback(monthData, start, end)
+  }
+
+  const mostActive = projectGroups.sort((a, b) =>
+    (b.completed.length + b.discussions.length) - (a.completed.length + a.discussions.length)
+  )[0]
+
+  return {
+    provider,
+    month: monthStr,
+    dateRange: {
+      start: start.toISOString(),
+      end:   end.toISOString(),
+    },
+    projects: Array.isArray(result.projects) ? result.projects : [],
+    overall_summary: result.overall_summary || '',
+    highlights: Array.isArray(result.highlights) ? result.highlights : [],
+    stats: {
+      totalCompleted:   monthData.completed.length,
+      totalDiscussions: monthData.discussions.length,
+      totalConflicts:   monthData.conflicts.length,
+      totalPending:     monthData.pending.length,
       projectCount:     projectGroups.length,
       mostActiveProject: mostActive?.name || null,
     },

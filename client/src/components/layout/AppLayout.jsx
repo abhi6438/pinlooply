@@ -18,10 +18,10 @@ function getNavItems(mode) {
     { to: '/dashboard',  icon: LayoutDashboard,  label: 'Dashboard' },
     { to: '/topics',     icon: Tag,               label: 'Topics' },
     { to: '/projects',   icon: FolderOpen,        label: 'Projects' },
-    { to: '/lists',      icon: ListChecks,        label: 'Lists' },
+    { to: '/lists',      icon: ListChecks,        label: 'Tasks' },
     { to: '/timeline',   icon: CalendarDays,      label: 'Timeline' },
     { to: '/standup',        icon: ClipboardList, label: 'Standup' },
-    { to: '/weekly-summary', icon: BarChart3,     label: 'Weekly Summary' },
+    { to: '/weekly-summary', icon: BarChart3,     label: 'Summary' },
     { to: '/test-cases',     icon: FlaskConical,  label: 'Test Cases' },
   ]
   if (mode === 'team' || mode === 'org') {

@@ -23,7 +23,7 @@ import ProjectDetail from './pages/ProjectDetail'
 import JoinGroup from './pages/JoinGroup'
 import GroupMembers from './pages/GroupMembers'
 import Standup from './pages/Standup'
-import WeeklySummary from './pages/WeeklySummary'
+import WeeklySummary from './pages/WeeklySummary' // now also handles monthly
 import Plan from './pages/settings/Plan'
 import AdminPanel from './pages/admin/AdminPanel'
 import PublicProject from './pages/PublicProject'

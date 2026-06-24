@@ -125,7 +125,8 @@ export const standupApi = {
 }
 
 export const summaryApi = {
-  weekly: (week) => api.get(`/api/summary/weekly${week ? `?week=${week}` : ''}`),
+  weekly:  (week)  => api.get(`/api/summary/weekly${week   ? `?week=${week}`   : ''}`),
+  monthly: (month) => api.get(`/api/summary/monthly${month ? `?month=${month}` : ''}`),
 }
 
 export const planApi = {

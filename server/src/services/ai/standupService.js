@@ -78,28 +78,33 @@ function buildPrompt(projects, recentDone, pending, userName) {
 
   const allProjectNames = projects.map(p => p.name).join(', ')
 
-  return `You are Pinlooply AI. Generate a concise daily standup for developer ${userName}.
+  return `You are Pinlooply AI. Generate a clear, specific daily standup for developer ${userName}.
 
 Active projects: ${allProjectNames || 'none'}
 
 Activity data:
 ${projectSummaries || 'No recent activity found.'}
 
-Generate a standup entry for EACH project that has activity (completed or pending tasks).
-Be concise and professional. For "blockers", mention overdue items or dependencies — if none, say "None".
-Do NOT invent tasks — only reference what is listed above.
+Rules:
+- Do NOT invent tasks. Only reference tasks explicitly listed above.
+- Keep items short (5-10 words each). No full sentences — just task names or short phrases.
+- "yesterday" = tasks that appear in "Completed recently". If empty, return [].
+- "today" = top 3-5 tasks from "Pending" (prefer HIGH priority and OVERDUE first).
+- "blockers" = ONLY items marked [OVERDUE] or that have a clear dependency. If none, return [].
+- "focus" = one short phrase describing the day's theme (e.g. "Auth bug fixes", "API integration").
 
-Return ONLY valid JSON, no markdown:
+Return ONLY valid JSON (no markdown, no extra text):
 {
   "projects": [
     {
-      "project_name": "exact project name",
-      "yesterday": "what was completed (1-2 sentences)",
-      "today": "what is planned based on pending tasks (1-2 sentences)",
-      "blockers": "any overdue items or blockers, or None"
+      "project_name": "exact project name from above",
+      "focus": "short theme for today",
+      "yesterday": ["Task title 1", "Task title 2"],
+      "today": ["Task title A", "Task title B", "Task title C"],
+      "blockers": ["Specific blocker description"]
     }
   ],
-  "summary": "1-line overall summary of the developer's day"
+  "summary": "One sentence: what ${userName} is focused on today across all projects"
 }`
 }
 
@@ -173,15 +178,14 @@ function buildFallbackStandup(projects, recentDone, pending) {
 
   const result = Object.entries(byProject).map(([name, data]) => {
     const overdue = data.pending.filter(t => t.overdue).map(t => t.title)
+    const topToday = [...data.pending.filter(t => t.overdue), ...data.pending.filter(t => !t.overdue)]
+      .slice(0, 5).map(t => t.title)
     return {
       project_name: name,
-      yesterday: data.done.length
-        ? `Completed: ${data.done.slice(0, 3).join(', ')}`
-        : 'No tasks completed recently',
-      today: data.pending.length
-        ? `Working on: ${data.pending.slice(0, 3).map(t => t.title).join(', ')}`
-        : 'No pending tasks',
-      blockers: overdue.length ? `Overdue: ${overdue.join(', ')}` : 'None',
+      focus: data.done.length ? 'Completing recent work' : 'Working through pending tasks',
+      yesterday: data.done.slice(0, 5).map(t => t),
+      today: topToday,
+      blockers: overdue,
     }
   })
 

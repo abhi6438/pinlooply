@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProjectStore } from '../stores/useProjectStore'
-import { useTaskStore } from '../stores/useTaskStore'
 import { supabase } from '../config/supabase'
-import { discussionsApi, groupsApi } from '../services/api'
+import { discussionsApi, groupsApi, projectsApi, tasksApi } from '../services/api'
 import { format } from 'date-fns'
 import {
   AlertTriangle, Clock, ChevronRight, Send, Loader2,
   CheckCircle2, Circle, Zap, FolderOpen, Users,
   ClipboardList, FlaskConical, ArrowRight, BarChart3,
+  Plus, ListChecks, X, Check,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../components/ui'
@@ -26,6 +26,95 @@ function healthColor(count) {
   if (count === 0) return { dot: 'bg-green-400', badge: 'text-green-700 bg-green-50', label: 'On track', health: 'health-good' }
   if (count <= 3)  return { dot: 'bg-yellow-400', badge: 'text-yellow-700 bg-yellow-50', label: 'In progress', health: 'health-at-risk' }
   return { dot: 'bg-red-400', badge: 'text-red-700 bg-red-50', label: 'Needs attention', health: 'health-behind' }
+}
+
+// ── New Project Modal ─────────────────────────────────────────
+const PROJECT_COLORS = ['#7C3AED', '#3B82F6', '#0D9488', '#16A34A', '#CA8A04', '#EA580C', '#DC2626', '#6366F1']
+
+function NewProjectModal({ onClose, onCreated }) {
+  const [name,   setName]   = useState('')
+  const [desc,   setDesc]   = useState('')
+  const [color,  setColor]  = useState(PROJECT_COLORS[0])
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef()
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  async function handleCreate(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      const res = await projectsApi.create({ name: name.trim(), description: desc.trim(), color })
+      toast.success('Project created!')
+      onCreated(res.data.data || res.data)
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to create project')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-semibold text-warm-900">New Project</h3>
+          <button onClick={onClose} className="p-1.5 text-warm-400 hover:text-warm-700 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex-shrink-0 border-2 border-white ring-2 ring-primary-400"
+              style={{ backgroundColor: color }} />
+            <input
+              ref={inputRef}
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Project name"
+              className="input flex-1"
+              required
+            />
+          </div>
+
+          <textarea
+            value={desc}
+            onChange={e => setDesc(e.target.value)}
+            placeholder="Description (optional)"
+            rows={3}
+            className="input resize-none"
+          />
+
+          <div>
+            <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide mb-2">Color</p>
+            <div className="flex gap-2 flex-wrap">
+              {PROJECT_COLORS.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  className="w-8 h-8 rounded-full transition-transform hover:scale-110 flex items-center justify-center"
+                  style={{ backgroundColor: c }}
+                >
+                  {color === c && <Check className="w-4 h-4 text-white" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-warm-100">
+            <button type="button" onClick={onClose} className="btn-ghost btn-sm">Cancel</button>
+            <button type="submit" disabled={!name.trim() || saving} className="btn-primary btn-sm flex items-center gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Create Project
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 // ── Alert Cards ───────────────────────────────────────────────
@@ -88,7 +177,6 @@ function ProjectCard({ project, taskCount }) {
   )
 }
 
-// ── Quick Log ─────────────────────────────────────────────────
 // ── Sources ───────────────────────────────────────────────────
 const SOURCES = [
   { key: 'manual',          label: 'Manual entry' },
@@ -144,7 +232,7 @@ function ProcessingOverlay({ step }) {
 }
 
 // ── Log Discussion Box ─────────────────────────────────────────
-function QuickLogBox({ projects }) {
+function QuickLogBox({ projects, onNewProject }) {
   const navigate = useNavigate()
   const [text,      setText]      = useState('')
   const [projectId, setProjectId] = useState('')
@@ -162,7 +250,6 @@ function QuickLogBox({ projects }) {
     setSaving(true)
     setStep(0)
 
-    // Animate through steps while API call runs
     let currentStep = 0
     const interval = setInterval(() => {
       currentStep += 1
@@ -176,7 +263,7 @@ function QuickLogBox({ projects }) {
     try {
       const res = await discussionsApi.process(text.trim(), projectId, source)
       clearInterval(interval)
-      setStep(PROCESSING_STEPS.length - 1) // "Done!"
+      setStep(PROCESSING_STEPS.length - 1)
       await new Promise(r => setTimeout(r, 400))
       navigate('/log/confirm', {
         state: { rawText: text.trim(), projectId, source, aiResult: res.data.data }
@@ -207,6 +294,29 @@ function QuickLogBox({ projects }) {
         <span className="text-xs text-warm-400 ml-auto">AI extracts topics, tasks &amp; decisions</span>
       </div>
 
+      {/* Project selector — TOP, prominent */}
+      <div className="flex items-center gap-2 mb-3 p-3 bg-warm-50 rounded-xl border border-warm-200">
+        <span className="text-xs font-semibold text-warm-600 flex-shrink-0">Project:</span>
+        {projects.length > 0 ? (
+          <select
+            value={projectId}
+            onChange={e => setProjectId(e.target.value)}
+            className="flex-1 text-sm font-medium border-0 bg-transparent text-warm-900 focus:outline-none focus:ring-0 cursor-pointer"
+          >
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        ) : (
+          <span className="text-xs text-warm-400 flex-1">No projects yet — create one first</span>
+        )}
+        <button
+          type="button"
+          onClick={onNewProject}
+          className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium bg-primary-50 hover:bg-primary-100 px-2.5 py-1 rounded-lg transition-colors flex-shrink-0"
+        >
+          <Plus className="w-3 h-3" /> New
+        </button>
+      </div>
+
       {/* Source selector */}
       <div className="flex gap-2 flex-wrap mb-3">
         {SOURCES.map(s => (
@@ -231,24 +341,11 @@ function QuickLogBox({ projects }) {
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSubmit() }}
           placeholder={placeholder}
-          rows={5}
+          rows={4}
           className="input resize-none text-sm"
         />
-        <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
-          <div className="flex items-center gap-2 min-w-0">
-            {projects.length > 0 ? (
-              <select
-                value={projectId}
-                onChange={e => setProjectId(e.target.value)}
-                className="text-xs border border-warm-200 rounded-xl px-2.5 py-1.5 text-warm-700 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-              >
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            ) : (
-              <span className="text-xs text-warm-400">No projects yet</span>
-            )}
-            <span className="text-xs text-warm-300 hidden sm:inline">⌘+Enter</span>
-          </div>
+        <div className="flex items-center justify-end mt-3 gap-2">
+          <span className="text-xs text-warm-300 hidden sm:inline">⌘+Enter</span>
           <button
             type="submit"
             disabled={!text.trim() || !projectId || saving}
@@ -293,8 +390,127 @@ function PriorityTask({ task, onToggle }) {
   )
 }
 
+// ── Quick Add Task ────────────────────────────────────────────
+function QuickAddTask({ projects, onAdded }) {
+  const [open,      setOpen]      = useState(false)
+  const [title,     setTitle]     = useState('')
+  const [projectId, setProjectId] = useState(projects[0]?.id || '')
+  const [priority,  setPriority]  = useState('medium')
+  const [saving,    setSaving]    = useState(false)
+  const inputRef = useRef()
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open])
+
+  async function handleAdd(e) {
+    e.preventDefault()
+    if (!title.trim() || !projectId) return
+    setSaving(true)
+    try {
+      const res = await tasksApi.create({ title: title.trim(), project_id: projectId, priority, status: 'pending' })
+      toast.success('Task added!')
+      setTitle('')
+      onAdded(res.data.data || res.data)
+      setOpen(false)
+    } catch (err) {
+      toast.error('Failed to add task')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 border border-dashed border-primary-200 rounded-xl px-4 py-3 transition-colors"
+      >
+        <Plus className="w-4 h-4" /> Add a task
+      </button>
+    )
+  }
+
+  return (
+    <form onSubmit={handleAdd} className="bg-primary-50 border border-primary-200 rounded-xl p-3 space-y-2">
+      <input
+        ref={inputRef}
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        placeholder="Task title…"
+        className="input text-sm py-2"
+      />
+      <div className="flex items-center gap-2 flex-wrap">
+        <select
+          value={projectId}
+          onChange={e => setProjectId(e.target.value)}
+          className="text-xs border border-warm-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+        >
+          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <select
+          value={priority}
+          onChange={e => setPriority(e.target.value)}
+          className="text-xs border border-warm-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+        >
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={() => setOpen(false)} className="text-xs text-warm-500 hover:text-warm-700 px-2 py-1">Cancel</button>
+          <button type="submit" disabled={!title.trim() || saving} className="btn-primary btn-sm text-xs">
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Add'}
+          </button>
+        </div>
+      </div>
+    </form>
+  )
+}
+
+// ── Stats Panel ───────────────────────────────────────────────
+const TASK_FILTERS = [
+  { key: 'work',  label: 'Work tasks' },
+  { key: 'test',  label: 'Test cases' },
+  { key: 'all',   label: 'All' },
+]
+
+function StatsPanel({ stats, taskFilter, onFilterChange }) {
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="section-title">Overview</h2>
+        <div className="flex items-center bg-warm-100 rounded-lg p-0.5 gap-0.5">
+          {TASK_FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => onFilterChange(f.key)}
+              className={`text-xs px-2 py-1 rounded-md font-medium transition-all ${
+                taskFilter === f.key
+                  ? 'bg-white text-warm-900 shadow-sm'
+                  : 'text-warm-500 hover:text-warm-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {stats.map(({ label, value, icon: Icon, color, bg }) => (
+          <div key={label} className={`${bg} rounded-xl p-3 flex flex-col items-start gap-1`}>
+            <Icon className={`w-4 h-4 ${color}`} />
+            <p className="text-xl font-bold text-warm-900 leading-none">{value}</p>
+            <p className="text-xs text-warm-500">{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Morning Briefing Widget ───────────────────────────────────
-function MorningBriefing({ tasks, projects, userName }) {
+function MorningBriefing({ tasks, projects }) {
   const navigate = useNavigate()
   const now = new Date()
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
@@ -323,13 +539,6 @@ function MorningBriefing({ tasks, projects, userName }) {
   }
 
   const pendingTests = tasks.filter(t => t.type === 'test_case' && t.status !== 'done')
-  const testsByProject = pendingTests.reduce((acc, t) => {
-    const name = projects.find(p => p.id === t.project_id)?.name || 'Unknown'
-    acc[name] = (acc[name] || 0) + 1
-    return acc
-  }, {})
-
-  if (!attentionItems.length && !pendingTests.length) return null
 
   return (
     <div className="card overflow-hidden">
@@ -358,7 +567,7 @@ function MorningBriefing({ tasks, projects, userName }) {
           <ClipboardList className="w-4 h-4 text-primary-500 flex-shrink-0" />
           <div className="text-left flex-1 min-w-0">
             <p className="text-xs font-semibold text-primary-800">Today's Standup</p>
-            <p className="text-xs text-primary-500">Generate with AI →</p>
+            <p className="text-xs text-primary-500">AI-generated daily update →</p>
           </div>
           <ArrowRight className="w-3.5 h-3.5 text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
@@ -366,7 +575,13 @@ function MorningBriefing({ tasks, projects, userName }) {
           <div>
             <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide mb-2">🧪 Test Cases Due</p>
             <div className="space-y-1.5">
-              {Object.entries(testsByProject).map(([name, count]) => (
+              {Object.entries(
+                pendingTests.reduce((acc, t) => {
+                  const name = projects.find(p => p.id === t.project_id)?.name || 'Unknown'
+                  acc[name] = (acc[name] || 0) + 1
+                  return acc
+                }, {})
+              ).map(([name, count]) => (
                 <div key={name} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-primary-50">
                   <FlaskConical className="w-3 h-3 text-primary-400 flex-shrink-0" />
                   <span className="text-xs text-warm-700 truncate flex-1">{name}</span>
@@ -427,15 +642,28 @@ function WhoSection({ group }) {
 export default function Dashboard() {
   const { user } = useAuth()
   const { projects, loading: projectsLoading, fetchProjects } = useProjectStore()
-  const { tasks, fetchAllTasks, updateTaskStatus } = useTaskStore()
-  const [userName, setUserName]   = useState('')
-  const [userMode, setUserMode]   = useState('personal')
-  const [group,    setGroup]      = useState(null)
+  const [userName, setUserName]         = useState('')
+  const [userMode, setUserMode]         = useState('personal')
+  const [group,    setGroup]            = useState(null)
+  const [showNewProject, setShowNewProject] = useState(false)
+  // Use local state + server API (bypasses Supabase RLS issues on client)
+  const [allTasks, setAllTasks]         = useState([])
+  // Track tasks the user just checked off — keep them visible (crossed out) in the list
+  const [justCompleted, setJustCompleted] = useState(new Set())
+  // Overview filter: 'work' = exclude test cases (default), 'test' = only test cases, 'all' = everything
+  const [taskFilter, setTaskFilter]     = useState('work')
   const navigate = useNavigate()
+
+  async function loadTasks() {
+    try {
+      const res = await tasksApi.list({ show_done: 'true' })
+      setAllTasks(res.data.data || [])
+    } catch { /* non-fatal */ }
+  }
 
   useEffect(() => {
     if (!user) return
-    fetchAllTasks(user.id)
+    loadTasks()
     fetchProjects(user.id)
     supabase.from('users').select('name, mode').eq('id', user.id).single()
       .then(({ data }) => {
@@ -444,7 +672,6 @@ export default function Dashboard() {
       })
   }, [user]) // eslint-disable-line
 
-  // Load group if in team/org mode
   useEffect(() => {
     if (userMode !== 'team' && userMode !== 'org') return
     groupsApi.list()
@@ -457,33 +684,80 @@ export default function Dashboard() {
       .catch(() => {})
   }, [userMode])
 
+  function handleProjectCreated() {
+    fetchProjects(user.id)
+    setShowNewProject(false)
+  }
+
+  async function handleToggleTask(taskId, newStatus) {
+    // Keep just-completed tasks visible in the list (crossed out, not disappeared)
+    if (newStatus === 'done') {
+      setJustCompleted(prev => new Set([...prev, taskId]))
+    } else {
+      setJustCompleted(prev => { const s = new Set(prev); s.delete(taskId); return s })
+    }
+    // Optimistic update
+    setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    try {
+      await tasksApi.update(taskId, { status: newStatus })
+    } catch {
+      loadTasks()
+    }
+  }
+
   const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
-  const highPriorityTasks = tasks
-    .filter(t => t.status !== 'done' && t.status !== 'released')
-    .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1))
+
+  // Apply task type filter to stats and priorities
+  const filteredTasks = allTasks.filter(t => {
+    if (taskFilter === 'work') return t.type !== 'test_case'
+    if (taskFilter === 'test') return t.type === 'test_case'
+    return true // 'all'
+  })
+
+  const openTasks      = filteredTasks.filter(t => t.status !== 'done' && t.status !== 'released')
+  const overdueTasks   = filteredTasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done')
+  const completedTasks = filteredTasks.filter(t => t.status === 'done' || t.status === 'released')
+
+  // Include just-completed tasks so they stay visible (crossed out) instead of disappearing
+  const highPriorityTasks = [...filteredTasks]
+    .filter(t => t.status !== 'done' && t.status !== 'released' || justCompleted.has(t.id))
+    .sort((a, b) => {
+      const aDone = justCompleted.has(a.id) ? 1 : 0
+      const bDone = justCompleted.has(b.id) ? 1 : 0
+      if (aDone !== bDone) return aDone - bDone
+      return (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1)
+    })
     .slice(0, 5)
 
-  const taskCountByProject = tasks.reduce((acc, t) => {
+  const taskCountByProject = allTasks.filter(t => t.type !== 'test_case').reduce((acc, t) => {
     acc[t.project_id] = (acc[t.project_id] || 0) + 1
     return acc
   }, {})
 
+  const stats = [
+    { label: 'Open Tasks',  value: openTasks.length,      icon: ListChecks,   color: 'text-primary-600', bg: 'bg-primary-50' },
+    { label: 'Completed',   value: completedTasks.length,  icon: CheckCircle2, color: 'text-green-600',   bg: 'bg-green-50'   },
+    { label: 'Overdue',     value: overdueTasks.length,    icon: AlertTriangle, color: overdueTasks.length > 0 ? 'text-red-600' : 'text-warm-400', bg: overdueTasks.length > 0 ? 'bg-red-50' : 'bg-warm-50' },
+    { label: 'Projects',    value: projects.length,        icon: FolderOpen,   color: 'text-violet-600',  bg: 'bg-violet-50'  },
+  ]
+
   const { text: greetText, emoji: greetEmoji } = greeting()
+  const hasMorningBriefing = allTasks.some(t => t.due_date && (new Date(t.due_date) < new Date() || new Date(t.due_date) <= new Date(Date.now() + 86400000)) && t.status !== 'done')
+    || allTasks.some(t => t.type === 'test_case' && t.status !== 'done')
 
   return (
     <PageShell>
       <PageHeader
         title={`${greetText}, ${userName.split(' ')[0]} ${greetEmoji}`}
         subtitle="Here's what's happening with your projects."
-      >
-        {group && (
-          <span className="inline-flex items-center gap-1.5 text-xs bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full font-medium border border-primary-100 mt-2">
+        actions={group && (
+          <span className="inline-flex items-center gap-1.5 text-xs bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full font-medium border border-primary-100">
             <Users className="w-3.5 h-3.5" />{group.name}
           </span>
         )}
-      </PageHeader>
+      />
 
-      <AlertCards tasks={tasks} />
+      <AlertCards tasks={allTasks} />
 
       {/* Friday weekly summary banner */}
       {new Date().getDay() === 5 && (
@@ -503,34 +777,65 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left — Quick log + priorities */}
+        {/* Left — Log discussion + Today's Priorities */}
         <div className="lg:col-span-2 space-y-6">
-          <QuickLogBox projects={projects} />
+          <QuickLogBox
+            projects={projects}
+            onNewProject={() => setShowNewProject(true)}
+          />
 
           <div className="card">
-            <h2 className="section-title mb-1">Today's Priorities</h2>
-            <p className="text-xs text-warm-400 mb-4">Open tasks across all projects, sorted by priority</p>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="section-title">Today's Priorities</h2>
+              {openTasks.length > 0 && (
+                <span className="text-xs text-warm-400">{openTasks.length} open</span>
+              )}
+            </div>
+            <p className="text-xs text-warm-400 mb-4">Your open tasks sorted by priority — check off as you go</p>
+
             {highPriorityTasks.length > 0 ? (
               highPriorityTasks.map(task => (
-                <PriorityTask key={task.id} task={task} onToggle={updateTaskStatus} />
+                <PriorityTask key={task.id} task={task} onToggle={handleToggleTask} />
               ))
             ) : (
-              <div className="empty-state py-8">
-                <CheckCircle2 className="empty-state-icon w-10 h-10 mx-auto mb-2" />
-                <p className="empty-state-title">All clear!</p>
-                <p className="empty-state-sub">No open tasks right now.</p>
+              <div className="space-y-4">
+                <div className="empty-state py-6">
+                  <CheckCircle2 className="empty-state-icon w-10 h-10 mx-auto mb-2" />
+                  <p className="empty-state-title">All clear!</p>
+                  <p className="empty-state-sub">
+                    {projects.length === 0
+                      ? 'Create a project and log a discussion to get started.'
+                      : 'No open tasks — use Log Discussion above or add one below.'}
+                  </p>
+                </div>
+                {projects.length > 0 && (
+                  <QuickAddTask projects={projects} onAdded={loadTasks} />
+                )}
               </div>
             )}
           </div>
         </div>
 
-        {/* Right — Briefing + Who's working + Project health */}
+        {/* Right — Stats + Briefing + Who's working + Project health */}
         <div className="space-y-6">
-          <MorningBriefing tasks={tasks} projects={projects} userName={userName} />
+          <StatsPanel stats={stats} taskFilter={taskFilter} onFilterChange={setTaskFilter} />
+
+          {hasMorningBriefing && (
+            <MorningBriefing tasks={allTasks} projects={projects} />
+          )}
+
           {group && <WhoSection group={group} />}
 
           <div>
-            <h2 className="section-title mb-4">Project Health</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="section-title">Project Health</h2>
+              <button
+                onClick={() => setShowNewProject(true)}
+                className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" /> New
+              </button>
+            </div>
             {projectsLoading ? (
               <div className="space-y-3">
                 {[1,2,3].map(i => (
@@ -547,15 +852,25 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <div className="empty-state border border-dashed border-warm-200 rounded-2xl p-6">
+              <button
+                onClick={() => setShowNewProject(true)}
+                className="w-full empty-state border border-dashed border-warm-200 rounded-2xl p-6 hover:border-primary-300 hover:bg-primary-50/30 transition-colors"
+              >
                 <FolderOpen className="empty-state-icon w-8 h-8 mx-auto mb-2" />
                 <p className="empty-state-title">No projects yet</p>
-                <p className="empty-state-sub">Create a project to get started.</p>
-              </div>
+                <p className="empty-state-sub text-primary-500 font-medium mt-1">+ Create your first project</p>
+              </button>
             )}
           </div>
         </div>
       </div>
+
+      {showNewProject && (
+        <NewProjectModal
+          onClose={() => setShowNewProject(false)}
+          onCreated={handleProjectCreated}
+        />
+      )}
     </PageShell>
   )
 }

@@ -337,20 +337,32 @@ export default function Timeline() {
           <div>
             <p className="text-xs font-semibold text-warm-400 uppercase tracking-wider mb-2">Date Range</p>
             <div className="space-y-2">
-              <div>
-                <label className="label mb-1">From</label>
-                <input type="date" value={fFrom} onChange={e => setFFrom(e.target.value)}
-                  onClick={e => e.target.showPicker?.()}
-                  className="input w-full text-xs py-1.5 cursor-pointer"
-                />
-              </div>
-              <div>
-                <label className="label mb-1">To</label>
-                <input type="date" value={fTo} onChange={e => setFTo(e.target.value)}
-                  onClick={e => e.target.showPicker?.()}
-                  className="input w-full text-xs py-1.5 cursor-pointer"
-                />
-              </div>
+              {[
+                { label: 'From', value: fFrom, set: setFFrom },
+                { label: 'To',   value: fTo,   set: setFTo   },
+              ].map(({ label, value, set }) => (
+                <div key={label}>
+                  <label className="label mb-1">{label}</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-warm-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={value}
+                      onChange={e => set(e.target.value)}
+                      onClick={e => e.target.showPicker?.()}
+                      className="input w-full text-xs pl-7 py-1.5 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              ))}
+              {(fFrom || fTo) && (
+                <button
+                  onClick={() => { setFFrom(''); setFTo('') }}
+                  className="text-xs text-warm-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                >
+                  <X className="w-3 h-3" /> Clear dates
+                </button>
+              )}
             </div>
           </div>
 

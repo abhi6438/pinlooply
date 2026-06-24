@@ -19,21 +19,10 @@ export const useTaskStore = create((set, get) => ({
 
   fetchAllTasks: async (userId) => {
     set({ loading: true })
-    // Fetch tasks across all user's projects
-    const { data: projects } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-
-    if (!projects?.length) { set({ tasks: [], loading: false }); return }
-
-    const projectIds = projects.map((p) => p.id)
+    // Let RLS handle visibility — fetch all tasks the user can see across all their projects
     const { data, error } = await supabase
       .from('tasks')
       .select('*, projects(name, color)')
-      .in('project_id', projectIds)
-      .neq('status', 'done')
       .order('created_at', { ascending: false })
     if (!error) set({ tasks: data ?? [] })
     set({ loading: false })
