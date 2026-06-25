@@ -154,19 +154,28 @@ router.get('/usage-detail', async (req, res) => {
     const since = new Date(Date.now() - weeksBack * 7 * 24 * 60 * 60 * 1000).toISOString()
 
     // Fetch raw data in parallel
+    // NOTE: tasks use `assigned_by` for creator; discussions use `user_id`; topics have no creator column
     const [
       { data: tasks },
       { data: discussions },
       { data: topics },
+      { data: topicVersions },
       { data: users },
       { data: projects },
     ] = await Promise.all([
-      supabaseAdmin.from('tasks').select('id, created_by, project_id, type, created_at').gte('created_at', since),
-      supabaseAdmin.from('discussions').select('id, created_by, project_id, created_at').gte('created_at', since),
-      supabaseAdmin.from('topics').select('id, created_by, project_id, created_at').gte('created_at', since),
+      supabaseAdmin.from('tasks').select('id, assigned_by, project_id, type, created_at').gte('created_at', since),
+      supabaseAdmin.from('discussions').select('id, user_id, project_id, created_at').gte('created_at', since),
+      supabaseAdmin.from('topics').select('id, project_id, created_at').gte('created_at', since),
+      supabaseAdmin.from('topic_versions').select('topic_id, changed_by, created_at').gte('created_at', since).eq('version_number', 1),
       supabaseAdmin.from('users').select('id, name, email, mode, plan'),
       supabaseAdmin.from('projects').select('id, name'),
     ])
+
+    // Build topic → creator map from version_number=1 entries
+    const topicCreatorMap = {}
+    for (const tv of topicVersions || []) {
+      if (!topicCreatorMap[tv.topic_id]) topicCreatorMap[tv.topic_id] = tv.changed_by
+    }
 
     const userMap    = {}
     const projectMap = {}
@@ -187,16 +196,17 @@ router.get('/usage-detail', async (req, res) => {
 
     for (const t of tasks || []) {
       if (t.type === 'test_case') continue
-      ensureUser(t.created_by)
-      if (t.created_by) userStats[t.created_by].tasks++
+      ensureUser(t.assigned_by)
+      if (t.assigned_by) userStats[t.assigned_by].tasks++
     }
     for (const d of discussions || []) {
-      ensureUser(d.created_by)
-      if (d.created_by) userStats[d.created_by].discussions++
+      ensureUser(d.user_id)
+      if (d.user_id) userStats[d.user_id].discussions++
     }
     for (const t of topics || []) {
-      ensureUser(t.created_by)
-      if (t.created_by) userStats[t.created_by].topics++
+      const creator = topicCreatorMap[t.id]
+      ensureUser(creator)
+      if (creator) userStats[creator].topics++
     }
 
     const byUser = Object.values(userStats)
@@ -243,15 +253,15 @@ router.get('/usage-detail', async (req, res) => {
 
     for (const t of tasks || []) {
       if (t.type === 'test_case') continue
-      const m = modeOf(t.created_by)
+      const m = modeOf(t.assigned_by)
       if (byMode[m]) byMode[m].tasks++
     }
     for (const d of discussions || []) {
-      const m = modeOf(d.created_by)
+      const m = modeOf(d.user_id)
       if (byMode[m]) byMode[m].discussions++
     }
     for (const t of topics || []) {
-      const m = modeOf(t.created_by)
+      const m = modeOf(topicCreatorMap[t.id])
       if (byMode[m]) byMode[m].topics++
     }
 

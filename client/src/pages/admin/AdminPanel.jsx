@@ -378,13 +378,17 @@ function UsageStatsTab({ stats }) {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Sub-tab pills */}
-      <div className="flex gap-1.5 flex-wrap">
+      {/* Sub-tab pills — styled as a segmented row */}
+      <div className="flex gap-0 bg-warm-100 p-1 rounded-xl w-fit">
         {SUB_TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setSubTab(t.id)}
-            className={`tab-pill ${subTab === t.id ? 'active' : 'inactive'}`}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              subTab === t.id
+                ? 'bg-white text-primary-700 shadow-sm font-semibold'
+                : 'text-warm-500 hover:text-warm-800'
+            }`}
           >
             {t.label}
           </button>
@@ -394,36 +398,77 @@ function UsageStatsTab({ stats }) {
       {/* ── Overview ─────────────────────────────────────── */}
       {subTab === 'overview' && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <StatCard label="Discussions" value={content.discussions || 0} icon={MessageSquare} iconBg="bg-primary-100"  iconColor="text-primary-600" />
-            <StatCard label="Tasks"       value={content.tasks        || 0} icon={CheckSquare2}  iconBg="bg-emerald-100"  iconColor="text-emerald-600" />
-            <StatCard label="Topics"      value={content.topics       || 0} icon={GitBranch}     iconBg="bg-amber-100"    iconColor="text-amber-600" />
-            <StatCard label="Projects"    value={content.projects     || 0} icon={FolderOpen}    iconBg="bg-warm-100"     iconColor="text-warm-500" />
-            <StatCard label="Conflicts"   value={content.conflicts    || 0} icon={AlertCircle}   iconBg="bg-red-100"      iconColor="text-red-500" />
+          {/* All-time content totals — single row */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="section-title">Platform Totals (All Time)</h3>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              {[
+                { label: 'Discussions', value: content.discussions || 0, icon: MessageSquare, bg: 'bg-primary-50',  iconColor: 'text-primary-600',  border: 'border-primary-100' },
+                { label: 'Tasks',       value: content.tasks        || 0, icon: CheckSquare2,  bg: 'bg-emerald-50', iconColor: 'text-emerald-600', border: 'border-emerald-100' },
+                { label: 'Topics',      value: content.topics       || 0, icon: GitBranch,     bg: 'bg-amber-50',   iconColor: 'text-amber-600',   border: 'border-amber-100'  },
+                { label: 'Projects',    value: content.projects     || 0, icon: FolderOpen,    bg: 'bg-warm-50',    iconColor: 'text-warm-500',    border: 'border-warm-200'   },
+                { label: 'Conflicts',   value: content.conflicts    || 0, icon: AlertCircle,   bg: 'bg-red-50',     iconColor: 'text-red-500',     border: 'border-red-100'    },
+              ].map(({ label, value, icon: Icon, bg, iconColor, border }) => (
+                <div key={label} className={`rounded-xl ${bg} border ${border} p-3 text-center`}>
+                  <Icon className={`w-5 h-5 ${iconColor} mx-auto mb-2`} />
+                  <p className="text-2xl font-bold text-warm-900">{value}</p>
+                  <p className="text-[11px] text-warm-500 mt-0.5">{label}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Activity by mode */}
+          {/* Activity by mode — last 8 weeks */}
           {detLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
-          ) : detail && (
-            <div className="card p-5">
-              <h3 className="section-title mb-4">Activity by Mode (Last 8 Weeks)</h3>
-              {[
-                { key: 'personal', label: '👤 Personal', color: 'bg-warm-400'     },
-                { key: 'group',    label: '👥 Group',    color: 'bg-primary-500'  },
-                { key: 'team',     label: '🏢 Team',     color: 'bg-primary-700'  },
-                { key: 'org',      label: '🏗️ Org',      color: 'bg-amber-500'    },
-              ].map(({ key, label, color }) => {
-                const m      = detail.byMode?.[key] || {}
-                const tot    = (m.tasks || 0) + (m.discussions || 0) + (m.topics || 0)
-                const allTot = Object.values(detail.byMode || {}).reduce((s, mm) => s + (mm.tasks || 0) + (mm.discussions || 0) + (mm.topics || 0), 0)
-                return (
-                  <HBar key={key} label={label} value={tot} max={Math.max(allTot, 1)} color={color}
-                    sub={`Tasks:${m.tasks||0}  Discussions:${m.discussions||0}  Topics:${m.topics||0}`} />
-                )
-              })}
-            </div>
-          )}
+          ) : detail && (() => {
+            const allTot = Object.values(detail.byMode || {}).reduce((s, mm) => s + (mm.tasks || 0) + (mm.discussions || 0) + (mm.topics || 0), 0)
+            const MODES = [
+              { key: 'personal', label: '👤 Personal', color: 'bg-warm-400'     },
+              { key: 'group',    label: '👥 Group',    color: 'bg-primary-500'  },
+              { key: 'team',     label: '🏢 Team',     color: 'bg-primary-700'  },
+              { key: 'org',      label: '🏗️ Org',      color: 'bg-amber-500'    },
+            ]
+            return (
+              <div className="card p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="section-title">Activity by Mode</h3>
+                  <span className="text-xs text-warm-400 bg-warm-50 px-2 py-1 rounded-lg border border-warm-100">Last 8 weeks</span>
+                </div>
+                {allTot === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-warm-400">No activity recorded in the last 8 weeks yet.</p>
+                    <p className="text-xs text-warm-300 mt-1">Activity will appear here once users create tasks, discussions, or topics.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {MODES.map(({ key, label, color }) => {
+                      const m   = detail.byMode?.[key] || {}
+                      const tot = (m.tasks || 0) + (m.discussions || 0) + (m.topics || 0)
+                      const pct = allTot > 0 ? Math.round((tot / allTot) * 100) : 0
+                      return (
+                        <div key={key} className="rounded-xl bg-warm-50 border border-warm-100 p-3">
+                          <p className="text-sm font-semibold text-warm-900 mb-1">{label}</p>
+                          <p className="text-2xl font-bold text-warm-900">{tot}</p>
+                          <p className="text-[11px] text-warm-400 mt-0.5">{pct}% of activity</p>
+                          <div className="mt-2 h-1.5 bg-warm-200 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="mt-2 space-y-0.5">
+                            <p className="text-[10px] text-warm-400">Tasks: <span className="font-semibold text-warm-700">{m.tasks||0}</span></p>
+                            <p className="text-[10px] text-warm-400">Discussions: <span className="font-semibold text-warm-700">{m.discussions||0}</span></p>
+                            <p className="text-[10px] text-warm-400">Topics: <span className="font-semibold text-warm-700">{m.topics||0}</span></p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* AI estimate */}
           <div className="card p-5">
