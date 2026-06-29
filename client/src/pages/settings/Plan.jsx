@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { planApi } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -7,6 +8,32 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../../components/ui'
+
+function SettingsNav() {
+  const { pathname } = useLocation()
+  const tabs = [
+    { to: '/settings/plan',        label: 'Plan & Billing' },
+    { to: '/settings/workspace',   label: 'Workspace'      },
+    { to: '/settings/automations', label: 'Automations'    },
+  ]
+  return (
+    <div className="flex gap-1 mb-6 bg-warm-100 p-1 rounded-xl w-fit">
+      {tabs.map(t => (
+        <Link
+          key={t.to}
+          to={t.to}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            pathname === t.to || (t.to === '/settings/plan' && pathname === '/settings')
+              ? 'bg-white text-primary-700 shadow-sm font-semibold'
+              : 'text-warm-500 hover:text-warm-800'
+          }`}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </div>
+  )
+}
 
 // ── Plan definitions ──────────────────────────────────────────
 const BMC_URL = 'https://buymeacoffee.com/pinlooply'
@@ -320,9 +347,10 @@ export default function Plan() {
   return (
     <PageShell>
       <PageHeader
-        title="Plan & Billing"
-        subtitle="Manage your plan and see what's included."
+        title="Settings"
+        subtitle="Manage your plan and workspace."
       />
+      <SettingsNav />
 
       {/* Current plan summary */}
       {info && (

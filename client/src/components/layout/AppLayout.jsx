@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useWorkspace } from '../../context/WorkspaceContext'
 import { useUIStore } from '../../stores/useUIStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { supabase } from '../../config/supabase'
@@ -9,26 +10,37 @@ import {
   LayoutDashboard, FolderOpen, ListChecks,
   CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
   Bell, CheckCheck, ClipboardList, BarChart3, Shield, FlaskConical,
+  UserCheck, BarChart2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// ── Helpers ───────────────────────────────────────────────────
-function getNavItems(mode) {
-  const items = [
-    { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard'  },
-    { to: '/projects',       icon: FolderOpen,      label: 'Projects'   },
-    { to: '/lists',          icon: ListChecks,      label: 'Tasks'      },
-    { to: '/timeline',       icon: CalendarDays,    label: 'Timeline'   },
-    { to: '/topics',         icon: Tag,             label: 'Topics'     },
-    { to: '/standup',        icon: ClipboardList,   label: 'Standup'    },
-    { to: '/weekly-summary', icon: BarChart3,       label: 'Summary'    },
-    { to: '/test-cases',     icon: FlaskConical,    label: 'Test Cases' },
+// ── Nav items — filtered by enabled modules + vocabulary labels ─
+function getNavItems(mode, vocabulary = {}, enabledModules = null) {
+  const ALL_ITEMS = [
+    { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard',                moduleKey: null        },
+    { to: '/projects',       icon: FolderOpen,      label: vocabulary.projects  || 'Projects',   moduleKey: 'projects'  },
+    { to: '/lists',          icon: ListChecks,      label: vocabulary.tasks     || 'Tasks',       moduleKey: 'tasks'     },
+    { to: '/timeline',       icon: CalendarDays,    label: vocabulary.timeline  || 'Timeline',    moduleKey: 'timeline'  },
+    { to: '/topics',         icon: Tag,             label: vocabulary.topics    || 'Topics',      moduleKey: 'topics'    },
+    { to: '/standup',        icon: ClipboardList,   label: vocabulary.standup   || 'Standup',     moduleKey: 'standup'   },
+    { to: '/weekly-summary', icon: BarChart3,       label: vocabulary.summary   || 'Summary',     moduleKey: 'summary'   },
+    { to: '/test-cases',     icon: FlaskConical,    label: vocabulary.testcases || 'Test Cases',  moduleKey: 'testcases' },
   ]
+
+  // Filter by enabled modules (null = show all)
+  const filtered = ALL_ITEMS.filter(item =>
+    item.moduleKey === null || enabledModules === null || enabledModules.includes(item.moduleKey)
+  )
+
+  // Always add My Tasks (personal view)
+  filtered.push({ to: '/my-tasks', icon: UserCheck, label: 'My Tasks', moduleKey: null })
+
   if (mode === 'team' || mode === 'org') {
-    items.push({ to: '/team', icon: Users, label: 'Team' })
+    filtered.push({ to: '/team',    icon: Users,     label: 'Team',    moduleKey: null })
+    filtered.push({ to: '/manager', icon: BarChart2,  label: 'Manager', moduleKey: null })
   }
-  items.push({ to: '/settings', icon: Settings, label: 'Settings' })
-  return items
+  filtered.push({ to: '/settings', icon: Settings, label: 'Settings', moduleKey: null })
+  return filtered
 }
 
 function Avatar({ user, size = 8 }) {
@@ -139,24 +151,26 @@ function SideNavLink({ to, icon: Icon, label, collapsed }) {
 // ── Sidebar ───────────────────────────────────────────────────
 function Sidebar({ user, userProfile, bellProps, onLogout }) {
   const { sidebarOpen, toggleSidebar } = useUIStore()
+  const { vocabulary, enabledModules, workspaceName } = useWorkspace()
   const collapsed = !sidebarOpen
-  const items = getNavItems(userProfile?.mode)
+  const items = getNavItems(userProfile?.mode, vocabulary, enabledModules)
+  const displayName = workspaceName || 'Pinlooply'
 
   return (
     <aside className={`hidden md:flex flex-col bg-[#1E1B4B] text-white transition-all duration-300 flex-shrink-0 ${collapsed ? 'w-16' : 'w-64'}`}>
       {/* Top: logo + collapse button */}
       <div className={`flex items-center h-16 px-4 border-b border-[#312E81] ${collapsed ? 'justify-center' : 'justify-between'}`}>
         {!collapsed && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">P</span>
+              <span className="text-white font-bold text-sm">{displayName[0]?.toUpperCase() || 'P'}</span>
             </div>
-            <span className="text-white font-bold text-lg">Pinlooply</span>
+            <span className="text-white font-bold text-lg truncate">{displayName}</span>
           </div>
         )}
         {collapsed && (
           <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">P</span>
+            <span className="text-white font-bold text-sm">{displayName[0]?.toUpperCase() || 'P'}</span>
           </div>
         )}
         <button onClick={toggleSidebar}
@@ -216,7 +230,8 @@ function Sidebar({ user, userProfile, bellProps, onLogout }) {
 
 // ── Mobile bottom nav ─────────────────────────────────────────
 function BottomNav({ mode }) {
-  const items = getNavItems(mode).slice(0, 5)
+  const { vocabulary, enabledModules } = useWorkspace()
+  const items = getNavItems(mode, vocabulary, enabledModules).slice(0, 5)
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-warm-200 z-40">
       <div className="flex">
@@ -239,7 +254,9 @@ function BottomNav({ mode }) {
 
 // ── Mobile drawer ─────────────────────────────────────────────
 function MobileDrawer({ open, onClose, user, userProfile, bellProps, onLogout }) {
-  const items = getNavItems(userProfile?.mode)
+  const { vocabulary, enabledModules, workspaceName } = useWorkspace()
+  const items = getNavItems(userProfile?.mode, vocabulary, enabledModules)
+  const displayName = workspaceName || 'Pinlooply'
 
   // Close on route change
   useEffect(() => { if (open) onClose() }, []) // eslint-disable-line
@@ -256,11 +273,11 @@ function MobileDrawer({ open, onClose, user, userProfile, bellProps, onLogout })
       <div className="md:hidden fixed top-0 left-0 bottom-0 w-72 bg-[#1E1B4B] z-50 flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between h-14 px-4 border-b border-[#312E81]">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary-500 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">P</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-primary-500 flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-sm">{displayName[0]?.toUpperCase() || 'P'}</span>
             </div>
-            <span className="text-white font-bold">Pinlooply</span>
+            <span className="text-white font-bold truncate">{displayName}</span>
           </div>
           <button onClick={onClose} className="p-1.5 text-purple-300 hover:text-white rounded-lg">
             <ChevronLeft className="w-5 h-5" />

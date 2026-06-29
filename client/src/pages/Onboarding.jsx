@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useWorkspace } from '../context/WorkspaceContext'
 import { supabase } from '../config/supabase'
 import { projectsApi } from '../services/api'
 import api from '../services/api'
+import { PROFESSIONS } from '../config/professions'
 import toast from 'react-hot-toast'
 import { ChevronLeft, Check, Plus, X } from 'lucide-react'
 
@@ -47,7 +49,56 @@ function StepName({ value, onChange, onNext, hasInvite }) {
 }
 
 // ─────────────────────────────────────────────
-// Step 2 — Choose Mode
+// Step 2 — Profession
+// ─────────────────────────────────────────────
+function StepProfession({ value, onChange, onNext }) {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div>
+        <h1 className="text-2xl font-bold text-warm-900">What's your work?</h1>
+        <p className="text-warm-500 mt-2">
+          We'll set up the right labels, tools, and AI prompts for you.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {PROFESSIONS.map(p => (
+          <button
+            key={p.value}
+            onClick={() => onChange(p.value)}
+            className={`flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+              value === p.value
+                ? 'border-primary-500 bg-primary-50'
+                : 'border-warm-200 hover:border-warm-300 bg-white'
+            }`}
+          >
+            <span className="text-2xl leading-none mt-0.5">{p.emoji}</span>
+            <div className="min-w-0">
+              <p className={`text-sm font-semibold ${value === p.value ? 'text-primary-700' : 'text-warm-900'}`}>
+                {p.label}
+              </p>
+              <p className="text-xs text-warm-400 mt-0.5 leading-snug">{p.desc}</p>
+            </div>
+            {value === p.value && (
+              <div className="ml-auto w-4 h-4 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Check className="w-2.5 h-2.5 text-white" />
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={onNext}
+        disabled={!value}
+        className="btn-primary btn-lg w-full"
+      >
+        Continue
+      </button>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// Step 3 — Choose Mode
 // ─────────────────────────────────────────────
 const MODES = [
   { value: 'personal', emoji: '👤', label: 'Just Me',  desc: 'Personal projects, just for me' },
@@ -98,23 +149,24 @@ function StepMode({ value, onChange, onNext }) {
 }
 
 // ─────────────────────────────────────────────
-// Step 3 — Create First Project
+// Step 4 — Create First Project
 // ─────────────────────────────────────────────
-function StepProject({ value, onChange, onNext, loading }) {
+function StepProject({ value, onChange, onNext, loading, vocab }) {
+  const projectLabel = vocab?.project || 'Project'
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-warm-900">Create your first project</h1>
-        <p className="text-warm-500 mt-2">A project holds discussions, topics, and tasks.</p>
+        <h1 className="text-2xl font-bold text-warm-900">Create your first {projectLabel.toLowerCase()}</h1>
+        <p className="text-warm-500 mt-2">A {projectLabel.toLowerCase()} groups your {vocab?.tasks?.toLowerCase() || 'tasks'}, {vocab?.discussions?.toLowerCase() || 'discussions'}, and {vocab?.topics?.toLowerCase() || 'topics'}.</p>
       </div>
       <div className="space-y-4">
         <div>
-          <label className="label">Project name</label>
+          <label className="label">{projectLabel} name</label>
           <input
             type="text"
             value={value.name}
             onChange={e => onChange({ ...value, name: e.target.value })}
-            placeholder="e.g. Product Roadmap"
+            placeholder={projectLabel === 'Course' ? 'e.g. Math 101' : projectLabel === 'Client' ? 'e.g. Acme Corp' : 'e.g. My First Project'}
             className="input"
             autoFocus
           />
@@ -126,7 +178,7 @@ function StepProject({ value, onChange, onNext, loading }) {
           <textarea
             value={value.description}
             onChange={e => onChange({ ...value, description: e.target.value })}
-            placeholder="What is this project about?"
+            placeholder={`What is this ${projectLabel.toLowerCase()} about?`}
             rows={2}
             className="input resize-none"
           />
@@ -152,14 +204,14 @@ function StepProject({ value, onChange, onNext, loading }) {
         disabled={!value.name.trim() || loading}
         className="btn-primary btn-lg w-full"
       >
-        {loading ? 'Creating...' : 'Create Project'}
+        {loading ? 'Creating...' : `Create ${projectLabel}`}
       </button>
     </div>
   )
 }
 
 // ─────────────────────────────────────────────
-// Step 4 — Group Setup (team/org only)
+// Step 5 — Group Setup (team/org only)
 // ─────────────────────────────────────────────
 function StepGroup({ value, onChange, onNext, onSkip, loading }) {
   const [emailInput, setEmailInput] = useState('')
@@ -211,10 +263,7 @@ function StepGroup({ value, onChange, onNext, onSkip, loading }) {
               placeholder="teammate@example.com"
               className="input flex-1"
             />
-            <button
-              onClick={addEmail}
-              className="btn-secondary p-2.5"
-            >
+            <button onClick={addEmail} className="btn-secondary p-2.5">
               <Plus className="w-4 h-4" />
             </button>
           </div>
@@ -231,17 +280,10 @@ function StepGroup({ value, onChange, onNext, onSkip, loading }) {
         </div>
       </div>
       <div className="space-y-2">
-        <button
-          onClick={onNext}
-          disabled={!value.name.trim() || loading}
-          className="btn-primary btn-lg w-full"
-        >
+        <button onClick={onNext} disabled={!value.name.trim() || loading} className="btn-primary btn-lg w-full">
           {loading ? 'Saving...' : 'Continue'}
         </button>
-        <button
-          onClick={onSkip}
-          className="btn-ghost btn-sm w-full text-warm-500"
-        >
+        <button onClick={onSkip} className="btn-ghost btn-sm w-full text-warm-500">
           Skip for now
         </button>
       </div>
@@ -250,23 +292,36 @@ function StepGroup({ value, onChange, onNext, onSkip, loading }) {
 }
 
 // ─────────────────────────────────────────────
-// Step 5 — Done
+// Step 6 — Done
 // ─────────────────────────────────────────────
-function StepDone({ name, onFinish }) {
+function StepDone({ name, profession, onFinish }) {
+  const prof = PROFESSIONS.find(p => p.value === profession) || PROFESSIONS.find(p => p.value === 'general')
+  const vocab = prof?.vocabulary || {}
   return (
     <div className="text-center space-y-6 py-4 animate-slide-up">
-      <div className="text-6xl">🎉</div>
+      <div className="text-6xl">{prof?.emoji || '🎉'}</div>
       <div>
-        <h1 className="text-2xl font-bold text-warm-900">Pinlooply is ready for you!</h1>
+        <h1 className="text-2xl font-bold text-warm-900">You're all set!</h1>
         <p className="text-warm-500 mt-2">
-          Hey {name?.split(' ')[0] || 'there'}, everything is set up. Let's get started.
+          Hey {name?.split(' ')[0] || 'there'}, your workspace is ready. It's been configured for <strong>{prof?.label}</strong> — everything speaks your language.
         </p>
       </div>
-      <button
-        onClick={onFinish}
-        className="btn-primary btn-lg w-full"
-      >
-        Start logging your first discussion →
+      <div className="bg-warm-50 border border-warm-200 rounded-xl p-4 text-left space-y-2">
+        <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide mb-3">Your workspace uses</p>
+        {[
+          { label: 'Tasks are called', value: vocab.tasks },
+          { label: 'Notes are called', value: vocab.discussions },
+          { label: 'Topics are called', value: vocab.topics },
+          { label: 'Projects are called', value: vocab.projects },
+        ].map(({ label, value }) => (
+          <div key={label} className="flex items-center justify-between text-sm">
+            <span className="text-warm-500">{label}</span>
+            <span className="font-semibold text-primary-700 bg-primary-50 px-2 py-0.5 rounded-lg">{value}</span>
+          </div>
+        ))}
+      </div>
+      <button onClick={onFinish} className="btn-primary btn-lg w-full">
+        Start using Pinlooply →
       </button>
     </div>
   )
@@ -276,30 +331,35 @@ function StepDone({ name, onFinish }) {
 // Main Onboarding Component
 // ─────────────────────────────────────────────
 export default function Onboarding() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
+  const { user }         = useAuth()
+  const { saveProfession } = useWorkspace()
+  const navigate         = useNavigate()
   const [loading, setLoading]   = useState(false)
   const [step, setStep]         = useState(1)
   const [name, setName]         = useState('')
+  const [profession, setProfession] = useState('')
   const [mode, setMode]         = useState('')
   const [project, setProject]   = useState({ name: '', description: '', color: COLORS[0] })
   const [group, setGroup]       = useState({ name: '', invites: [] })
 
-  // Detect invite link in localStorage (persists across login redirects)
+  // Active profession vocab for dynamic labels
+  const activeVocab = PROFESSIONS.find(p => p.value === profession)?.vocabulary || {}
+
+  // Detect invite link in localStorage
   const pendingInvite = (() => {
     try { return JSON.parse(localStorage.getItem('pendingInvite') || 'null') } catch { return null }
   })()
 
-  const needsGroup  = mode === 'team' || mode === 'org'
-  const totalSteps  = needsGroup ? 5 : 4
+  const needsGroup = mode === 'team' || mode === 'org'
+  // Steps: 1=Name, 2=Profession, 3=Mode, 4=Project, [5=Group], 6=Done
+  const totalSteps = needsGroup ? 6 : 5
 
-  // ── Load saved progress ──
   useEffect(() => {
     if (!user) return
     async function loadProgress() {
       const { data } = await supabase
         .from('users')
-        .select('name, mode, onboarding_step, onboarding_complete')
+        .select('name, mode, onboarding_step, onboarding_complete, profession')
         .eq('id', user.id)
         .single()
 
@@ -309,21 +369,19 @@ export default function Onboarding() {
       const savedName = data.name || user.user_metadata?.full_name || ''
       if (savedName) setName(savedName)
 
-      // If user arrived via invite link — fast-track straight to invite page
       const invite = localStorage.getItem('pendingInvite')
       if (invite) {
         const { inviteCode } = JSON.parse(invite)
-        // If they already have a name, skip even step 1
         if (savedName) {
           await supabase.from('users').update({ mode: 'team', onboarding_complete: true }).eq('id', user.id)
           navigate(`/invite/${inviteCode}`)
           return
         }
-        // Otherwise show step 1 only (handleStep1 will redirect after name entered)
         setStep(1)
         return
       }
 
+      if (data.profession) setProfession(data.profession)
       if (data.mode) setMode(data.mode)
       if (data.onboarding_step > 1) setStep(data.onboarding_step)
     }
@@ -334,10 +392,8 @@ export default function Onboarding() {
     await supabase.from('users').update(updates).eq('id', user.id)
   }
 
-  // ── Step submit handlers ──
   async function handleStep1() {
     setLoading(true)
-    // If user came via invite link — skip onboarding, mark complete, go join
     if (pendingInvite) {
       await save({ name, mode: 'team', onboarding_complete: true })
       setLoading(false)
@@ -351,61 +407,60 @@ export default function Onboarding() {
 
   async function handleStep2() {
     setLoading(true)
-    await save({ mode, onboarding_step: 3 })
+    try {
+      await saveProfession(profession)
+      await save({ profession, onboarding_step: 3 })
+    } catch { /* non-fatal */ }
     setLoading(false)
     setStep(3)
   }
 
   async function handleStep3() {
     setLoading(true)
-    try {
-      await projectsApi.create({
-        name:        project.name,
-        description: project.description || null,
-        color:       project.color,
-      })
-      const next = needsGroup ? 4 : 5
-      await save({ onboarding_step: next })
-      setStep(next)
-    } catch (err) {
-      toast.error(err?.response?.data?.error || err.message || 'Failed to create project')
-    } finally {
-      setLoading(false)
-    }
+    await save({ mode, onboarding_step: 4 })
+    setLoading(false)
+    setStep(4)
   }
 
   async function handleStep4() {
     setLoading(true)
     try {
+      await projectsApi.create({ name: project.name, description: project.description || null, color: project.color })
+      const next = needsGroup ? 5 : 6
+      await save({ onboarding_step: next })
+      setStep(next)
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err.message || 'Failed to create project')
+    } finally { setLoading(false) }
+  }
+
+  async function handleStep5() {
+    setLoading(true)
+    try {
       await api.post('/api/groups', { name: group.name })
-      await save({ onboarding_step: 5 })
-      setStep(5)
+      await save({ onboarding_step: 6 })
+      setStep(6)
     } catch (err) {
       toast.error(err?.response?.data?.error || err.message || 'Failed to create team')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   async function handleSkipGroup() {
-    await save({ onboarding_step: 5 })
-    setStep(5)
+    await save({ onboarding_step: 6 })
+    setStep(6)
   }
 
   async function handleFinish() {
     setLoading(true)
     await save({ onboarding_complete: true })
-    // Full reload so ProtectedRoute re-fetches onboarding_complete fresh
     window.location.replace('/dashboard')
   }
 
-  function goBack() {
-    setStep(s => Math.max(1, s - 1))
-  }
+  function goBack() { setStep(s => Math.max(1, s - 1)) }
 
   return (
     <div className="min-h-screen bg-warm-50 flex flex-col items-center justify-center px-4 py-12">
-      <div className="max-w-md mx-auto w-full">
+      <div className="max-w-lg mx-auto w-full">
         {/* Logo */}
         <div className="text-center mb-8">
           <span className="text-xl font-bold text-warm-900">Pinlooply</span>
@@ -424,24 +479,19 @@ export default function Onboarding() {
         </div>
 
         {/* Back button */}
-        {step > 1 && step < totalSteps + 1 && step !== totalSteps && (
-          <button
-            onClick={goBack}
-            className="btn-ghost btn-sm flex items-center gap-1 mb-6 text-warm-500"
-          >
+        {step > 1 && step < totalSteps && (
+          <button onClick={goBack} className="btn-ghost btn-sm flex items-center gap-1 mb-6 text-warm-500">
             <ChevronLeft className="w-4 h-4" /> Back
           </button>
         )}
 
         {/* Step content */}
         {step === 1 && <StepName value={name} onChange={setName} onNext={handleStep1} hasInvite={!!pendingInvite} />}
-        {step === 2 && <StepMode value={mode} onChange={setMode} onNext={handleStep2} />}
-        {step === 3 && <StepProject value={project} onChange={setProject} onNext={handleStep3} loading={loading} />}
-        {step === 4 && needsGroup && (
-          <StepGroup value={group} onChange={setGroup} onNext={handleStep4} onSkip={handleSkipGroup} loading={loading} />
-        )}
-        {step === 5 && <StepDone name={name} onFinish={handleFinish} />}
-        {step === 4 && !needsGroup && <StepDone name={name} onFinish={handleFinish} />}
+        {step === 2 && <StepProfession value={profession} onChange={setProfession} onNext={handleStep2} />}
+        {step === 3 && <StepMode value={mode} onChange={setMode} onNext={handleStep3} />}
+        {step === 4 && <StepProject value={project} onChange={setProject} onNext={handleStep4} loading={loading} vocab={activeVocab} />}
+        {step === 5 && needsGroup && <StepGroup value={group} onChange={setGroup} onNext={handleStep5} onSkip={handleSkipGroup} loading={loading} />}
+        {(step === 6 || (step === 5 && !needsGroup)) && <StepDone name={name} profession={profession} onFinish={handleFinish} />}
 
         {/* Step counter */}
         <p className="text-center text-xs text-warm-400 mt-6">

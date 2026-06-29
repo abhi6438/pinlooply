@@ -3,13 +3,14 @@ import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { projectsApi, topicsApi, tasksApi, timelineApi, discussionsApi, publishApi } from '../services/api'
 import { useProjectStore } from '../stores/useProjectStore'
+import { useWorkspace } from '../context/WorkspaceContext'
 import {
   ArrowLeft, FolderOpen, CheckSquare2, Tag, AlertTriangle,
   Users, Settings, LayoutDashboard, Clock, Loader2,
-  MessageSquare, Zap, Archive, Globe, Copy, CheckCheck, EyeOff, Trash2,
+  MessageSquare, Zap, Archive, Globe, Copy, CheckCheck, EyeOff, Trash2, GitBranch,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { PageShell, SectionTabs, PageLoader } from '../components/ui'
+import { PageShell, SectionTabs, PageLoader, StatusPipelineEditor } from '../components/ui'
 
 // ── Confirm Modal ─────────────────────────────────────────────────
 function ConfirmModal({ icon: Icon = Trash2, iconBg = 'bg-red-50', iconColor = 'text-red-500', title, message, confirmLabel = 'Confirm', confirmClass = 'bg-red-500 text-white hover:bg-red-600 border-red-500', onConfirm, onCancel }) {
@@ -354,11 +355,14 @@ function MembersTab({ stats }) {
 
 // ── Settings Tab ──────────────────────────────────────────────────
 function SettingsTab({ project, onUpdate, onArchive }) {
+  const { getEffectiveStatuses } = useWorkspace()
   const COLORS = ['#6366f1','#2563eb','#0d9488','#16a34a','#ca8a04','#ea580c','#dc2626','#7c3aed']
-  const [name,        setName]        = useState(project.name || '')
-  const [description, setDescription] = useState(project.description || '')
-  const [color,       setColor]       = useState(project.color || COLORS[0])
-  const [saving,      setSaving]      = useState(false)
+  const [name,           setName]           = useState(project.name || '')
+  const [description,    setDescription]    = useState(project.description || '')
+  const [color,          setColor]          = useState(project.color || COLORS[0])
+  const [localStatuses,  setLocalStatuses]  = useState(() => getEffectiveStatuses(project.custom_statuses))
+  const [useCustom,      setUseCustom]      = useState(!!(project.custom_statuses?.length))
+  const [saving,         setSaving]         = useState(false)
   // Publish state
   const [publishState,  setPublishState]  = useState(null) // { slug, is_active } | null
   const [publishing,    setPublishing]    = useState(false)
@@ -375,7 +379,12 @@ function SettingsTab({ project, onUpdate, onArchive }) {
   async function handleSave() {
     setSaving(true)
     try {
-      await onUpdate({ name, description, color })
+      await onUpdate({
+        name,
+        description,
+        color,
+        custom_statuses: useCustom ? localStatuses : null,
+      })
       toast.success('Project updated')
     } catch { toast.error('Failed to save') }
     finally { setSaving(false) }
@@ -515,6 +524,38 @@ function SettingsTab({ project, onUpdate, onArchive }) {
               : <><Globe className="w-4 h-4" /> Publish Status Page</>
             }
           </button>
+        )}
+      </div>
+
+      {/* Status Pipeline Override */}
+      <div className="bg-white border border-warm-200 rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GitBranch className="w-4 h-4 text-primary-500" />
+            <h3 className="text-sm font-semibold text-warm-700">Status Pipeline</h3>
+          </div>
+          {/* Toggle custom override */}
+          <button
+            type="button"
+            onClick={() => setUseCustom(v => !v)}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-all ${
+              useCustom ? 'bg-primary-50 border-primary-300 text-primary-700' : 'bg-warm-100 border-warm-200 text-warm-500'
+            }`}
+          >
+            {useCustom ? 'Custom (overriding workspace)' : 'Using workspace default'}
+          </button>
+        </div>
+        {useCustom ? (
+          <StatusPipelineEditor
+            statuses={localStatuses}
+            onChange={setLocalStatuses}
+            compact
+          />
+        ) : (
+          <p className="text-xs text-warm-500">
+            This project uses the workspace status pipeline.
+            Click "Using workspace default" above to set a custom pipeline for this project only.
+          </p>
         )}
       </div>
 

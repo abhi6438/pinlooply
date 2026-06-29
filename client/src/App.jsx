@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { WorkspaceProvider } from './context/WorkspaceContext'
 import ProtectedRoute from './components/shared/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 
@@ -25,9 +26,13 @@ import GroupMembers from './pages/GroupMembers'
 import Standup from './pages/Standup'
 import WeeklySummary from './pages/WeeklySummary' // now also handles monthly
 import Plan from './pages/settings/Plan'
+import Workspace from './pages/settings/Workspace'
+import Automations from './pages/settings/Automations'
 import AdminPanel from './pages/admin/AdminPanel'
 import PublicProject from './pages/PublicProject'
 import TestCaseGenerator from './pages/TestCaseGenerator'
+import Manager from './pages/Manager'
+import MyTasks from './pages/MyTasks'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -149,9 +154,29 @@ function AppRoutes() {
           <AppLayout><Plan /></AppLayout>
         </ProtectedRoute>
       } />
+      <Route path="/settings/workspace" element={
+        <ProtectedRoute>
+          <AppLayout><Workspace /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/automations" element={
+        <ProtectedRoute>
+          <AppLayout><Automations /></AppLayout>
+        </ProtectedRoute>
+      } />
       <Route path="/admin" element={
         <ProtectedRoute>
           <AppLayout><AdminPanel /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/my-tasks" element={
+        <ProtectedRoute>
+          <AppLayout><MyTasks /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/manager" element={
+        <ProtectedRoute>
+          <AppLayout><Manager /></AppLayout>
         </ProtectedRoute>
       } />
     </Routes>
@@ -162,8 +187,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-        <AppRoutes />
+        <WorkspaceProvider>
+          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+          <AppRoutes />
+        </WorkspaceProvider>
       </AuthProvider>
     </BrowserRouter>
   )

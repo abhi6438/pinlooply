@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { projectsApi } from '../services/api'
+import { projectsApi, tasksApi } from '../services/api'
 import {
   Plus, FolderOpen, CheckSquare2, Tag, Clock,
-  MoreVertical, Archive, Pencil, Loader2,
+  MoreVertical, Archive, Pencil, Loader2, Sparkles, ChevronLeft, GitBranch,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { UpgradeBanner } from '../components/shared/UpgradeGate'
 import {
   PageShell, PageHeader, PageLoader, EmptyState, Modal, ModalButton,
 } from '../components/ui'
+import { useWorkspace } from '../context/WorkspaceContext'
+import { getTemplatesForProfession, PROJECT_TEMPLATES } from '../config/projectTemplates'
 
 const FREE_PROJECT_LIMIT = 3
 
@@ -55,7 +57,90 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function ProjectModal({ project, onClose, onSave }) {
+// ── Template Gallery Modal ────────────────────────────────────
+function TemplateGallery({ profession, onSelect, onClose }) {
+  const [tab, setTab] = useState('mine')
+
+  const profTemplates = getTemplatesForProfession(profession)
+  const allTemplates  = PROJECT_TEMPLATES
+
+  const tabs = [
+    { key: 'mine', label: 'For You', templates: profTemplates },
+    { key: 'all',  label: 'All',     templates: allTemplates  },
+  ]
+  const displayed = tabs.find(t => t.key === tab)?.templates || []
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-warm-100">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary-500" />
+            <h2 className="text-base font-semibold text-warm-900">Choose a Template</h2>
+          </div>
+          <button onClick={onClose} className="text-warm-400 hover:text-warm-700 text-sm">✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 px-6 pt-3">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                tab === t.key
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-warm-500 hover:text-warm-800 hover:bg-warm-100'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid */}
+        <div className="overflow-y-auto px-6 py-4 grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1">
+          {displayed.map(template => (
+            <button
+              key={template.id}
+              onClick={() => onSelect(template)}
+              className="flex flex-col items-start p-4 rounded-xl border-2 border-warm-200 hover:border-primary-400 hover:bg-primary-50 text-left transition-all group"
+            >
+              <span className="text-2xl mb-2">{template.emoji}</span>
+              <p className="text-sm font-semibold text-warm-900 group-hover:text-primary-800 leading-tight mb-1">
+                {template.name}
+              </p>
+              <p className="text-xs text-warm-400 group-hover:text-primary-500 leading-snug">
+                {template.desc}
+              </p>
+              {template.statuses && template.statuses.length > 0 && (
+                <div className="flex gap-1 mt-2 flex-wrap">
+                  {template.statuses.slice(0, 4).map(s => (
+                    <span key={s.key} className="text-[10px] bg-warm-100 text-warm-500 px-1.5 py-0.5 rounded-full">
+                      {s.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-5 pt-3 border-t border-warm-100">
+          <p className="text-xs text-warm-400 text-center">
+            Pick a template to pre-load a status pipeline and starter tasks, or choose Blank to start empty.
+          </p>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ── Project Modal (create / edit) ─────────────────────────────
+function ProjectModal({ project, template, onClose, onSave, onBack }) {
   const [name,        setName]        = useState(project?.name        || '')
   const [description, setDescription] = useState(project?.description || '')
   const [color,       setColor]       = useState(project?.color       || COLORS[0])
@@ -71,9 +156,27 @@ function ProjectModal({ project, onClose, onSave }) {
     finally { setSaving(false) }
   }
 
+  const isCreate = !project
+
   return (
     <Modal
-      title={project ? 'Edit Project' : 'New Project'}
+      title={
+        <div className="flex items-center gap-2">
+          {isCreate && onBack && (
+            <button onClick={onBack} className="text-warm-400 hover:text-warm-600 mr-1">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+          {isCreate && template ? (
+            <span className="flex items-center gap-1.5">
+              <span>{template.emoji}</span>
+              <span>{template.name}</span>
+            </span>
+          ) : (
+            project ? 'Edit Project' : 'New Project'
+          )}
+        </div>
+      }
       onClose={onClose}
       footer={
         <>
@@ -85,6 +188,20 @@ function ProjectModal({ project, onClose, onSave }) {
       }
     >
       <div className="space-y-4">
+        {/* Template info banner */}
+        {isCreate && template && template.id !== 'blank' && (
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-primary-50 border border-primary-100">
+            <GitBranch className="w-3.5 h-3.5 text-primary-500 mt-0.5 flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-primary-700">Template: {template.name}</p>
+              <p className="text-xs text-primary-500 mt-0.5">
+                {template.statuses?.length} statuses
+                {template.starter_tasks?.length > 0 ? ` · ${template.starter_tasks.length} starter tasks` : ''}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex-shrink-0 border-2 border-white ring-2 ring-warm-200"
             style={{ background: color }} />
@@ -93,7 +210,7 @@ function ProjectModal({ project, onClose, onSave }) {
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSave()}
-            placeholder="Project name"
+            placeholder={isCreate && template ? `e.g. ${template.name}` : 'Project name'}
             className="input flex-1"
           />
         </div>
@@ -121,6 +238,7 @@ function ProjectModal({ project, onClose, onSave }) {
   )
 }
 
+// ── Project Card ──────────────────────────────────────────────
 function ProjectCard({ project, onEdit, onArchive }) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -194,11 +312,16 @@ function ProjectCard({ project, onEdit, onArchive }) {
   )
 }
 
+// ── Main Page ─────────────────────────────────────────────────
 export default function Projects() {
-  const [projects,   setProjects]   = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [modal,      setModal]      = useState(null)
-  const [upgradeMsg, setUpgradeMsg] = useState(null)
+  const { profession } = useWorkspace()
+  const [projects,      setProjects]      = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [modal,         setModal]         = useState(null)   // null | 'create' | project object
+  const [templateStep,  setTemplateStep]  = useState(false)  // show template gallery
+  const [selectedTpl,   setSelectedTpl]   = useState(null)   // chosen template
+  const [upgradeMsg,    setUpgradeMsg]    = useState(null)
+  const [archiveTarget, setArchiveTarget] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -213,22 +336,50 @@ export default function Projects() {
 
   async function handleSave(payload) {
     if (modal && modal !== 'create') {
+      // Edit existing project — no template involved
       await projectsApi.update(modal.id, payload)
       toast.success('Project updated')
     } else {
+      // Create new project — attach template statuses if chosen
+      const createPayload = {
+        ...payload,
+        custom_statuses: selectedTpl && selectedTpl.id !== 'blank'
+          ? selectedTpl.statuses
+          : null,
+      }
+      let created
       try {
-        await projectsApi.create(payload)
+        const res = await projectsApi.create(createPayload)
+        created = res.data?.data || res.data
         toast.success('Project created')
         setUpgradeMsg(null)
       } catch (err) {
         if (err.response?.status === 403 && err.response?.data?.upgrade) {
           setUpgradeMsg(err.response.data.message)
           setModal(null)
+          setSelectedTpl(null)
           return
         }
         throw err
       }
+      // Create starter tasks if template has them
+      if (created?.id && selectedTpl?.starter_tasks?.length > 0) {
+        try {
+          await Promise.all(
+            selectedTpl.starter_tasks.map((title, i) =>
+              tasksApi.create({
+                title,
+                project_id: created.id,
+                status: selectedTpl.statuses?.[0]?.key || 'todo',
+              })
+            )
+          )
+        } catch {
+          // non-fatal — project was still created
+        }
+      }
     }
+    setSelectedTpl(null)
     load()
   }
 
@@ -237,10 +388,20 @@ export default function Projects() {
       setUpgradeMsg(`You've reached ${FREE_PROJECT_LIMIT} projects. Upgrade to Group (free) to add more.`)
       return
     }
+    setTemplateStep(true)
+  }
+
+  function handleTemplateSelect(template) {
+    setSelectedTpl(template)
+    setTemplateStep(false)
     setModal('create')
   }
 
-  const [archiveTarget, setArchiveTarget] = useState(null)
+  function handleClose() {
+    setModal(null)
+    setSelectedTpl(null)
+    setTemplateStep(false)
+  }
 
   async function handleArchive(project) {
     setArchiveTarget(project)
@@ -295,13 +456,26 @@ export default function Projects() {
         </div>
       )}
 
+      {/* Template Gallery — step 1 of new project flow */}
+      {templateStep && (
+        <TemplateGallery
+          profession={profession}
+          onSelect={handleTemplateSelect}
+          onClose={() => setTemplateStep(false)}
+        />
+      )}
+
+      {/* Project Form — step 2 (or direct edit) */}
       {modal && (
         <ProjectModal
           project={modal !== 'create' ? modal : null}
-          onClose={() => setModal(null)}
+          template={modal === 'create' ? selectedTpl : null}
+          onClose={handleClose}
           onSave={handleSave}
+          onBack={modal === 'create' ? () => { setModal(null); setTemplateStep(true) } : null}
         />
       )}
+
       {archiveTarget && (
         <ConfirmModal
           title={`Archive "${archiveTarget.name}"?`}

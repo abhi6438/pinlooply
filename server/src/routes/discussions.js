@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.js'
 import { processDiscussion, saveDiscussion } from '../services/ai/aiService.js'
 import { RateLimitError } from '../services/ai/groqService.js'
 import { supabaseAdmin } from '../config/supabase.js'
+import { onDiscussionSaved } from '../services/automationEngine.js'
 
 const router = Router()
 
@@ -78,6 +79,16 @@ router.post('/save', requireAuth, async (req, res) => {
 
   try {
     const discussion = await saveDiscussion({ rawText, projectId, userId, source, aiResult })
+
+    // Automation: fire discussion_saved trigger (non-blocking)
+    const extractedTasks = aiResult?.tasks || aiResult?.action_items || []
+    onDiscussionSaved({
+      userId,
+      projectId,
+      tasks: extractedTasks,
+      discussionId: discussion.id,
+    }).catch(() => {})
+
     return res.json({ success: true, discussionId: discussion.id })
   } catch (err) {
     console.error('[/save] DB error:', err)

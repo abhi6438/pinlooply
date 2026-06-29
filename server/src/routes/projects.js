@@ -21,7 +21,7 @@ router.get('/', requireAuth, async (req, res) => {
   // Owned + membered projects
   const { data: owned } = await supabaseAdmin
     .from('projects')
-    .select('id, name, description, color, created_at, user_id')
+    .select('id, name, description, color, created_at, user_id, custom_statuses')
     .eq('user_id', userId)
     .neq('status', 'archived')
     .order('created_at', { ascending: false })
@@ -85,16 +85,17 @@ router.get('/', requireAuth, async (req, res) => {
     const lastActivity = dates.length ? dates.sort().reverse()[0] : p.created_at
 
     return {
-      id:            p.id,
-      name:          p.name,
-      description:   p.description,
-      color:         p.color || '#6366f1',
-      health:        calcHealth(overdueTasks.length, deadlineSoon),
-      pending_tasks: pendingTasks.length,
-      test_cases:    testCases.length,
-      topics_count:  pTopics.length,
-      last_activity: lastActivity,
-      created_at:    p.created_at,
+      id:             p.id,
+      name:           p.name,
+      description:    p.description,
+      color:          p.color || '#6366f1',
+      custom_statuses: p.custom_statuses || null,
+      health:         calcHealth(overdueTasks.length, deadlineSoon),
+      pending_tasks:  pendingTasks.length,
+      test_cases:     testCases.length,
+      topics_count:   pTopics.length,
+      last_activity:  lastActivity,
+      created_at:     p.created_at,
     }
   })
 
@@ -104,12 +105,20 @@ router.get('/', requireAuth, async (req, res) => {
 // ── POST /api/projects — create project ───────────────────────────
 router.post('/', requireAuth, checkProjectLimit, async (req, res) => {
   const userId = req.user.id
-  const { name, description, color } = req.body
+  const { name, description, color, custom_statuses } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' })
+
+  const insert = {
+    name: name.trim(),
+    description: description?.trim() || null,
+    color: color || '#6366f1',
+    user_id: userId,
+  }
+  if (custom_statuses) insert.custom_statuses = custom_statuses
 
   const { data, error } = await supabaseAdmin
     .from('projects')
-    .insert({ name: name.trim(), description: description?.trim() || null, color: color || '#6366f1', user_id: userId })
+    .insert(insert)
     .select()
     .single()
 
@@ -121,7 +130,7 @@ router.post('/', requireAuth, checkProjectLimit, async (req, res) => {
 router.patch('/:projectId', requireAuth, async (req, res) => {
   const userId = req.user.id
   const { projectId } = req.params
-  const { name, description, color } = req.body
+  const { name, description, color, custom_statuses } = req.body
 
   // Only owner can edit
   const { data: proj } = await supabaseAdmin
@@ -134,9 +143,10 @@ router.patch('/:projectId', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' })
 
   const patch = {}
-  if (name !== undefined)        patch.name        = name.trim()
-  if (description !== undefined) patch.description = description?.trim() || null
-  if (color !== undefined)       patch.color       = color
+  if (name !== undefined)            patch.name            = name.trim()
+  if (description !== undefined)     patch.description     = description?.trim() || null
+  if (color !== undefined)           patch.color           = color
+  if (custom_statuses !== undefined) patch.custom_statuses = custom_statuses
 
   const { data, error } = await supabaseAdmin
     .from('projects')
@@ -179,12 +189,14 @@ router.get('/:projectId/stats', requireAuth, async (req, res) => {
   const in3days = new Date(Date.now() + 3 * 86400000).toISOString()
 
   const [
+    { data: project },
     { data: tasks },
     { data: topics },
     { data: conflicts },
     { data: discs },
     { data: members },
   ] = await Promise.all([
+    supabaseAdmin.from('projects').select('id, name, color, custom_statuses').eq('id', projectId).single(),
     supabaseAdmin.from('tasks').select('id, type, status, due_date, priority, title, updated_at').eq('project_id', projectId),
     supabaseAdmin.from('topics').select('id, title, status, updated_at').eq('project_id', projectId),
     supabaseAdmin.from('conflicts').select('id, description, detected_at').eq('project_id', projectId).order('detected_at', { ascending: false }).limit(5),
@@ -203,16 +215,17 @@ router.get('/:projectId/stats', requireAuth, async (req, res) => {
   res.json({
     success: true,
     data: {
-      health:         calcHealth(overdueTasks.length, deadlineSoon),
-      tasks_total:    workTasks.length,           // all work tasks (all statuses)
-      tasks_pending:  pendingTasks.length,        // open work tasks
-      tasks_done:     doneTasks.length,           // completed work tasks
-      tasks_overdue:  overdueTasks.length,
-      test_cases:     testCases.length,
-      topics_total:   (topics || []).length,
-      topics_open:    (topics || []).filter(t => t.status !== 'resolved').length,
-      conflicts_open: (conflicts || []).length,
-      members:        members || [],
+      custom_statuses: project?.custom_statuses || null,
+      health:          calcHealth(overdueTasks.length, deadlineSoon),
+      tasks_total:     workTasks.length,
+      tasks_pending:   pendingTasks.length,
+      tasks_done:      doneTasks.length,
+      tasks_overdue:   overdueTasks.length,
+      test_cases:      testCases.length,
+      topics_total:    (topics || []).length,
+      topics_open:     (topics || []).filter(t => t.status !== 'resolved').length,
+      conflicts_open:  (conflicts || []).length,
+      members:         members || [],
       recent_discussions: discs || [],
       recent_conflicts:   conflicts || [],
       high_priority_tasks: workTasks.filter(t => t.priority === 'high' && t.status !== 'done' && t.status !== 'released'),

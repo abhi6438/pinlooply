@@ -135,6 +135,11 @@ export const planApi = {
   upgrade: (mode) => api.post('/api/plan/upgrade', { mode }),
 }
 
+export const workspaceApi = {
+  get:   ()       => api.get('/api/workspace'),
+  save:  (payload) => api.patch('/api/workspace', payload),
+}
+
 export const adminApi = {
   getAiConfig:       ()             => api.get('/api/admin/ai-config'),
   saveAiConfig:      (configs)      => api.put('/api/admin/ai-config', { configs }),
@@ -156,4 +161,28 @@ export const testCasesApi = {
   list:         (projectId)       => api.get(`/api/testcases/${projectId}`),
   updateStatus: (id, status)      => api.patch(`/api/testcases/${id}/status`, { status }),
   delete:       (id)              => api.delete(`/api/testcases/${id}`),
+}
+
+export const managerApi = {
+  overview:    ()           => api.get('/api/manager/overview'),
+  memberTasks: (memberId)   => api.get(`/api/manager/member/${memberId}/tasks`),
+}
+
+export const customFieldsApi = {
+  // Field definitions
+  list:   ()            => api.get('/api/custom-fields'),
+  create: (payload)     => api.post('/api/custom-fields', payload),
+  update: (id, payload) => api.patch(`/api/custom-fields/${id}`, payload),
+  delete: (id)          => api.delete(`/api/custom-fields/${id}`),
+  // Task values
+  getValues:  (taskId)          => api.get(`/api/custom-fields/task-values/${taskId}`),
+  saveValues: (taskId, values)  => api.patch(`/api/custom-fields/task-values/${taskId}`, { values }),
+}
+
+export const automationsApi = {
+  list:       ()            => api.get('/api/automations'),
+  create:     (payload)     => api.post('/api/automations', payload),
+  update:     (id, payload) => api.patch(`/api/automations/${id}`, payload),
+  delete:     (id)          => api.delete(`/api/automations/${id}`),
+  runOverdue: ()            => api.post('/api/automations/run-overdue'),
 }

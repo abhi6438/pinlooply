@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { supabaseAdmin } from '../config/supabase.js'
+import { onStatusChange, spawnRecurringTask } from '../services/automationEngine.js'
 
 const router = Router()
 
@@ -242,7 +243,7 @@ router.patch('/:taskId', requireAuth, async (req, res) => {
     const { taskId } = req.params
     const userId = req.user.id
 
-    const allowed = ['status', 'priority', 'assigned_to', 'title', 'description', 'due_date']
+    const allowed = ['status', 'priority', 'assigned_to', 'title', 'description', 'due_date', 'recurrence_rule', 'recurrence_end']
     const patch = {}
     for (const k of allowed) {
       if (req.body[k] !== undefined) patch[k] = req.body[k]
@@ -285,6 +286,21 @@ router.patch('/:taskId', requireAuth, async (req, res) => {
         body: `"${existing.title}" has been marked as done`,
         relatedTaskId: taskId,
       })
+    }
+
+    // Automation: fire status_change trigger (non-blocking)
+    if (patch.status && patch.status !== existing.status) {
+      onStatusChange({
+        userId,
+        task: { id: taskId, title: existing.title, project_id: data.project_id },
+        fromStatus: existing.status,
+        toStatus: patch.status,
+      }).catch(() => {})
+
+      // Recurring task: spawn next instance when marked done
+      if (patch.status === 'done' && data.recurrence_rule && data.recurrence_rule !== 'none') {
+        spawnRecurringTask(data).catch(() => {})
+      }
     }
 
     return res.json({ success: true, data })

@@ -48,7 +48,12 @@ async function fetchStandupData(userId) {
 }
 
 // ── Build AI prompt ───────────────────────────────────────────
-function buildPrompt(projects, recentDone, pending, userName) {
+function buildPrompt(projects, recentDone, pending, userName, workspaceCtx = {}) {
+  const { profession = 'general', vocabulary = {} } = workspaceCtx
+  const taskLabel    = vocabulary.tasks     || 'Tasks'
+  const projectLabel = vocabulary.projects  || 'Projects'
+  const standupLabel = vocabulary.standup   || 'standup'
+  const aiContext    = vocabulary.aiContext  || 'a professional'
   const byProject = {}
 
   // Group completed tasks by project
@@ -78,9 +83,10 @@ function buildPrompt(projects, recentDone, pending, userName) {
 
   const allProjectNames = projects.map(p => p.name).join(', ')
 
-  return `You are Pinlooply AI. Generate a clear, specific daily standup for developer ${userName}.
+  return `You are Pinlooply AI. Generate a clear, specific daily ${standupLabel.toLowerCase()} for ${userName}, who works as ${aiContext}.
+Use their vocabulary: ${projectLabel} (not "Projects"), ${taskLabel} (not "Tasks").
 
-Active projects: ${allProjectNames || 'none'}
+Active ${projectLabel.toLowerCase()}: ${allProjectNames || 'none'}
 
 Activity data:
 ${projectSummaries || 'No recent activity found.'}
@@ -110,14 +116,15 @@ Return ONLY valid JSON (no markdown, no extra text):
 
 // ── Main: generate standup ────────────────────────────────────
 export async function generateStandup(userId, userName) {
-  // 1. Get AI config
+  // 1. Get AI config + workspace context
   const { data: userData } = await supabaseAdmin
     .from('users')
-    .select('plan')
+    .select('plan, profession, vocabulary')
     .eq('id', userId)
     .single()
 
-  const plan = userData?.plan || 'free'
+  const plan          = userData?.plan       || 'free'
+  const workspaceCtx  = { profession: userData?.profession || 'general', vocabulary: userData?.vocabulary || {} }
 
   const { data: aiConfig } = await supabaseAdmin
     .from('ai_config')
@@ -132,7 +139,7 @@ export async function generateStandup(userId, userName) {
   const { projects, recentDone, pending } = await fetchStandupData(userId)
 
   // 3. Build prompt + call AI
-  const prompt = buildPrompt(projects, recentDone, pending, userName)
+  const prompt = buildPrompt(projects, recentDone, pending, userName, workspaceCtx)
 
   let result
   try {

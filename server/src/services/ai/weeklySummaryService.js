@@ -166,21 +166,29 @@ function groupByProject(data) {
 }
 
 // ── Build AI prompt ───────────────────────────────────────────
-function buildPrompt(weekData, userName, start, end) {
+function buildPrompt(weekData, userName, start, end, workspaceCtx = {}) {
+  const { vocabulary = {} } = workspaceCtx
+  const taskLabel    = vocabulary.tasks    || 'Tasks'
+  const topicLabel   = vocabulary.topics   || 'Topics'
+  const projectLabel = vocabulary.projects || 'Projects'
+  const summaryLabel = vocabulary.summary  || 'weekly summary'
+  const aiContext    = vocabulary.aiContext || 'a professional'
+
   const dateRange = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
   const projectGroups = groupByProject(weekData)
 
   const projectSummaries = projectGroups.map(p => {
-    const lines = [`Project: ${p.name}`]
-    if (p.completed.length) lines.push(`  Completed (${p.completed.length}): ${p.completed.map(t => t.title).join(', ')}`)
+    const lines = [`${projectLabel.replace(/s$/, '')}: ${p.name}`]
+    if (p.completed.length) lines.push(`  Completed ${taskLabel} (${p.completed.length}): ${p.completed.map(t => t.title).join(', ')}`)
     if (p.pending.length) lines.push(`  Still pending: ${p.pending.slice(0, 5).map(t => t.title).join(', ')}`)
-    if (p.discussions.length) lines.push(`  Discussions logged: ${p.discussions.length}`)
-    if (p.topicChanges.length) lines.push(`  Topic changes: ${p.topicChanges.map(tv => tv.topics?.title || 'unknown').join(', ')}`)
+    if (p.discussions.length) lines.push(`  Notes logged: ${p.discussions.length}`)
+    if (p.topicChanges.length) lines.push(`  ${topicLabel} changes: ${p.topicChanges.map(tv => tv.topics?.title || 'unknown').join(', ')}`)
     if (p.conflicts.length) lines.push(`  Conflicts detected: ${p.conflicts.map(c => c.description).join('; ')}`)
     return lines.join('\n')
   }).join('\n\n')
 
-  return `You are Pinlooply AI. Generate a weekly summary for developer ${userName} for the week of ${dateRange}.
+  return `You are Pinlooply AI. Generate a ${summaryLabel.toLowerCase()} for ${userName}, who works as ${aiContext}, for the week of ${dateRange}.
+Use their vocabulary: "${projectLabel}" (not "Projects"), "${taskLabel}" (not "Tasks"), "${topicLabel}" (not "Topics").
 
 Data:
 ${projectSummaries || 'No activity this week.'}
@@ -189,12 +197,12 @@ Return ONLY valid JSON, no markdown:
 {
   "projects": [
     {
-      "project_name": "exact project name",
-      "completed": ["list of completed task titles"],
-      "changed": ["list of topic changes with brief description"],
-      "pending": ["list of still-pending task titles"],
+      "project_name": "exact ${projectLabel.toLowerCase().replace(/s$/, '')} name",
+      "completed": ["list of completed ${taskLabel.toLowerCase()} titles"],
+      "changed": ["list of ${topicLabel.toLowerCase()} changes with brief description"],
+      "pending": ["list of still-pending ${taskLabel.toLowerCase()} titles"],
       "conflicts": ["list of conflict descriptions"],
-      "summary": "1-2 sentence project summary for the week"
+      "summary": "1-2 sentence ${projectLabel.toLowerCase().replace(/s$/, '')} summary for the week"
     }
   ],
   "overall_summary": "2-3 sentence overview of the whole week",
@@ -248,14 +256,16 @@ export function currentMonthStr() {
 export async function generateWeeklySummary(userId, userName, weekStr) {
   const { start, end } = parseWeek(weekStr)
 
-  // AI config
+  // AI config + profession/vocabulary
   const { data: userData } = await supabaseAdmin
     .from('users')
-    .select('plan')
+    .select('plan, profession, vocabulary')
     .eq('id', userId)
     .single()
 
-  const plan = userData?.plan || 'free'
+  const plan         = userData?.plan       || 'free'
+  const workspaceCtx = { profession: userData?.profession || 'general', vocabulary: userData?.vocabulary || {} }
+
   const { data: aiConfig } = await supabaseAdmin
     .from('ai_config')
     .select('provider, model_name')
@@ -270,7 +280,7 @@ export async function generateWeeklySummary(userId, userName, weekStr) {
   const projectGroups = groupByProject(weekData)
 
   // Build prompt + call AI
-  const prompt = buildPrompt(weekData, userName, start, end)
+  const prompt = buildPrompt(weekData, userName, start, end, workspaceCtx)
 
   let result
   try {
@@ -324,11 +334,13 @@ export async function generateMonthlySummary(userId, userName, monthStr) {
 
   const { data: userData } = await supabaseAdmin
     .from('users')
-    .select('plan')
+    .select('plan, profession, vocabulary')
     .eq('id', userId)
     .single()
 
-  const plan = userData?.plan || 'free'
+  const plan         = userData?.plan       || 'free'
+  const workspaceCtx = { profession: userData?.profession || 'general', vocabulary: userData?.vocabulary || {} }
+
   const { data: aiConfig } = await supabaseAdmin
     .from('ai_config')
     .select('provider, model_name')
@@ -341,18 +353,25 @@ export async function generateMonthlySummary(userId, userName, monthStr) {
   const monthData = await fetchWeekData(userId, start, end) // reuses same fetch
   const projectGroups = groupByProject(monthData)
 
+  const { vocabulary = {} } = workspaceCtx
+  const taskLabel    = vocabulary.tasks    || 'Tasks'
+  const topicLabel   = vocabulary.topics   || 'Topics'
+  const projectLabel = vocabulary.projects || 'Projects'
+  const aiContext    = vocabulary.aiContext || 'a professional'
+
   const dateRange = `${start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
   const projectSummaries = projectGroups.map(p => {
-    const lines = [`Project: ${p.name}`]
-    if (p.completed.length) lines.push(`  Completed (${p.completed.length}): ${p.completed.map(t => t.title).join(', ')}`)
+    const lines = [`${projectLabel.replace(/s$/, '')}: ${p.name}`]
+    if (p.completed.length) lines.push(`  Completed ${taskLabel} (${p.completed.length}): ${p.completed.map(t => t.title).join(', ')}`)
     if (p.pending.length) lines.push(`  Still pending: ${p.pending.slice(0, 8).map(t => t.title).join(', ')}`)
-    if (p.discussions.length) lines.push(`  Discussions logged: ${p.discussions.length}`)
-    if (p.topicChanges.length) lines.push(`  Topic changes: ${p.topicChanges.map(tv => tv.topics?.title || 'unknown').join(', ')}`)
+    if (p.discussions.length) lines.push(`  Notes logged: ${p.discussions.length}`)
+    if (p.topicChanges.length) lines.push(`  ${topicLabel} changes: ${p.topicChanges.map(tv => tv.topics?.title || 'unknown').join(', ')}`)
     if (p.conflicts.length) lines.push(`  Conflicts detected: ${p.conflicts.map(c => c.description).join('; ')}`)
     return lines.join('\n')
   }).join('\n\n')
 
-  const prompt = `You are Pinlooply AI. Generate a monthly summary for developer ${userName} for ${dateRange}.
+  const prompt = `You are Pinlooply AI. Generate a monthly summary for ${userName}, who works as ${aiContext}, for ${dateRange}.
+Use their vocabulary: "${projectLabel}" (not "Projects"), "${taskLabel}" (not "Tasks"), "${topicLabel}" (not "Topics").
 
 Data:
 ${projectSummaries || 'No activity this month.'}
@@ -361,12 +380,12 @@ Return ONLY valid JSON, no markdown:
 {
   "projects": [
     {
-      "project_name": "exact project name",
-      "completed": ["list of completed task titles"],
-      "changed": ["list of topic changes with brief description"],
-      "pending": ["list of still-pending task titles"],
+      "project_name": "exact ${projectLabel.toLowerCase().replace(/s$/, '')} name",
+      "completed": ["list of completed ${taskLabel.toLowerCase()} titles"],
+      "changed": ["list of ${topicLabel.toLowerCase()} changes with brief description"],
+      "pending": ["list of still-pending ${taskLabel.toLowerCase()} titles"],
       "conflicts": ["list of conflict descriptions"],
-      "summary": "2-3 sentence project summary for the month"
+      "summary": "2-3 sentence ${projectLabel.toLowerCase().replace(/s$/, '')} summary for the month"
     }
   ],
   "overall_summary": "3-4 sentence overview of the whole month including progress and trends",

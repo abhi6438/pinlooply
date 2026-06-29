@@ -63,6 +63,10 @@ import planRouter from './routes/plan.js'
 import adminRouter from './routes/admin.js'
 import publicRouter from './routes/public.js'
 import testCasesRouter from './routes/testcases.js'
+import workspaceRouter from './routes/workspace.js'
+import customFieldsRouter from './routes/customFields.js'
+import managerRouter from './routes/manager.js'
+import automationsRouter from './routes/automations.js'
 app.use('/api/discussions', discussionsRouter)
 app.use('/api/topics', topicsRouter)
 app.use('/api/tasks', tasksRouter)
@@ -76,6 +80,10 @@ app.use('/api/plan', planRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/public', publicRouter)
 app.use('/api/testcases', testCasesRouter)
+app.use('/api/workspace', workspaceRouter)
+app.use('/api/custom-fields', customFieldsRouter)
+app.use('/api/manager', managerRouter)
+app.use('/api/automations', automationsRouter)
 
 // ── Global JSON error handler — MUST be last ─────────────────────────
 // Catches errors from middleware (e.g. CORS, body-parser) and returns JSON

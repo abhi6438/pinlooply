@@ -3,25 +3,35 @@ import { callGroq } from './groqService.js'
 import { callClaude } from './claudeService.js'
 
 // ── Prompt builder ────────────────────────────────────────────
-function buildPrompt(rawText, existingTopics) {
+function buildPrompt(rawText, existingTopics, workspaceCtx = {}) {
+  const { vocabulary = {} } = workspaceCtx
+  const taskLabel       = vocabulary.tasks       || 'Tasks'
+  const taskSingular    = vocabulary.task        || 'task'
+  const topicLabel      = vocabulary.topics      || 'Topics'
+  const topicSingular   = vocabulary.topic       || 'topic'
+  const projectLabel    = vocabulary.projects    || 'Projects'
+  const discussionLabel = vocabulary.discussions || 'Notes'
+  const aiContext       = vocabulary.aiContext   || 'a professional team'
+
   const topicsStr = existingTopics.length
     ? existingTopics.map(t => `- [${t.id}] ${t.title}: ${t.summary || 'no summary'}`).join('\n')
-    : 'No existing topics yet.'
+    : `No existing ${topicLabel.toLowerCase()} yet.`
 
-  return `You are Pinlooply AI — a smart team memory assistant for developers.
+  return `You are Pinlooply AI — a smart team memory assistant for ${aiContext}.
 
-A developer just logged this discussion:
+A team member just logged this ${discussionLabel.toLowerCase().replace(/s$/, '')}:
 "${rawText}"
 
-Existing topics in this project:
+Existing ${topicLabel.toLowerCase()} in this ${projectLabel.toLowerCase().replace(/s$/, '')}:
 ${topicsStr}
 
-Extract ALL information and return ONLY valid JSON with no explanation or markdown:
+Extract ALL information and return ONLY valid JSON with no explanation or markdown.
+Use the team's vocabulary: "${taskSingular}" (not "task"), "${topicSingular}" (not "topic").
 {
-  "project_match": "project name if mentioned or null",
+  "project_match": "${projectLabel.toLowerCase().replace(/s$/, '')} name if mentioned or null",
   "topics": [
     {
-      "title": "short topic title",
+      "title": "short ${topicSingular} title",
       "is_new": true,
       "existing_topic_id": null,
       "summary": "2-3 sentence summary"
@@ -29,7 +39,7 @@ Extract ALL information and return ONLY valid JSON with no explanation or markdo
   ],
   "tasks": [
     {
-      "title": "task title",
+      "title": "${taskSingular} title",
       "description": "clear description of what needs to be done and why, 1-3 sentences",
       "type": "task|test_case|deployment_check|backlog",
       "priority": "high|medium|low",
@@ -44,20 +54,21 @@ Extract ALL information and return ONLY valid JSON with no explanation or markdo
       "new_value": "what it changed to"
     }
   ],
-  "overall_summary": "2-3 line summary of entire discussion"
+  "overall_summary": "2-3 line summary of entire ${discussionLabel.toLowerCase().replace(/s$/, '')}"
 }`
 }
 
 // ── Main processing function ──────────────────────────────────
 export async function processDiscussion(rawText, projectId, userId) {
-  // 1. Get user plan to determine which AI to use
+  // 1. Get user plan + profession/vocabulary
   const { data: userData } = await supabaseAdmin
     .from('users')
-    .select('plan')
+    .select('plan, profession, vocabulary')
     .eq('id', userId)
     .single()
 
-  const plan = userData?.plan || 'free'
+  const plan         = userData?.plan       || 'free'
+  const workspaceCtx = { profession: userData?.profession || 'general', vocabulary: userData?.vocabulary || {} }
 
   // 2. Get AI config for this plan
   const { data: aiConfig } = await supabaseAdmin
@@ -78,8 +89,8 @@ export async function processDiscussion(rawText, projectId, userId) {
     .order('updated_at', { ascending: false })
     .limit(20)
 
-  // 4. Build prompt
-  const prompt = buildPrompt(rawText, existingTopics || [])
+  // 4. Build prompt with profession context
+  const prompt = buildPrompt(rawText, existingTopics || [], workspaceCtx)
 
   // 5. Call AI
   let result

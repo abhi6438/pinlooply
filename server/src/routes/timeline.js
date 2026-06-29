@@ -168,30 +168,42 @@ router.get('/', requireAuth, async (req, res) => {
     })
   }
 
-  // ── 5. Group member joins ────────────────────────────────
+  // ── 5. Group member joins — only for groups this user belongs to ─
   if (!type || type === 'member') {
-    const { data: groupData } = await supabaseAdmin
+    // First get the groups this user is a member of
+    const { data: myGroups } = await supabaseAdmin
       .from('group_members')
-      .select('id, joined_at, role, users(id,name,avatar_url), groups(id,name)')
-      .order('joined_at', { ascending: false })
-      .limit(50)
-    ;(groupData || []).forEach(m => {
-      if (fromDate && m.joined_at < fromDate) return
-      if (toDate   && m.joined_at > toDate)   return
-      events.push({
-        id:           `member-${m.id}`,
-        type:         'member_joined',
-        timestamp:    m.joined_at,
-        title:        'Member joined',
-        description:  `${m.users?.name || 'Someone'} joined ${m.groups?.name || 'a group'} as ${m.role}`,
-        project_id:   null,
-        project_name: m.groups?.name,
-        project_color: '#14b8a6',
-        user_name:    m.users?.name || 'Unknown',
-        user_avatar:  m.users?.avatar_url,
-        meta:         { role: m.role, group: m.groups?.name },
+      .select('group_id')
+      .eq('user_id', userId)
+
+    const myGroupIds = (myGroups || []).map(g => g.group_id)
+
+    if (myGroupIds.length > 0) {
+      let q = supabaseAdmin
+        .from('group_members')
+        .select('id, joined_at, role, users(id,name,avatar_url), groups(id,name)')
+        .in('group_id', myGroupIds)
+        .order('joined_at', { ascending: false })
+        .limit(50)
+      if (fromDate) q = q.gte('joined_at', fromDate)
+      if (toDate)   q = q.lte('joined_at', toDate)
+      const { data: groupData } = await q
+      ;(groupData || []).forEach(m => {
+        events.push({
+          id:           `member-${m.id}`,
+          type:         'member_joined',
+          timestamp:    m.joined_at,
+          title:        'Member joined',
+          description:  `${m.users?.name || 'Someone'} joined ${m.groups?.name || 'a group'} as ${m.role}`,
+          project_id:   null,
+          project_name: m.groups?.name,
+          project_color: '#14b8a6',
+          user_name:    m.users?.name || 'Unknown',
+          user_avatar:  m.users?.avatar_url,
+          meta:         { role: m.role, group: m.groups?.name },
+        })
       })
-    })
+    }
   }
 
   // ── Sort all events newest first, apply limit ─────────────

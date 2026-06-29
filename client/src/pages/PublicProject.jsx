@@ -118,7 +118,7 @@ export default function PublicProject() {
     )
   }
 
-  const { project, health, latestSummary, openItems, recentUpdates, topics, testStatus } = data
+  const { project, health, taskProgress, latestSummary, openItems, recentUpdates, topics, testStatus } = data
   const healthCfg = HEALTH[health] || HEALTH.on_track
   const HealthIcon = healthCfg.icon
 
@@ -187,6 +187,36 @@ export default function PublicProject() {
             {health === 'behind'   && <p className="text-xs text-gray-500 mt-0.5">Multiple tasks are overdue.</p>}
           </div>
         </div>
+
+        {/* Task Progress Bar */}
+        {taskProgress && taskProgress.total > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-gray-400" />
+                Progress
+              </h2>
+              <span className="text-sm font-bold text-gray-900">{taskProgress.pct}%</span>
+            </div>
+            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${taskProgress.pct}%`,
+                  background: taskProgress.pct >= 80 ? '#22c55e' : taskProgress.pct >= 40 ? '#f59e0b' : '#6366f1',
+                }}
+              />
+            </div>
+            <div className="flex gap-4 text-xs text-gray-500">
+              <span><strong className="text-gray-900">{taskProgress.done}</strong> completed</span>
+              <span><strong className="text-gray-900">{taskProgress.open}</strong> open</span>
+              {taskProgress.overdue > 0 && (
+                <span className="text-red-600"><strong>{taskProgress.overdue}</strong> overdue</span>
+              )}
+              <span className="ml-auto text-gray-400">{taskProgress.total} total</span>
+            </div>
+          </div>
+        )}
 
         {/* AI Summary */}
         {latestSummary && (

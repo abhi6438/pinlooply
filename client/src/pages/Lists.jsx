@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useWorkspace } from '../context/WorkspaceContext'
 import { useProjectStore } from '../stores/useProjectStore'
-import { tasksApi, groupsApi } from '../services/api'
+import { tasksApi, groupsApi, customFieldsApi } from '../services/api'
+import { STATUS_COLORS } from '../config/statuses'
 import {
   LayoutGrid, List, Plus, ChevronDown, X, Loader2,
   RefreshCw, Calendar, Tag, UserCircle, Trash2, Check,
@@ -28,6 +30,36 @@ const WORKFLOW_MAP = Object.fromEntries(WORKFLOW.map(w => [w.key, w]))
 function normalizeStatus(s) {
   if (s === 'pending') return 'todo'
   return s || 'todo'
+}
+
+// ── Convert statuses config → workflow format ─────────────────
+function workflowFromStatuses(statuses) {
+  if (!statuses?.length) return WORKFLOW
+  return statuses.map(s => {
+    const colors = STATUS_COLORS[s.color] || STATUS_COLORS.warm
+    return {
+      key:      s.key,
+      label:    s.label,
+      is_done:  s.is_done,
+      headerBg: colors.header,
+      dotColor: colors.dot,
+      textColor:colors.text,
+      badgeBg:  colors.badge,
+    }
+  })
+}
+
+// ── Map a raw DB status key to the nearest key in the workflow ─
+function normalizeToWorkflow(raw, workflow) {
+  if (!raw || !workflow?.length) return workflow?.[0]?.key || 'todo'
+  const val = raw === 'pending' ? 'todo' : raw
+  if (workflow.find(w => w.key === val)) return val
+  // Legacy done/released → first is_done status in pipeline
+  if (val === 'done' || val === 'released') {
+    return workflow.find(w => w.is_done)?.key || workflow[workflow.length - 1]?.key || val
+  }
+  // Unknown key → first status
+  return workflow[0]?.key || val
 }
 
 // ── Priority meta ─────────────────────────────────────────────
@@ -111,9 +143,11 @@ function useDropdown() {
 }
 
 // ── Status Badge (clickable dropdown) ────────────────────────
-function StatusBadge({ status, onChange, disabled }) {
+function StatusBadge({ status, onChange, disabled, workflow = WORKFLOW }) {
   const { open, setOpen, ref } = useDropdown()
-  const wf = WORKFLOW_MAP[normalizeStatus(status)] || WORKFLOW_MAP.todo
+  const workflowMap = Object.fromEntries(workflow.map(w => [w.key, w]))
+  const currentKey = normalizeToWorkflow(status, workflow)
+  const wf = workflowMap[currentKey] || workflow[0] || WORKFLOW_MAP.todo
 
   return (
     <div ref={ref}>
@@ -127,15 +161,15 @@ function StatusBadge({ status, onChange, disabled }) {
         {!disabled && <ChevronDown className="w-3 h-3 opacity-60" />}
       </button>
       <PortalDropdown anchorRef={ref} open={open} minWidth={160}>
-        {WORKFLOW.map(w => (
+        {workflow.map(w => (
           <button
             key={w.key}
             onClick={() => { onChange(w.key); setOpen(false) }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-warm-50 ${w.key === normalizeStatus(status) ? 'bg-warm-50 font-medium' : 'text-warm-800'}`}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-warm-50 ${w.key === currentKey ? 'bg-warm-50 font-medium' : 'text-warm-800'}`}
           >
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${w.dotColor}`} />
             <span className={w.textColor}>{w.label}</span>
-            {w.key === normalizeStatus(status) && <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />}
+            {w.key === currentKey && <Check className="w-3.5 h-3.5 ml-auto text-primary-600" />}
           </button>
         ))}
       </PortalDropdown>
@@ -268,10 +302,10 @@ function DueDatePicker({ dueDate, onChange }) {
 }
 
 // ── Add Task Modal ────────────────────────────────────────────
-function AddTaskModal({ projects, groupMembers, initialStatus = 'todo', onClose, onSave }) {
+function AddTaskModal({ projects, groupMembers, initialStatus, onClose, onSave, workflow = WORKFLOW }) {
   const [title, setTitle]       = useState('')
   const [projectId, setProjectId] = useState(projects[0]?.id || '')
-  const [status, setStatus]     = useState(initialStatus)
+  const [status, setStatus]     = useState(initialStatus || workflow[0]?.key || 'todo')
   const [priority, setPriority] = useState('medium')
   const [assignedTo, setAssignedTo] = useState('')
   const [dueDate, setDueDate]   = useState('')
@@ -336,7 +370,7 @@ function AddTaskModal({ projects, groupMembers, initialStatus = 'todo', onClose,
             <div>
               <label className="label">Status</label>
               <select value={status} onChange={e => setStatus(e.target.value)} className="input w-full">
-                {WORKFLOW.map(w => <option key={w.key} value={w.key}>{w.label}</option>)}
+                {workflow.map(w => <option key={w.key} value={w.key}>{w.label}</option>)}
               </select>
             </div>
             <div>
@@ -423,7 +457,7 @@ function DeleteConfirmModal({ title, onConfirm, onCancel }) {
 }
 
 // ── Detail Panel ──────────────────────────────────────────────
-function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete, onStatusChange }) {
+function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete, onStatusChange, workflow = WORKFLOW }) {
   const [title, setTitle]       = useState(task.title)
   const [priority, setPriority] = useState(task.priority || 'medium')
   const [dueDate, setDueDate]   = useState(task.due_date ? task.due_date.slice(0, 10) : '')
@@ -431,9 +465,27 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   const [assignedTo, setAssignedTo]   = useState(task.assigned_user?.id || task.assigned_to || '')
   const [saving, setSaving]     = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Recurrence
+  const [recurrenceRule, setRecurrenceRule] = useState(task.recurrence_rule || 'none')
+  const [recurrenceEnd,  setRecurrenceEnd]  = useState(task.recurrence_end ? task.recurrence_end.slice(0, 10) : '')
+  // Custom fields
+  const [customFields,  setCustomFields]  = useState([])
+  const [fieldValues,   setFieldValues]   = useState({})
   const navigate = useNavigate()
 
-  const wf = WORKFLOW_MAP[normalizeStatus(task.status)] || WORKFLOW_MAP.todo
+  // Load custom field definitions + task values on mount
+  useEffect(() => {
+    customFieldsApi.list()
+      .then(r => setCustomFields(r.data.data || []))
+      .catch(() => {})
+    customFieldsApi.getValues(task.id)
+      .then(r => setFieldValues(r.data.data || {}))
+      .catch(() => {})
+  }, [task.id])
+
+  const workflowMap = Object.fromEntries(workflow.map(w => [w.key, w]))
+  const currentKey = normalizeToWorkflow(task.status, workflow)
+  const wf = workflowMap[currentKey] || workflow[0] || WORKFLOW_MAP.todo
 
   async function save() {
     if (!title.trim()) return
@@ -444,9 +496,15 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
         priority,
         due_date: dueDate || null,
         description: description || null,
+        recurrence_rule: recurrenceRule !== 'none' ? recurrenceRule : null,
+        recurrence_end:  (recurrenceRule !== 'none' && recurrenceEnd) ? recurrenceEnd : null,
       })
       if (assignedTo !== (task.assigned_user?.id || task.assigned_to || '')) {
         await onUpdate(task.id, { assigned_to: assignedTo || null })
+      }
+      // Save custom field values if any fields exist
+      if (customFields.length > 0) {
+        await customFieldsApi.saveValues(task.id, fieldValues).catch(() => {})
       }
       toast.success('Task saved')
     } finally {
@@ -476,6 +534,7 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
         <StatusBadge
           status={task.status}
           onChange={newStatus => onStatusChange(task.id, newStatus)}
+          workflow={workflow}
         />
       </div>
 
@@ -562,6 +621,100 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
             className="input w-full resize-none"
           />
         </div>
+
+        {/* Recurrence */}
+        <div className="border-t border-warm-100 pt-3 space-y-3">
+          <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide">Recurrence</p>
+          <div>
+            <label className="label">Repeat</label>
+            <select
+              value={recurrenceRule}
+              onChange={e => setRecurrenceRule(e.target.value)}
+              className="input w-full"
+            >
+              <option value="none">No repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          {recurrenceRule !== 'none' && (
+            <div>
+              <label className="label">End date (optional)</label>
+              <input
+                type="date"
+                value={recurrenceEnd}
+                onChange={e => setRecurrenceEnd(e.target.value)}
+                className="input w-full cursor-pointer"
+                min={dueDate || undefined}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Custom fields */}
+        {customFields.length > 0 && (
+          <div className="border-t border-warm-100 pt-3 space-y-3">
+            <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide">Custom Fields</p>
+            {customFields.map(field => (
+              <div key={field.key}>
+                <label className="label">{field.label}</label>
+                {field.field_type === 'text' && (
+                  <input
+                    type="text"
+                    value={fieldValues[field.key] || ''}
+                    onChange={e => setFieldValues(v => ({ ...v, [field.key]: e.target.value }))}
+                    className="input w-full"
+                    placeholder={`Enter ${field.label.toLowerCase()}…`}
+                  />
+                )}
+                {field.field_type === 'number' && (
+                  <input
+                    type="number"
+                    value={fieldValues[field.key] || ''}
+                    onChange={e => setFieldValues(v => ({ ...v, [field.key]: e.target.value }))}
+                    className="input w-full"
+                    placeholder="0"
+                  />
+                )}
+                {field.field_type === 'date' && (
+                  <input
+                    type="date"
+                    value={fieldValues[field.key] || ''}
+                    onChange={e => setFieldValues(v => ({ ...v, [field.key]: e.target.value }))}
+                    className="input w-full cursor-pointer"
+                  />
+                )}
+                {field.field_type === 'select' && (
+                  <select
+                    value={fieldValues[field.key] || ''}
+                    onChange={e => setFieldValues(v => ({ ...v, [field.key]: e.target.value }))}
+                    className="input w-full"
+                  >
+                    <option value="">— Select —</option>
+                    {(field.options || []).map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                )}
+                {field.field_type === 'checkbox' && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="checkbox"
+                      id={`cf_${field.key}`}
+                      checked={fieldValues[field.key] === 'true'}
+                      onChange={e => setFieldValues(v => ({ ...v, [field.key]: e.target.checked ? 'true' : 'false' }))}
+                      className="w-4 h-4 rounded accent-primary-500 cursor-pointer"
+                    />
+                    <label htmlFor={`cf_${field.key}`} className="text-sm text-warm-700 cursor-pointer">
+                      {field.label}
+                    </label>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Panel footer */}
@@ -723,7 +876,7 @@ function BoardColumn({ workflow, tasks, onCardClick, onStatusChange }) {
 }
 
 // ── List View Table ───────────────────────────────────────────
-function ListView({ tasks, groupMembers, filterProject, setFilterProject, filterStatus, setFilterStatus, filterPriority, setFilterPriority, projects, onStatusChange, onUpdate, onDelete, onCardClick, selectedIds, toggleSelect, toggleSelectAll, onBulkStatusChange, onBulkDelete }) {
+function ListView({ tasks, groupMembers, filterProject, setFilterProject, filterStatus, setFilterStatus, filterPriority, setFilterPriority, projects, onStatusChange, onUpdate, onDelete, onCardClick, selectedIds, toggleSelect, toggleSelectAll, onBulkStatusChange, onBulkDelete, workflow = WORKFLOW }) {
   const allSelected = tasks.length > 0 && selectedIds.size === tasks.length
 
   return (
@@ -734,7 +887,7 @@ function ListView({ tasks, groupMembers, filterProject, setFilterProject, filter
           onClick={() => setFilterStatus([])}
           className={`tab-pill text-xs ${filterStatus.length === 0 ? 'active' : 'inactive'}`}
         >All Statuses</button>
-        {WORKFLOW.map(w => (
+        {workflow.map(w => (
           <button
             key={w.key}
             onClick={() => setFilterStatus(prev =>
@@ -757,7 +910,7 @@ function ListView({ tasks, groupMembers, filterProject, setFilterProject, filter
         <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-600 text-white text-sm rounded-2xl mb-3">
           <span className="font-medium">{selectedIds.size} selected</span>
           <div className="flex gap-2 ml-auto flex-wrap">
-            {WORKFLOW.slice(0, 4).map(w => (
+            {workflow.slice(0, 4).map(w => (
               <button
                 key={w.key}
                 onClick={() => onBulkStatusChange(w.key)}
@@ -829,6 +982,7 @@ function ListView({ tasks, groupMembers, filterProject, setFilterProject, filter
                       <StatusBadge
                         status={task.status}
                         onChange={newStatus => onStatusChange(task.id, newStatus)}
+                        workflow={workflow}
                       />
                     </td>
                     <td className="px-3 py-3 w-24 hidden sm:table-cell">
@@ -899,6 +1053,7 @@ function ListView({ tasks, groupMembers, filterProject, setFilterProject, filter
 // ── Main Component ────────────────────────────────────────────
 export default function Lists() {
   const { user } = useAuth()
+  const { getEffectiveStatuses } = useWorkspace()
   const { projects, loading: projectsLoading, fetchProjects } = useProjectStore()
 
   const [view, setView]           = useState('board') // 'board' | 'list'
@@ -1042,8 +1197,11 @@ export default function Lists() {
     }
   }
 
-  // Normalize 'todo' alias to DB value 'pending' before saving
-  function toDbStatus(s) { return s === 'todo' ? 'pending' : (s || 'pending') }
+  // Store status key as-is; legacy 'todo' maps to 'pending' for backward compat
+  function toDbStatus(s) {
+    if (!s) return workflow[0]?.key || 'pending'
+    return s === 'todo' ? 'pending' : s
+  }
 
   async function handleCreate(payload) {
     try {
@@ -1087,12 +1245,22 @@ export default function Lists() {
     else setSelectedIds(new Set())
   }
 
+  // Compute effective workflow based on selected project's custom statuses
+  const workflow = useMemo(() => {
+    const selectedProject = projects.find(p => p.id === filterProject)
+    const statuses = getEffectiveStatuses(selectedProject?.custom_statuses)
+    return workflowFromStatuses(statuses)
+  }, [projects, filterProject, getEffectiveStatuses])
+
   // Filtered tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
       if (filterProject && t.project_id !== filterProject) return false
       if (filterPriority && t.priority !== filterPriority) return false
-      if (filterStatus.length > 0 && !filterStatus.includes(normalizeStatus(t.status))) return false
+      if (filterStatus.length > 0) {
+        const normalized = normalizeToWorkflow(t.status, workflow)
+        if (!filterStatus.includes(normalized)) return false
+      }
       if (search) {
         const q = search.toLowerCase()
         return (
@@ -1102,19 +1270,19 @@ export default function Lists() {
       }
       return true
     })
-  }, [tasks, filterProject, filterPriority, filterStatus, search])
+  }, [tasks, filterProject, filterPriority, filterStatus, search, workflow])
 
   // Group tasks by status for board view
   const tasksByStatus = useMemo(() => {
     const map = {}
-    WORKFLOW.forEach(w => { map[w.key] = [] })
+    workflow.forEach(w => { map[w.key] = [] })
     filteredTasks.forEach(t => {
-      const s = normalizeStatus(t.status)
-      if (map[s]) map[s].push(t)
-      else map['todo'].push(t)
+      const s = normalizeToWorkflow(t.status, workflow)
+      if (map[s] !== undefined) map[s].push(t)
+      else map[workflow[0]?.key]?.push(t)
     })
     return map
-  }, [filteredTasks])
+  }, [filteredTasks, workflow])
 
   const totalCount = tasks.length
   const projectCount = useMemo(() => new Set(tasks.map(t => t.project_id).filter(Boolean)).size, [tasks])
@@ -1169,7 +1337,7 @@ export default function Lists() {
               {showStatusPicker && (
                 <div className="absolute right-0 top-full mt-1 bg-white border border-warm-200 rounded-xl shadow-lg z-50 py-1.5 min-w-[190px]">
                   <p className="px-3 py-1 text-[11px] font-semibold text-warm-400 uppercase tracking-wide">Add to column</p>
-                  {WORKFLOW.map(wf => (
+                  {workflow.map(wf => (
                     <button
                       key={wf.key}
                       onClick={() => { setAddModalStatus(wf.key); setShowStatusPicker(false); setShowAddModal(true) }}
@@ -1231,7 +1399,7 @@ export default function Lists() {
           </div>
         ) : view === 'board' ? (
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {WORKFLOW.map(wf => (
+            {workflow.map(wf => (
               <BoardColumn
                 key={wf.key}
                 workflow={wf}
@@ -1261,6 +1429,7 @@ export default function Lists() {
             toggleSelectAll={toggleSelectAll}
             onBulkStatusChange={handleBulkStatusChange}
             onBulkDelete={handleBulkDelete}
+            workflow={workflow}
           />
         )}
       </div>
@@ -1273,6 +1442,7 @@ export default function Lists() {
           initialStatus={addModalStatus}
           onClose={() => setShowAddModal(false)}
           onSave={handleCreate}
+          workflow={workflow}
         />
       )}
 
@@ -1292,6 +1462,7 @@ export default function Lists() {
             onUpdate={handleUpdate}
             onDelete={requestDelete}
             onStatusChange={handleStatusChange}
+            workflow={workflow}
           />
         </>
       )}

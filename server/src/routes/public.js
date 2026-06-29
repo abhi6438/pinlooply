@@ -42,9 +42,8 @@ router.get('/:slug', async (req, res) => {
         .from('tasks')
         .select('id, title, type, status, priority, due_date')
         .eq('project_id', projectId)
-        .neq('status', 'done')
         .order('priority', { ascending: true })
-        .limit(20),
+        .limit(100),
 
       supabaseAdmin
         .from('topics')
@@ -65,10 +64,19 @@ router.get('/:slug', async (req, res) => {
     if (!project) return res.status(404).json({ error: 'Project not found' })
 
     // 3. Compute health
-    const pendingTasks  = (tasks || []).filter(t => t.type !== 'test_case')
+    const allTasks      = (tasks || []).filter(t => t.type !== 'test_case')
+    const doneTasks     = allTasks.filter(t => t.status === 'done' || t.status === 'resolved' || t.status === 'closed' || t.status === 'completed')
+    const pendingTasks  = allTasks.filter(t => !doneTasks.includes(t))
     const overdueTasks  = pendingTasks.filter(t => t.due_date && t.due_date < now)
     const deadlineSoon  = pendingTasks.some(t => t.due_date && t.due_date >= now && t.due_date <= in3days)
     const testCases     = (tasks || []).filter(t => t.type === 'test_case')
+    const taskProgress  = {
+      total:    allTasks.length,
+      done:     doneTasks.length,
+      open:     pendingTasks.length,
+      overdue:  overdueTasks.length,
+      pct:      allTasks.length > 0 ? Math.round((doneTasks.length / allTasks.length) * 100) : 0,
+    }
 
     let health = 'on_track'
     if (overdueTasks.length >= 4) health = 'behind'
@@ -86,7 +94,7 @@ router.get('/:slug', async (req, res) => {
       }))
 
     // 6. Open tasks — omit assigned_to / discussion_id / internal details
-    const openItems = pendingTasks.slice(0, 10).map(t => ({
+    const openItems = pendingTasks.slice(0, 15).map(t => ({
       title:    t.title,
       priority: t.priority,
       type:     t.type,
@@ -104,6 +112,7 @@ router.get('/:slug', async (req, res) => {
           updated_at:  project.updated_at,
         },
         health,
+        taskProgress,
         latestSummary,
         openItems,
         recentUpdates,
