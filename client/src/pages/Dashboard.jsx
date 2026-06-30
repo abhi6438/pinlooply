@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProjectStore } from '../stores/useProjectStore'
 import { supabase } from '../config/supabase'
-import { discussionsApi, groupsApi, projectsApi, tasksApi } from '../services/api'
+import { discussionsApi, groupsApi, projectsApi, tasksApi, suggestionsApi } from '../services/api'
 import { format } from 'date-fns'
 import {
   AlertTriangle, Clock, ChevronRight, Send, Loader2,
   CheckCircle2, Circle, Zap, FolderOpen, Users,
   ClipboardList, FlaskConical, ArrowRight, BarChart3,
-  Plus, ListChecks, X, Check,
+  Plus, ListChecks, X, Check, Sparkles, RefreshCw,
+  Rocket, HelpCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../components/ui'
@@ -644,6 +645,124 @@ function WhoSection({ group }) {
   )
 }
 
+// ── Getting Started Checklist ─────────────────────────────────
+const CHECKLIST_STEPS = [
+  {
+    id: 'project',
+    icon: FolderOpen,
+    label: 'Create your first project',
+    desc: 'Projects hold your tasks and discussions',
+    to: '/projects',
+    action: 'Create project',
+  },
+  {
+    id: 'task',
+    icon: ListChecks,
+    label: 'Add a task',
+    desc: 'Track work items on your task board',
+    to: '/lists',
+    action: 'Go to Tasks',
+  },
+  {
+    id: 'discussion',
+    icon: Send,
+    label: 'Log a discussion',
+    desc: 'Paste meeting notes — AI extracts tasks automatically',
+    to: '/log',
+    action: 'Log Discussion',
+  },
+  {
+    id: 'help',
+    icon: HelpCircle,
+    label: 'Explore the Help guide',
+    desc: 'See all features with step-by-step walkthroughs',
+    to: '/help',
+    action: 'Open Help',
+  },
+]
+
+function GettingStarted({ completedIds, onDismiss }) {
+  const navigate = useNavigate()
+  const doneCount = completedIds.size
+  const total = CHECKLIST_STEPS.length
+
+  if (doneCount >= total) return null
+
+  return (
+    <div className="card border-2 border-primary-100 bg-gradient-to-br from-primary-50/60 to-white mb-6 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute right-0 top-0 w-32 h-32 bg-primary-100/30 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+
+      <div className="flex items-start justify-between mb-4 relative">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center flex-shrink-0">
+            <Rocket className="w-4.5 h-4.5 text-white w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-warm-900">Getting started</h3>
+            <p className="text-xs text-warm-500">{doneCount} of {total} complete</p>
+          </div>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="p-1 rounded-lg text-warm-400 hover:text-warm-600 hover:bg-warm-100 transition-colors flex-shrink-0"
+          title="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 bg-warm-200 rounded-full mb-4 overflow-hidden">
+        <div
+          className="h-full bg-primary-500 rounded-full transition-all duration-500"
+          style={{ width: `${(doneCount / total) * 100}%` }}
+        />
+      </div>
+
+      <div className="space-y-2">
+        {CHECKLIST_STEPS.map(step => {
+          const done = completedIds.has(step.id)
+          const Icon = step.icon
+          return (
+            <div
+              key={step.id}
+              className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+                done ? 'opacity-50' : 'bg-white border border-warm-100 hover:border-primary-200 hover:shadow-sm'
+              }`}
+            >
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                done ? 'bg-green-100' : 'bg-primary-50 border border-primary-200'
+              }`}>
+                {done
+                  ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  : <Icon className="w-3.5 h-3.5 text-primary-500" />
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium leading-tight ${done ? 'line-through text-warm-400' : 'text-warm-900'}`}>
+                  {step.label}
+                </p>
+                {!done && (
+                  <p className="text-xs text-warm-400 leading-tight mt-0.5">{step.desc}</p>
+                )}
+              </div>
+              {!done && (
+                <button
+                  onClick={() => navigate(step.to)}
+                  className="text-xs text-primary-600 font-semibold hover:text-primary-700 whitespace-nowrap flex-shrink-0 px-2.5 py-1.5 rounded-lg bg-primary-50 hover:bg-primary-100 transition-colors"
+                >
+                  {step.action} →
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Dashboard ─────────────────────────────────────────────────
 export default function Dashboard() {
   const { user } = useAuth()
@@ -658,6 +777,13 @@ export default function Dashboard() {
   const [justCompleted, setJustCompleted] = useState(new Set())
   // Overview filter: 'work' = exclude test cases (default), 'test' = only test cases, 'all' = everything
   const [taskFilter, setTaskFilter]     = useState('work')
+  // AI suggestions
+  const [suggestions,     setSuggestions]     = useState([])
+  const [suggestLoading,  setSuggestLoading]  = useState(false)
+  // Getting Started checklist
+  const [checklistDismissed, setChecklistDismissed] = useState(
+    () => localStorage.getItem('gs_dismissed') === '1'
+  )
   const navigate = useNavigate()
 
   async function loadTasks() {
@@ -676,7 +802,21 @@ export default function Dashboard() {
         setUserName(data?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'there')
         setUserMode(data?.mode || 'personal')
       })
+    // Load AI suggestions (non-blocking, fire-and-forget style)
+    setSuggestLoading(true)
+    suggestionsApi.get()
+      .then(r => setSuggestions(r.data.data || []))
+      .catch(() => {})
+      .finally(() => setSuggestLoading(false))
   }, [user]) // eslint-disable-line
+
+  function refreshSuggestions() {
+    setSuggestLoading(true)
+    suggestionsApi.get()
+      .then(r => setSuggestions(r.data.data || []))
+      .catch(() => {})
+      .finally(() => setSuggestLoading(false))
+  }
 
   useEffect(() => {
     if (userMode !== 'team' && userMode !== 'org') return
@@ -694,6 +834,18 @@ export default function Dashboard() {
     fetchProjects(user.id)
     setShowNewProject(false)
   }
+
+  function dismissChecklist() {
+    localStorage.setItem('gs_dismissed', '1')
+    setChecklistDismissed(true)
+  }
+
+  // Determine which checklist steps are done
+  const checklistDone = new Set()
+  if (projects.length > 0)   checklistDone.add('project')
+  if (allTasks.length > 0)   checklistDone.add('task')
+  // 'discussion' and 'help' are always nudges (can't detect easily without extra fetch)
+  const showChecklist = !checklistDismissed && projects.length === 0
 
   async function handleToggleTask(taskId, newStatus) {
     // Keep just-completed tasks visible in the list (crossed out, not disappeared)
@@ -765,6 +917,10 @@ export default function Dashboard() {
 
       <AlertCards tasks={allTasks} />
 
+      {showChecklist && (
+        <GettingStarted completedIds={checklistDone} onDismiss={dismissChecklist} />
+      )}
+
       {/* Friday weekly summary banner */}
       {new Date().getDay() === 5 && (
         <button
@@ -825,6 +981,53 @@ export default function Dashboard() {
         {/* Right — Stats + Briefing + Who's working + Project health */}
         <div className="space-y-6">
           <StatsPanel stats={stats} taskFilter={taskFilter} onFilterChange={setTaskFilter} />
+
+          {/* AI Suggestions */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="section-title flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-primary-500" />
+                What to work on next
+              </h2>
+              <button
+                onClick={refreshSuggestions}
+                disabled={suggestLoading}
+                className="p-1 rounded-lg text-warm-400 hover:text-warm-600 hover:bg-warm-100 transition-colors"
+                title="Refresh suggestions"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${suggestLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            {suggestLoading ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <div key={i} className="h-12 bg-warm-100 rounded-lg animate-pulse" />)}
+              </div>
+            ) : suggestions.length > 0 ? (
+              <div className="space-y-2">
+                {suggestions.map((s, idx) => (
+                  <div key={s.id} className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-warm-50 transition-colors">
+                    <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-warm-900 truncate">{s.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {s.project && <span className="text-xs text-warm-400 truncate">{s.project.name}</span>}
+                        {s.days_until_due !== null && (
+                          <span className={`text-xs font-medium shrink-0 ${s.days_until_due <= 0 ? 'text-red-500' : s.days_until_due <= 3 ? 'text-amber-500' : 'text-warm-400'}`}>
+                            {s.days_until_due <= 0 ? 'Overdue' : `${s.days_until_due}d left`}
+                          </span>
+                        )}
+                      </div>
+                      {s.reason && <p className="text-xs text-warm-500 mt-0.5 italic">{s.reason}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-warm-400 text-center py-4">No open tasks — you're all caught up!</p>
+            )}
+          </div>
 
           {hasMorningBriefing && (
             <MorningBriefing tasks={allTasks} projects={projects} />

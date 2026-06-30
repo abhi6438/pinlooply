@@ -4,12 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useWorkspace } from '../context/WorkspaceContext'
 import { useProjectStore } from '../stores/useProjectStore'
-import { tasksApi, groupsApi, customFieldsApi } from '../services/api'
+import { tasksApi, groupsApi, customFieldsApi, timeEntriesApi } from '../services/api'
 import { STATUS_COLORS } from '../config/statuses'
 import {
   LayoutGrid, List, Plus, ChevronDown, X, Loader2,
   RefreshCw, Calendar, Tag, UserCircle, Trash2, Check,
-  AlertTriangle, Clock, UserPlus,
+  AlertTriangle, Clock, UserPlus, Play, Square, Timer, Pencil,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -468,12 +468,21 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   // Recurrence
   const [recurrenceRule, setRecurrenceRule] = useState(task.recurrence_rule || 'none')
   const [recurrenceEnd,  setRecurrenceEnd]  = useState(task.recurrence_end ? task.recurrence_end.slice(0, 10) : '')
+  // Time tracking
+  const [timeEntries,   setTimeEntries]   = useState([])
+  const [timerRunning,  setTimerRunning]  = useState(false)
+  const [timerSeconds,  setTimerSeconds]  = useState(0)
+  const [manualMins,    setManualMins]    = useState('')
+  const [timeNotes,     setTimeNotes]     = useState('')
+  const [loggingTime,   setLoggingTime]   = useState(false)
+  const [showTimeForm,  setShowTimeForm]  = useState(false)
+  const timerRef = useRef(null)
   // Custom fields
   const [customFields,  setCustomFields]  = useState([])
   const [fieldValues,   setFieldValues]   = useState({})
   const navigate = useNavigate()
 
-  // Load custom field definitions + task values on mount
+  // Load custom field definitions + task values + time entries on mount
   useEffect(() => {
     customFieldsApi.list()
       .then(r => setCustomFields(r.data.data || []))
@@ -481,7 +490,67 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
     customFieldsApi.getValues(task.id)
       .then(r => setFieldValues(r.data.data || {}))
       .catch(() => {})
+    timeEntriesApi.list({ task_id: task.id })
+      .then(r => setTimeEntries(r.data.data || []))
+      .catch(() => {})
   }, [task.id])
+
+  // Timer tick
+  useEffect(() => {
+    if (timerRunning) {
+      timerRef.current = setInterval(() => setTimerSeconds(s => s + 1), 1000)
+    } else {
+      clearInterval(timerRef.current)
+    }
+    return () => clearInterval(timerRef.current)
+  }, [timerRunning])
+
+  function fmtTimer(secs) {
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    const s = secs % 60
+    return h > 0
+      ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+      : `${m}:${String(s).padStart(2,'0')}`
+  }
+
+  function fmtMins(mins) {
+    if (!mins) return '0m'
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
+  }
+
+  async function stopTimerAndLog() {
+    setTimerRunning(false)
+    const mins = Math.max(1, Math.round(timerSeconds / 60))
+    setTimerSeconds(0)
+    await logTime(mins, timeNotes)
+  }
+
+  async function logTime(mins, notes) {
+    if (!mins || mins <= 0) return
+    setLoggingTime(true)
+    try {
+      const r = await timeEntriesApi.create({ task_id: task.id, duration_mins: parseInt(mins), notes: notes || null })
+      setTimeEntries(prev => [r.data.data, ...prev])
+      setManualMins('')
+      setTimeNotes('')
+      setShowTimeForm(false)
+      toast.success(`Logged ${fmtMins(parseInt(mins))}`)
+    } catch {
+      toast.error('Failed to log time')
+    } finally {
+      setLoggingTime(false)
+    }
+  }
+
+  async function deleteTimeEntry(entryId) {
+    await timeEntriesApi.delete(entryId).catch(() => {})
+    setTimeEntries(prev => prev.filter(e => e.id !== entryId))
+  }
+
+  const totalMins = timeEntries.reduce((sum, e) => sum + (e.duration_mins || 0), 0)
 
   const workflowMap = Object.fromEntries(workflow.map(w => [w.key, w]))
   const currentKey = normalizeToWorkflow(task.status, workflow)
@@ -620,6 +689,102 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
             placeholder="Add a description…"
             className="input w-full resize-none"
           />
+        </div>
+
+        {/* Time tracking */}
+        <div className="border-t border-warm-100 pt-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide flex items-center gap-1.5">
+              <Timer className="w-3.5 h-3.5" />
+              Time Logged
+              {totalMins > 0 && <span className="font-bold text-warm-700">{fmtMins(totalMins)}</span>}
+            </p>
+            <div className="flex items-center gap-1">
+              {/* Live timer */}
+              {timerRunning ? (
+                <button
+                  onClick={stopTimerAndLog}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-red-100 text-red-600 text-xs font-medium hover:bg-red-200 transition-colors"
+                >
+                  <Square className="w-3 h-3" />
+                  {fmtTimer(timerSeconds)}
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setTimerRunning(true); setTimerSeconds(0) }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-100 text-green-700 text-xs font-medium hover:bg-green-200 transition-colors"
+                >
+                  <Play className="w-3 h-3" />
+                  Start
+                </button>
+              )}
+              {/* Manual log */}
+              <button
+                onClick={() => setShowTimeForm(v => !v)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-warm-100 text-warm-600 text-xs font-medium hover:bg-warm-200 transition-colors"
+              >
+                <Pencil className="w-3 h-3" />
+                Log
+              </button>
+            </div>
+          </div>
+
+          {/* Manual time entry form */}
+          {showTimeForm && (
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="label">Minutes</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={manualMins}
+                  onChange={e => setManualMins(e.target.value)}
+                  placeholder="e.g. 30"
+                  className="input w-full"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="label">Notes (optional)</label>
+                <input
+                  type="text"
+                  value={timeNotes}
+                  onChange={e => setTimeNotes(e.target.value)}
+                  placeholder="What did you work on?"
+                  className="input w-full"
+                />
+              </div>
+              <button
+                onClick={() => logTime(manualMins, timeNotes)}
+                disabled={loggingTime || !manualMins}
+                className="btn btn-primary btn-sm mb-0.5"
+              >
+                {loggingTime ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
+              </button>
+            </div>
+          )}
+
+          {/* Entries list */}
+          {timeEntries.length > 0 && (
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {timeEntries.map(entry => (
+                <div key={entry.id} className="flex items-center justify-between text-xs text-warm-600 py-1 px-2 rounded-lg hover:bg-warm-50 group">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-semibold text-warm-800 shrink-0">{fmtMins(entry.duration_mins)}</span>
+                    {entry.notes && <span className="truncate text-warm-500">{entry.notes}</span>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <span className="text-warm-400">{entry.logged_at}</span>
+                    <button
+                      onClick={() => deleteTimeEntry(entry.id)}
+                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Recurrence */}
@@ -1396,6 +1561,23 @@ export default function Lists() {
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+          </div>
+        ) : tasks.length === 0 && !filterProject && !filterStatus ? (
+          /* Empty state — no tasks at all */
+          <div className="flex flex-col items-center justify-center h-64 text-center px-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary-50 border-2 border-dashed border-primary-200 flex items-center justify-center mb-4">
+              <ListChecks className="w-7 h-7 text-primary-400" />
+            </div>
+            <h3 className="text-base font-semibold text-warm-800 mb-1">No tasks yet</h3>
+            <p className="text-sm text-warm-400 max-w-xs mb-5">
+              Tasks live inside projects. Create a project first, then add tasks here — or click <strong>+ Add Task</strong> above to start right now.
+            </p>
+            <button
+              onClick={() => setShowStatusPicker(p => !p)}
+              className="btn btn-primary btn-sm"
+            >
+              <Plus className="w-4 h-4" /> Add your first task
+            </button>
           </div>
         ) : view === 'board' ? (
           <div className="flex gap-4 overflow-x-auto pb-4">

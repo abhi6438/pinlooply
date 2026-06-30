@@ -31,11 +31,13 @@ ALTER TABLE public.workspace_custom_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.task_custom_values       ENABLE ROW LEVEL SECURITY;
 
 -- Field definitions: owner can read/write
+DROP POLICY IF EXISTS "fields_owner" ON public.workspace_custom_fields;
 CREATE POLICY "fields_owner" ON public.workspace_custom_fields
   USING (auth.uid() = user_id);
 
 -- Task values: task owner's workspace members can read/write
 -- Simple approach: allow if the task belongs to a project the user can see
+DROP POLICY IF EXISTS "task_values_access" ON public.task_custom_values;
 CREATE POLICY "task_values_access" ON public.task_custom_values
   USING (
     EXISTS (

@@ -1,27 +1,67 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useWorkspace, clearSessionWorkspace } from '../../context/WorkspaceContext'
+import api, { groupsApi } from '../../services/api'
 import toast from 'react-hot-toast'
 
 export default function Login() {
   const { login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const inviteCode = searchParams.get('invite') // present when coming from invite link
+  const inviteCode = searchParams.get('invite')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
 
   async function handleLogin(e) {
     e.preventDefault()
+    setErrorMsg('')
     setLoading(true)
     try {
+      // 1. Check if the email is registered BEFORE touching Supabase auth.
+      //    This prevents Supabase from accidentally creating an unconfirmed session.
+      let emailExists = true
+      try {
+        const check = await api.post('/api/auth/check-email', { email })
+        emailExists = check.data.exists
+      } catch {
+        // If the check fails (network/server error), proceed and let Supabase decide
+        emailExists = true
+      }
+
+      if (!emailExists) {
+        setErrorMsg('No account found with this email address. Did you mean to sign up?')
+        setLoading(false)
+        return
+      }
+
+      // 2. Email exists — attempt login
       await login(email, password)
-      // If they came from an invite link, send them there directly
-      navigate(inviteCode ? `/invite/${inviteCode}` : '/dashboard')
+
+      // If coming from an invite, skip workspace selector
+      if (inviteCode) {
+        navigate(`/invite/${inviteCode}`)
+        return
+      }
+
+      // 3. Check if user belongs to any groups — if yes, show workspace selector
+      clearSessionWorkspace() // clear any previous session choice
+      try {
+        const res = await groupsApi.list()
+        const groups = res.data.data || []
+        if (groups.length > 0) {
+          navigate('/choose-workspace')
+          return
+        }
+      } catch { /* non-fatal — fall through to dashboard */ }
+
+      navigate('/dashboard')
     } catch (err) {
-      toast.error(err.message || 'Login failed')
+      // login() threw — email exists but password is wrong
+      setErrorMsg('Wrong password. Please try again or reset your password.')
     } finally {
       setLoading(false)
     }
@@ -124,9 +164,18 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
+            {errorMsg && (
+              <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{errorMsg}</span>
+              </div>
+            )}
             <div>
               <label className="label">Email</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+              <input type="email" required value={email}
+                onChange={e => { setEmail(e.target.value); setErrorMsg('') }}
                 placeholder="you@example.com" className="input" />
             </div>
             <div>
@@ -134,7 +183,8 @@ export default function Login() {
                 <label className="label mb-0">Password</label>
                 <Link to="/forgot-password" className="text-xs text-primary-600 hover:text-primary-700 font-medium">Forgot password?</Link>
               </div>
-              <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
+              <input type="password" required value={password}
+                onChange={e => { setPassword(e.target.value); setErrorMsg('') }}
                 placeholder="••••••••" className="input" />
             </div>
             <button type="submit" disabled={loading}

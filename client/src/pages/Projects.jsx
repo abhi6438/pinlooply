@@ -441,11 +441,14 @@ export default function Projects() {
         <EmptyState
           icon={<FolderOpen className="w-12 h-12" />}
           title="No projects yet"
-          subtitle="Create your first project to get started"
+          subtitle="A project groups your tasks, discussions, and topics. Create one to get started — it only takes a few seconds."
           action={
-            <button onClick={openCreate} className="btn-primary btn-sm mt-4">
-              <Plus className="w-4 h-4" /> Create project
-            </button>
+            <div className="flex flex-col items-center gap-3 mt-4">
+              <button onClick={openCreate} className="btn-primary btn-sm">
+                <Plus className="w-4 h-4" /> Create your first project
+              </button>
+              <p className="text-xs text-warm-400">Or choose a template below to pre-fill tasks for you</p>
+            </div>
           }
         />
       ) : (

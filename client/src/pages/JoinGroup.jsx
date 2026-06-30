@@ -43,8 +43,9 @@ export default function JoinGroup() {
 
       if (!userData?.onboarding_complete) {
         const name = userData?.name || user.user_metadata?.full_name || ''
+        // Don't overwrite mode — user keeps their personal mode in DB.
+        // The workspace selector on login will let them choose which context to use.
         await supabase.from('users').update({
-          mode: 'team',
           onboarding_complete: true,
           onboarding_step: 4,
           ...(name && { name }),

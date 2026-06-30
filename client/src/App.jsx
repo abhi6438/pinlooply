@@ -28,11 +28,15 @@ import WeeklySummary from './pages/WeeklySummary' // now also handles monthly
 import Plan from './pages/settings/Plan'
 import Workspace from './pages/settings/Workspace'
 import Automations from './pages/settings/Automations'
+import DataManagement from './pages/settings/DataManagement'
+import WorkspaceSelect from './pages/WorkspaceSelect'
 import AdminPanel from './pages/admin/AdminPanel'
 import PublicProject from './pages/PublicProject'
 import TestCaseGenerator from './pages/TestCaseGenerator'
 import Manager from './pages/Manager'
 import MyTasks from './pages/MyTasks'
+import TimeReports from './pages/TimeReports'
+import Help from './pages/Help'
 
 // Placeholder pages (will be built in future prompts)
 function Placeholder({ title }) {
@@ -60,6 +64,9 @@ function AppRoutes() {
 
       {/* Onboarding — protected but no AppLayout */}
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+
+      {/* Workspace selector — shown after login when user has groups */}
+      <Route path="/choose-workspace" element={<ProtectedRoute><WorkspaceSelect /></ProtectedRoute>} />
 
       {/* App — protected + AppLayout */}
       <Route path="/dashboard" element={
@@ -164,6 +171,11 @@ function AppRoutes() {
           <AppLayout><Automations /></AppLayout>
         </ProtectedRoute>
       } />
+      <Route path="/settings/data" element={
+        <ProtectedRoute>
+          <AppLayout><DataManagement /></AppLayout>
+        </ProtectedRoute>
+      } />
       <Route path="/admin" element={
         <ProtectedRoute>
           <AppLayout><AdminPanel /></AppLayout>
@@ -177,6 +189,16 @@ function AppRoutes() {
       <Route path="/manager" element={
         <ProtectedRoute>
           <AppLayout><Manager /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/time-reports" element={
+        <ProtectedRoute>
+          <AppLayout><TimeReports /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/help" element={
+        <ProtectedRoute>
+          <AppLayout><Help /></AppLayout>
         </ProtectedRoute>
       } />
     </Routes>

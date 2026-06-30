@@ -55,7 +55,6 @@ router.get('/overview', async (req, res) => {
     const { data: tasks, error: taskErr } = await supabaseAdmin
       .from('tasks')
       .select('id, title, status, priority, due_date, assigned_to, project_id, projects(id, name, color)')
-      .eq('archived', false)
 
     if (taskErr) throw taskErr
 
@@ -168,7 +167,6 @@ router.get('/member/:memberId/tasks', async (req, res) => {
       .from('tasks')
       .select('id, title, status, priority, due_date, created_at, project_id, projects(id, name, color)')
       .eq('assigned_to', memberId)
-      .eq('archived', false)
       .order('due_date', { ascending: true, nullsFirst: false })
 
     if (error) throw error

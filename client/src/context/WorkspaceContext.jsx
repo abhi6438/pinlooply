@@ -6,6 +6,24 @@ import { DEFAULT_STATUS_PIPELINES } from '../config/statuses'
 
 const WorkspaceContext = createContext(null)
 
+// ── Session workspace helpers ─────────────────────────────────
+const SESSION_KEY = 'pw_active_workspace'
+
+function readSessionWorkspace() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+function writeSessionWorkspace(ws) {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(ws)) } catch {}
+}
+
+export function clearSessionWorkspace() {
+  try { sessionStorage.removeItem(SESSION_KEY) } catch {}
+}
+
 export function WorkspaceProvider({ children }) {
   const { user } = useAuth()
 
@@ -17,6 +35,19 @@ export function WorkspaceProvider({ children }) {
   const [accentColor,     setAccentColor]     = useState(null)
   const [loading,         setLoading]         = useState(true)
   const [rawVocab,        setRawVocab]        = useState({}) // user overrides (not merged)
+
+  // ── Session workspace (personal vs team) — persists for browser session ──
+  const [activeWorkspace, setActiveWorkspaceState] = useState(() => readSessionWorkspace())
+
+  function setActiveWorkspace(ws) {
+    writeSessionWorkspace(ws)
+    setActiveWorkspaceState(ws)
+  }
+
+  // activeMode: the mode in effect right now (may differ from DB mode)
+  const activeMode    = activeWorkspace?.mode    ?? null // null = not chosen yet
+  const activeGroupId = activeWorkspace?.groupId ?? null
+  const activeGroupName = activeWorkspace?.groupName ?? null
 
   // ── Apply accent color CSS variables ─────────────────────────
   function applyAccentColor(hex) {
@@ -138,6 +169,11 @@ export function WorkspaceProvider({ children }) {
       isModuleEnabled,
       getEffectiveStatuses,
       reload: load,
+      // Session workspace
+      activeMode,
+      activeGroupId,
+      activeGroupName,
+      setActiveWorkspace,
     }}>
       {children}
     </WorkspaceContext.Provider>

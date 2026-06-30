@@ -186,3 +186,19 @@ export const automationsApi = {
   delete:     (id)          => api.delete(`/api/automations/${id}`),
   runOverdue: ()            => api.post('/api/automations/run-overdue'),
 }
+
+export const timeEntriesApi = {
+  list:   (params = {})    => api.get('/api/time-entries',       { params }),
+  report: (params = {})    => api.get('/api/time-entries/report', { params }),
+  create: (payload)        => api.post('/api/time-entries', payload),
+  update: (id, payload)    => api.patch(`/api/time-entries/${id}`, payload),
+  delete: (id)             => api.delete(`/api/time-entries/${id}`),
+}
+
+export const searchApi = {
+  query: (q, limit = 20) => api.get('/api/search', { params: { q, limit } }),
+}
+
+export const suggestionsApi = {
+  get: () => api.get('/api/suggestions'),
+}
