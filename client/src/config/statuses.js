@@ -28,10 +28,15 @@ export const COLOR_OPTIONS = [
 // ── Default status pipelines per profession ────────────────────
 export const DEFAULT_STATUS_PIPELINES = {
   software: [
-    { key: 'todo',        label: 'To Do',       color: 'warm',   is_done: false },
-    { key: 'in_progress', label: 'In Progress', color: 'blue',   is_done: false },
-    { key: 'in_review',   label: 'In Review',   color: 'violet', is_done: false },
-    { key: 'done',        label: 'Done',        color: 'green',  is_done: true  },
+    { key: 'backlog',     label: 'Backlog',      color: 'warm',   is_done: false },
+    { key: 'todo',        label: 'To Do',        color: 'warm',   is_done: false },
+    { key: 'in_progress', label: 'In Progress',  color: 'blue',   is_done: false },
+    { key: 'in_review',   label: 'In Review',    color: 'violet', is_done: false },
+    { key: 'qa_testing',  label: 'QA Testing',   color: 'amber',  is_done: false },
+    { key: 'uat',         label: 'UAT',          color: 'orange', is_done: false },
+    { key: 'deployment',  label: 'Deployment',   color: 'teal',   is_done: false },
+    { key: 'pilot',       label: 'Pilot',        color: 'pink',   is_done: false },
+    { key: 'done',        label: 'Done / Prod',  color: 'green',  is_done: true  },
   ],
   education: [
     { key: 'assigned',    label: 'Assigned',    color: 'warm',   is_done: false },

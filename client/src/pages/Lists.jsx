@@ -15,11 +15,17 @@ import toast from 'react-hot-toast'
 
 // ── Workflow statuses ─────────────────────────────────────────
 const WORKFLOW = [
+  { key: 'backlog',      label: 'Backlog',      headerBg: 'bg-warm-100',    dotColor: 'bg-warm-300',   textColor: 'text-warm-500',   badgeBg: 'bg-warm-100 text-warm-500'     },
   { key: 'todo',         label: 'To Do',        headerBg: 'bg-warm-100',    dotColor: 'bg-warm-400',   textColor: 'text-warm-600',   badgeBg: 'bg-warm-100 text-warm-600'     },
   { key: 'in_progress',  label: 'In Progress',  headerBg: 'bg-blue-100',    dotColor: 'bg-blue-500',   textColor: 'text-blue-700',   badgeBg: 'bg-blue-100 text-blue-700'     },
   { key: 'blocked',      label: 'Blocked',      headerBg: 'bg-red-100',     dotColor: 'bg-red-500',    textColor: 'text-red-700',    badgeBg: 'bg-red-100 text-red-700'       },
   { key: 'in_review',    label: 'In Review',    headerBg: 'bg-violet-100',  dotColor: 'bg-violet-500', textColor: 'text-violet-700', badgeBg: 'bg-violet-100 text-violet-700' },
-  { key: 'done',         label: 'Done',         headerBg: 'bg-green-100',   dotColor: 'bg-green-500',  textColor: 'text-green-700',  badgeBg: 'bg-green-100 text-green-700'   },
+  { key: 'qa_testing',   label: 'QA Testing',   headerBg: 'bg-amber-100',   dotColor: 'bg-amber-500',  textColor: 'text-amber-700',  badgeBg: 'bg-amber-100 text-amber-700'   },
+  { key: 'uat',          label: 'UAT',          headerBg: 'bg-orange-100',  dotColor: 'bg-orange-500', textColor: 'text-orange-700', badgeBg: 'bg-orange-100 text-orange-700' },
+  { key: 'deployment',   label: 'Deployment',   headerBg: 'bg-teal-100',    dotColor: 'bg-teal-500',   textColor: 'text-teal-700',   badgeBg: 'bg-teal-100 text-teal-700'     },
+  { key: 'pilot',        label: 'Pilot',        headerBg: 'bg-pink-100',    dotColor: 'bg-pink-500',   textColor: 'text-pink-700',   badgeBg: 'bg-pink-100 text-pink-700'     },
+  { key: 'done',         label: 'Done / Prod',  headerBg: 'bg-green-100',   dotColor: 'bg-green-500',  textColor: 'text-green-700',  badgeBg: 'bg-green-100 text-green-700'   },
+  // Legacy keys — kept so old tasks still render
   { key: 'pending_uat',  label: 'Pending UAT',  headerBg: 'bg-amber-100',   dotColor: 'bg-amber-500',  textColor: 'text-amber-700',  badgeBg: 'bg-amber-100 text-amber-700'   },
   { key: 'pending_prod', label: 'Pending Prod', headerBg: 'bg-orange-100',  dotColor: 'bg-orange-500', textColor: 'text-orange-700', badgeBg: 'bg-orange-100 text-orange-700' },
   { key: 'released',     label: 'Released',     headerBg: 'bg-teal-100',    dotColor: 'bg-teal-500',   textColor: 'text-teal-700',   badgeBg: 'bg-teal-100 text-teal-700'     },
