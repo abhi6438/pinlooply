@@ -57,8 +57,8 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background-color: var(--color-bg);
   color: var(--color-text-primary);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 /* ── Page Transition ───────────────────────────────────────────── */
@@ -103,15 +103,15 @@ body {
 
   /* ── Buttons ───────────────────────────────────────────────── */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 font-semibold rounded-xl
+    @apply inline-flex items-center justify-center gap-1.5 font-medium rounded-lg
            transition-all duration-150 ease-out select-none cursor-pointer
            disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
-    padding: 10px 20px;
-    font-size: 14px;
+    padding: 7px 14px;
+    font-size: 13px;
     line-height: 1;
   }
   .btn:not(:disabled):active { transform: scale(0.97); }
-  .btn:not(:disabled):hover  { transform: scale(1.02); }
+  .btn:not(:disabled):hover  { transform: scale(1.01); }
 
   .btn-primary {
     @apply btn bg-primary-600 text-white;
@@ -119,7 +119,7 @@ body {
   }
   .btn-primary:not(:disabled):hover {
     @apply bg-primary-700;
-    box-shadow: 0 4px 12px rgba(124,58,237,0.3);
+    box-shadow: 0 3px 8px rgba(124,58,237,0.3);
   }
 
   .btn-secondary {
@@ -142,21 +142,21 @@ body {
   .btn-danger:not(:disabled):hover { background: #DC2626; }
 
   .btn-sm {
-    padding: 7px 14px;
-    font-size: 13px;
-    @apply rounded-lg;
+    padding: 5px 10px;
+    font-size: 12px;
+    @apply rounded-md;
   }
 
   .btn-lg {
-    padding: 13px 28px;
-    font-size: 16px;
+    padding: 9px 20px;
+    font-size: 14px;
   }
 
   /* ── Cards ─────────────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-2xl border border-warm-200;
+    @apply bg-white rounded-xl border border-warm-200;
     box-shadow: var(--shadow-sm);
-    padding: 24px;
+    padding: 16px;
   }
   .card-hover {
     @apply card cursor-pointer;
@@ -170,12 +170,12 @@ body {
 
   /* ── Inputs ────────────────────────────────────────────────── */
   .input {
-    @apply w-full bg-white rounded-xl border text-warm-900 placeholder-warm-400
+    @apply w-full bg-white rounded-lg border text-warm-900 placeholder-warm-400
            transition-all duration-150;
     border-color: var(--color-border);
     border-width: 1.5px;
-    padding: 10px 14px;
-    font-size: 14px;
+    padding: 7px 11px;
+    font-size: 13px;
   }
   .input:focus {
     outline: none;
@@ -226,7 +226,7 @@ body {
 
   /* ── Sidebar nav ───────────────────────────────────────────── */
   .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+    @apply flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium
            transition-all duration-150 cursor-pointer;
     color: var(--color-sidebar-text);
   }
@@ -247,12 +247,12 @@ body {
 
   /* ── Page shell ────────────────────────────────────────────── */
   .page-shell {
-    @apply px-6 py-8 max-w-7xl mx-auto w-full;
+    @apply px-5 py-5 max-w-7xl mx-auto w-full;
   }
 
   /* ── Tab pills ─────────────────────────────────────────────── */
   .tab-pill {
-    @apply flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium
+    @apply flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
            transition-all duration-150 cursor-pointer;
   }
   .tab-pill.active  { @apply bg-primary-600 text-white; box-shadow: 0 2px 8px rgba(124,58,237,0.25); }
@@ -261,7 +261,7 @@ body {
 
   /* ── Section tabs (underline) ──────────────────────────────── */
   .section-tab {
-    @apply flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium whitespace-nowrap
+    @apply flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap
            transition-colors border-b-2 -mb-px text-warm-500 border-transparent;
   }
   .section-tab:hover { @apply text-warm-700; }

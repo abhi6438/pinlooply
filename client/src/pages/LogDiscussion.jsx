@@ -144,90 +144,88 @@ export default function LogDiscussion() {
       {processing && <ProcessingOverlay currentStep={step} />}
 
       <PageShell>
-        <PageHeader
-          title="Log Discussion"
-          subtitle="Tell Pinloop what happened — AI will handle the rest."
-        />
-
-        <div className="card space-y-5">
-          {/* Source pill toggle */}
+        {/* Compact header row */}
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <label className="label mb-2">Source</label>
-            <div className="flex flex-wrap gap-2 mb-1">
-              {SOURCES.map(s => (
-                <button
-                  key={s.value}
-                  onClick={() => setSource(s.value)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    source === s.value
-                      ? 'bg-primary-600 text-white shadow-sm'
-                      : 'bg-white border border-warm-200 text-warm-600 hover:border-primary-300 hover:text-primary-600'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <h1 className="text-xl font-bold text-warm-900">Log Discussion</h1>
+            <p className="text-xs text-warm-400 mt-0.5">Tell Pinloop what happened — AI will handle the rest.</p>
           </div>
+        </div>
 
-          {/* Textarea */}
-          <div>
-            <label className="label mb-2">Discussion</label>
-            <textarea
-              ref={textareaRef}
-              value={text}
-              onChange={handleTextChange}
-              onKeyDown={onKeyDown}
-              placeholder="What happened today? Describe your meeting, standup, or team discussion... 💬"
-              className="input min-h-48 text-base"
-              style={{ height: 'auto' }}
-            />
-            <div className="flex justify-end mt-1.5">
-              <span className={`text-xs ${text.length > 4000 ? 'text-red-500' : 'text-warm-400'}`}>
-                {text.length} characters
-              </span>
-            </div>
-          </div>
+        <div className="card p-4 space-y-3">
+          {/* Top toolbar: source chips + project selector in one line */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Source chips */}
+            {SOURCES.map(s => (
+              <button
+                key={s.value}
+                onClick={() => setSource(s.value)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                  source === s.value
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
 
-          {/* Project selector */}
-          <div>
-            <label className="label mb-2">Project</label>
-            <div className="relative">
+            {/* Divider */}
+            <div className="h-4 w-px bg-warm-200 mx-1 hidden sm:block" />
+
+            {/* Project selector — inline, compact */}
+            <div className="relative flex-1 min-w-[140px] max-w-[220px]">
               <select
                 value={projectId}
                 onChange={e => setProjectId(e.target.value)}
-                className="input appearance-none pr-9 text-sm"
+                className="w-full appearance-none bg-warm-100 border-0 rounded-lg pl-2.5 pr-7 py-1 text-xs font-medium text-warm-700 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer"
               >
                 {projects.length === 0 && <option value="">No projects</option>}
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-warm-400 pointer-events-none" />
             </div>
           </div>
 
-          {/* Submit */}
-          <div className="flex items-center justify-between pt-1 gap-3">
-            <span className="text-xs text-warm-400 hidden sm:block">
-              Press <kbd className="px-1.5 py-0.5 bg-warm-100 rounded text-warm-600 font-mono text-xs border border-warm-200">⌘ Enter</kbd> to process
-            </span>
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleTextChange}
+            onKeyDown={onKeyDown}
+            placeholder="What happened today? Describe your meeting, standup, or team discussion... 💬"
+            className="input min-h-52 text-sm resize-none w-full"
+            style={{ height: 'auto' }}
+          />
+
+          {/* Bottom action bar */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-warm-400 hidden sm:block">
+                <kbd className="px-1.5 py-0.5 bg-warm-100 rounded text-warm-600 font-mono text-xs border border-warm-200">⌘ Enter</kbd> to process
+              </span>
+              <span className={`text-xs ${text.length > 4000 ? 'text-red-500' : 'text-warm-400'}`}>
+                {text.length} chars
+              </span>
+            </div>
             <button
               onClick={handleSubmit}
               disabled={!text.trim() || !projectId || processing}
-              className="btn-primary btn-lg w-full sm:w-auto"
+              className="btn-primary px-5 py-2 text-sm"
             >
               Process with AI ✨
             </button>
           </div>
         </div>
 
-        {/* Tips */}
-        <div className="mt-6 bg-primary-50 rounded-2xl p-5 border border-primary-100">
-          <p className="text-xs font-semibold text-primary-700 mb-2">💡 Tips for better results</p>
-          <ul className="text-xs text-primary-600 space-y-1.5">
-            <li>• Include names when assigning tasks ("John will fix the login bug")</li>
-            <li>• Mention dates for deadlines ("deploy by Friday")</li>
-            <li>• Paste full Slack threads or meeting notes for richer extraction</li>
-          </ul>
+        {/* Compact tips */}
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 px-1">
+          <span className="text-xs text-warm-400">💡 <span className="font-medium text-warm-500">Tips:</span></span>
+          <span className="text-xs text-warm-400">Name people for auto-assign</span>
+          <span className="text-xs text-warm-300">·</span>
+          <span className="text-xs text-warm-400">Mention dates for deadlines</span>
+          <span className="text-xs text-warm-300">·</span>
+          <span className="text-xs text-warm-400">Paste full Slack threads</span>
         </div>
       </PageShell>
     </>

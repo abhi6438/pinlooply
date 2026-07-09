@@ -114,11 +114,11 @@ function NotificationBell({ notifications, unreadCount, onMarkRead, onMarkAllRea
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        className={`relative flex items-center gap-3 w-full px-3 py-2 rounded-xl transition-colors text-purple-200 hover:bg-[#312E81] hover:text-white ${open ? 'bg-[#312E81] text-white' : ''}`}
+        className={`relative flex items-center gap-2 w-full px-3 py-1.5 rounded-lg transition-colors text-purple-200 hover:bg-[#312E81] hover:text-white ${open ? 'bg-[#312E81] text-white' : ''}`}
         title="Notifications"
       >
-        <Bell className="w-5 h-5 flex-shrink-0" />
-        {!collapsed && <span className="text-sm font-medium">Notifications</span>}
+        <Bell className="w-4 h-4 flex-shrink-0" />
+        {!collapsed && <span className="text-xs font-medium">Notifications</span>}
         {unreadCount > 0 && (
           <span className="absolute top-1 left-6 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -170,11 +170,11 @@ function SideNavLink({ to, icon: Icon, label, collapsed }) {
     <NavLink to={to}
       title={collapsed ? label : undefined}
       className={({ isActive }) =>
-        `sidebar-link${isActive ? ' active' : ''} flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-3'} py-2.5`
+        `sidebar-link${isActive ? ' active' : ''} flex items-center gap-2 ${collapsed ? 'justify-center px-2' : 'px-3'} py-1.5`
       }
     >
-      <Icon className="w-5 h-5 flex-shrink-0" />
-      {!collapsed && <span className="truncate">{label}</span>}
+      <Icon className="w-4 h-4 flex-shrink-0" />
+      {!collapsed && <span className="truncate text-xs">{label}</span>}
     </NavLink>
   )
 }
@@ -199,9 +199,9 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
   const workspaceBadge = effectiveMode === 'team' ? 'Team' : 'Personal'
 
   return (
-    <aside className={`hidden md:flex flex-col bg-[#1E1B4B] text-white transition-all duration-300 flex-shrink-0 ${collapsed ? 'w-16' : 'w-64'}`}>
+    <aside className={`hidden md:flex flex-col bg-[#1E1B4B] text-white transition-all duration-300 flex-shrink-0 ${collapsed ? 'w-14' : 'w-56'}`}>
       {/* Logo + workspace switcher + collapse */}
-      <div className={`flex items-center h-16 px-4 border-b border-[#312E81] ${collapsed ? 'justify-center' : 'justify-between'}`}>
+      <div className={`flex items-center h-12 px-3 border-b border-[#312E81] ${collapsed ? 'justify-center' : 'justify-between'}`}>
         {!collapsed && (
           <button
             onClick={() => navigate('/choose-workspace')}
@@ -235,13 +235,13 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
       </div>
 
       {/* Search */}
-      <div className="px-2 pt-3 pb-1">
+      <div className="px-2 pt-2 pb-1">
         <button
           onClick={onSearchOpen}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-purple-300 hover:bg-[#312E81] hover:text-white transition-colors ${collapsed ? 'justify-center' : ''}`}
+          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-purple-300 hover:bg-[#312E81] hover:text-white transition-colors ${collapsed ? 'justify-center' : ''}`}
           title="Search (⌘K)"
         >
-          <Search className="w-4 h-4 flex-shrink-0" />
+          <Search className="w-3.5 h-3.5 flex-shrink-0" />
           {!collapsed && (
             <>
               <span className="flex-1 text-left">Search…</span>
@@ -281,7 +281,7 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
       </nav>
 
       {/* Bottom: notifications + user */}
-      <div className="px-3 py-4 border-t border-[#312E81] space-y-2">
+      <div className="px-2 py-3 border-t border-[#312E81] space-y-1">
         <NotificationBell {...bellProps} collapsed={collapsed} />
 
         {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
@@ -298,9 +298,9 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
           </div>
         ) : (
           <div className="flex items-center gap-2 pt-1">
-            <Avatar user={user} size={8} />
+            <Avatar user={user} size={6} />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
+              <p className="text-xs font-medium text-white truncate">
                 {userProfile?.name || user?.user_metadata?.full_name || 'You'}
               </p>
               {userProfile?.plan && (
