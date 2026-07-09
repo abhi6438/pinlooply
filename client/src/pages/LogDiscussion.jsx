@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProjectStore } from '../stores/useProjectStore'
 import { discussionsApi } from '../services/api'
-import { CheckCircle2, Loader2, ChevronDown } from 'lucide-react'
+import { CheckCircle2, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../components/ui'
 
@@ -174,17 +174,14 @@ export default function LogDiscussion() {
             <div className="h-4 w-px bg-warm-200 mx-1 hidden sm:block" />
 
             {/* Project selector — inline, compact */}
-            <div className="relative flex-1 min-w-[140px] max-w-[220px]">
-              <select
-                value={projectId}
-                onChange={e => setProjectId(e.target.value)}
-                className="w-full appearance-none bg-warm-100 border-0 rounded-lg pl-2.5 pr-7 py-1 text-xs font-medium text-warm-700 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer"
-              >
-                {projects.length === 0 && <option value="">No projects</option>}
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-warm-400 pointer-events-none" />
-            </div>
+            <select
+              value={projectId}
+              onChange={e => setProjectId(e.target.value)}
+              className="select-inline flex-1 min-w-[140px] max-w-[200px]"
+            >
+              {projects.length === 0 && <option value="">No projects</option>}
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
 
           {/* Textarea */}
@@ -218,14 +215,24 @@ export default function LogDiscussion() {
           </div>
         </div>
 
-        {/* Compact tips */}
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 px-1">
-          <span className="text-xs text-warm-400">💡 <span className="font-medium text-warm-500">Tips:</span></span>
-          <span className="text-xs text-warm-400">Name people for auto-assign</span>
-          <span className="text-xs text-warm-300">·</span>
-          <span className="text-xs text-warm-400">Mention dates for deadlines</span>
-          <span className="text-xs text-warm-300">·</span>
-          <span className="text-xs text-warm-400">Paste full Slack threads</span>
+        {/* Tips */}
+        <div className="mt-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-warm-400 mb-2 px-0.5">💡 Tips for better AI results</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { color: 'bg-blue-50 text-blue-700 border-blue-200',   icon: '👤', text: 'Name people — AI auto-assigns tasks' },
+              { color: 'bg-amber-50 text-amber-700 border-amber-200', icon: '📅', text: 'Mention dates — "by Friday", "next Monday"' },
+              { color: 'bg-violet-50 text-violet-700 border-violet-200', icon: '📋', text: 'Full Slack/email threads work best' },
+              { color: 'bg-green-50 text-green-700 border-green-200',  icon: '✅', text: 'Say "done" or "completed" to mark tasks' },
+              { color: 'bg-rose-50 text-rose-700 border-rose-200',     icon: '🚨', text: '"Blocked" or "urgent" flags priority' },
+              { color: 'bg-teal-50 text-teal-700 border-teal-200',     icon: '🔗', text: 'Link to project — topics auto-tagged' },
+            ].map(t => (
+              <span key={t.text} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-medium ${t.color}`}>
+                <span>{t.icon}</span>
+                {t.text}
+              </span>
+            ))}
+          </div>
         </div>
       </PageShell>
     </>
