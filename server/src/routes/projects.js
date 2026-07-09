@@ -108,6 +108,12 @@ router.post('/', requireAuth, checkProjectLimit, async (req, res) => {
   const { name, description, color, custom_statuses } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' })
 
+  // Ensure the user row exists in public.users before inserting (guards against
+  // cases where the DB trigger didn't fire, e.g. after a data reset).
+  await supabaseAdmin
+    .from('users')
+    .upsert({ id: userId, email: req.user.email }, { onConflict: 'id', ignoreDuplicates: true })
+
   const insert = {
     name: name.trim(),
     description: description?.trim() || null,
