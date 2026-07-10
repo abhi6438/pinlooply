@@ -147,7 +147,7 @@ export default function LogDiscussion() {
         {/* Compact header row */}
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-xl font-bold text-warm-900">Log Discussion</h1>
+            <h1 className="text-lg font-semibold text-warm-900">Log Discussion</h1>
             <p className="text-xs text-warm-400 mt-0.5">Tell Pinloop what happened — AI will handle the rest.</p>
           </div>
         </div>
@@ -160,11 +160,7 @@ export default function LogDiscussion() {
               <button
                 key={s.value}
                 onClick={() => setSource(s.value)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                  source === s.value
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
-                }`}
+                className={`chip ${source === s.value ? 'chip-active' : 'chip-inactive'}`}
               >
                 {s.label}
               </button>

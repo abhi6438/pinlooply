@@ -29,7 +29,7 @@ function StatCard({ label, value, sub, iconBg, iconColor, icon: Icon }) {
       <div className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center mb-3`}>
         <Icon className={`w-4 h-4 ${iconColor}`} />
       </div>
-      <p className="text-2xl font-bold text-warm-900">{value}</p>
+      <p className="text-sm font-semibold text-warm-900">{value}</p>
       <p className="text-xs font-medium text-warm-900 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-warm-400 mt-0.5">{sub}</p>}
     </div>
@@ -413,7 +413,7 @@ function UsageStatsTab({ stats }) {
               ].map(({ label, value, icon: Icon, bg, iconColor, border }) => (
                 <div key={label} className={`rounded-xl ${bg} border ${border} p-3 text-center`}>
                   <Icon className={`w-5 h-5 ${iconColor} mx-auto mb-2`} />
-                  <p className="text-2xl font-bold text-warm-900">{value}</p>
+                  <p className="text-sm font-semibold text-warm-900">{value}</p>
                   <p className="text-[11px] text-warm-500 mt-0.5">{label}</p>
                 </div>
               ))}
@@ -451,7 +451,7 @@ function UsageStatsTab({ stats }) {
                       return (
                         <div key={key} className="rounded-xl bg-warm-50 border border-warm-100 p-3">
                           <p className="text-sm font-semibold text-warm-900 mb-1">{label}</p>
-                          <p className="text-2xl font-bold text-warm-900">{tot}</p>
+                          <p className="text-sm font-semibold text-warm-900">{tot}</p>
                           <p className="text-[11px] text-warm-400 mt-0.5">{pct}% of activity</p>
                           <div className="mt-2 h-1.5 bg-warm-200 rounded-full overflow-hidden">
                             <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
@@ -475,17 +475,17 @@ function UsageStatsTab({ stats }) {
             <h3 className="section-title mb-4">AI Usage Estimate (This Month)</h3>
             <div className="grid grid-cols-3 gap-4 mb-3">
               <div className="text-center p-3 bg-warm-50 rounded-xl border border-warm-100">
-                <p className="text-xl font-bold text-warm-900">{estFreeCalls}</p>
+                <p className="text-sm font-semibold text-warm-900">{estFreeCalls}</p>
                 <p className="text-xs text-warm-500 mt-1">Est. AI calls (Free)</p>
                 <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Free tier</p>
               </div>
               <div className="text-center p-3 bg-amber-50 rounded-xl border border-amber-100">
-                <p className="text-xl font-bold text-warm-900">{estPaidCalls}</p>
+                <p className="text-sm font-semibold text-warm-900">{estPaidCalls}</p>
                 <p className="text-xs text-warm-500 mt-1">Est. AI calls (Paid)</p>
                 <p className="text-[11px] text-amber-600 font-medium mt-0.5">Paid tier</p>
               </div>
               <div className="text-center p-3 bg-primary-50 rounded-xl border border-primary-100">
-                <p className="text-xl font-bold text-warm-900">${estCostUSD}</p>
+                <p className="text-sm font-semibold text-warm-900">${estCostUSD}</p>
                 <p className="text-xs text-warm-500 mt-1">Est. AI cost</p>
                 <p className="text-[11px] text-primary-600 font-medium mt-0.5">This month</p>
               </div>
@@ -873,7 +873,7 @@ export default function AdminPanel() {
     <div className="h-full flex flex-col px-6 py-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-warm-900">Admin Panel 🛡️</h1>
+        <h1 className="text-lg font-semibold text-warm-900">Admin Panel 🛡️</h1>
         <span className="badge">Admin</span>
       </div>
 

@@ -293,13 +293,28 @@ body {
   }
 
   /* ── Tab pills ─────────────────────────────────────────────── */
-  .tab-pill {
-    @apply flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-           transition-all duration-150 cursor-pointer;
+  /* ── Standard chip/pill — use everywhere for filter toggles ── */
+  /* Usage: className={`chip ${active ? 'chip-active' : 'chip-inactive'}`} */
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium
+           transition-all duration-150 cursor-pointer select-none;
   }
-  .tab-pill.active  { @apply bg-primary-600 text-white; box-shadow: 0 2px 8px rgba(124,58,237,0.25); }
-  .tab-pill.inactive { @apply bg-white text-warm-600 border border-warm-200; }
-  .tab-pill.inactive:hover { @apply bg-warm-50 text-warm-800; }
+  .chip-active  {
+    @apply bg-primary-600 text-white;
+    box-shadow: 0 1px 4px rgba(124,58,237,0.3);
+  }
+  .chip-inactive {
+    @apply bg-white text-warm-600 border border-warm-200;
+  }
+  .chip-inactive:hover { @apply border-primary-300 text-primary-600 bg-primary-50; }
+
+  /* ── Tab pill (alias for chip — kept for backward compat) ──── */
+  .tab-pill {
+    @apply chip;
+  }
+  .tab-pill.active   { @apply chip-active;   }
+  .tab-pill.inactive { @apply chip-inactive; }
+  .tab-pill.inactive:hover { @apply border-primary-300 text-primary-600 bg-primary-50; }
 
   /* ── Section tabs (underline) ──────────────────────────────── */
   .section-tab {

@@ -494,7 +494,7 @@ export default function GroupMembers() {
         <div className="flex items-center gap-2">
           {groups.length > 1 && (
             <select value={active?.id || ''} onChange={e => selectGroup(e.target.value)}
-              className="input py-2 text-sm w-auto">
+              className="select-inline">
               {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           )}

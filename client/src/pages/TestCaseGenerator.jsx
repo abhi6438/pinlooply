@@ -628,7 +628,7 @@ export default function TestCases() {
       {/* Project + Stats */}
       <div className="flex items-center gap-4 mb-5 flex-wrap">
         {projects.length > 1 ? (
-          <select value={projectId} onChange={e => setProjectId(e.target.value)} className="input text-sm w-auto">
+          <select value={projectId} onChange={e => setProjectId(e.target.value)} className="select-inline min-w-[140px]">
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         ) : projects.length === 1 ? (

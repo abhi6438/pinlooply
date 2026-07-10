@@ -240,11 +240,7 @@ export default function MyTasks() {
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                filter === f.key
-                  ? 'bg-white text-primary-700 shadow-sm'
-                  : 'text-warm-500 hover:text-warm-800'
-              }`}
+              className={`chip ${filter === f.key ? 'chip-active' : 'chip-inactive'}`}
             >
               {f.label}
               {f.key === 'overdue' && overdueC > 0 && (
@@ -261,7 +257,7 @@ export default function MyTasks() {
           <select
             value={sort}
             onChange={e => setSort(e.target.value)}
-            className="input py-1.5 text-xs pr-7"
+            className="select-inline min-w-[120px]"
           >
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>

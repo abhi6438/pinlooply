@@ -331,11 +331,7 @@ function QuickLogBox({ projects, onNewProject }) {
             key={s.key}
             type="button"
             onClick={() => setSource(s.key)}
-            className={`text-xs px-3 py-1.5 rounded-xl font-medium border transition-colors ${
-              source === s.key
-                ? 'bg-primary-600 text-white border-primary-600'
-                : 'bg-white text-warm-600 border-warm-200 hover:border-primary-300'
-            }`}
+            className={`chip ${source === s.key ? 'chip-active' : 'chip-inactive'}`}
           >
             {s.label}
           </button>

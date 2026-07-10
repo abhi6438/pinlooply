@@ -1555,11 +1555,7 @@ export default function Lists() {
               <button
                 key={p.v}
                 onClick={() => setFilterPriority(p.v)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                  filterPriority === p.v
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
-                }`}
+                className={`chip ${filterPriority === p.v ? 'chip-active' : 'chip-inactive'}`}
               >{p.l}</button>
             ))}
           </div>
