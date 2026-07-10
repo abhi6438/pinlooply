@@ -381,8 +381,8 @@ function SectionCard({ section, isOpen, onToggle, query }) {
           <SIcon className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-bold text-warm-900">{section.title}</h2>
-          <p className="text-sm text-warm-500">{section.summary}</p>
+          <h2 className="text-sm font-semibold text-warm-900">{section.title}</h2>
+          <p className="text-xs text-warm-400">{section.summary}</p>
         </div>
         <div className="text-warm-400 shrink-0">
           {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -483,8 +483,8 @@ export default function Help() {
         <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <BookOpen className="w-7 h-7 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-white mb-2">How to Use Pinlooply</h1>
-        <p className="text-purple-200 text-base mb-6 max-w-lg mx-auto">
+        <h1 className="text-xl font-semibold text-white mb-2">How to Use Pinlooply</h1>
+        <p className="text-purple-200 text-xs mb-6 max-w-lg mx-auto">
           Everything you need to know — from first login to advanced automations. Search below or browse by topic.
         </p>
         {/* Search */}

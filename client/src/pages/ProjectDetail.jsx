@@ -70,7 +70,7 @@ function StatCard({ icon: Icon, label, value, sub, color = '#6366f1' }) {
         </div>
         <span className="text-xs text-warm-500">{label}</span>
       </div>
-      <p className="text-2xl font-bold text-warm-900">{value}</p>
+      <p className="text-lg font-semibold text-warm-900">{value}</p>
       {sub && <p className="text-xs text-warm-400 mt-0.5">{sub}</p>}
     </div>
   )
@@ -639,14 +639,14 @@ export default function ProjectDetail() {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-warm-900">{project?.name ?? '…'}</h1>
+            <h1 className="text-lg font-semibold text-warm-900">{project?.name ?? '…'}</h1>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${health.bg} ${health.text}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${health.dot}`} />
               {health.label}
             </span>
           </div>
           {project?.description && (
-            <p className="text-sm text-warm-500 mt-0.5 truncate">{project.description}</p>
+            <p className="text-xs text-warm-400 mt-0.5 truncate">{project.description}</p>
           )}
         </div>
       </div>

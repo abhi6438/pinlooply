@@ -484,8 +484,8 @@ export default function GroupMembers() {
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-warm-900">Team</h1>
-            <p className="text-sm text-warm-400 mt-0.5">
+            <h1 className="text-lg font-semibold text-warm-900">Team</h1>
+            <p className="text-xs text-warm-400 mt-0.5">
               {members.length} member{members.length !== 1 ? 's' : ''}
               {active?.name && <span className="ml-1.5 text-warm-300">· {active.name}</span>}
             </p>

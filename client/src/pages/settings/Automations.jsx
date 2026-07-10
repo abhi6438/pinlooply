@@ -336,7 +336,7 @@ export default function Automations() {
             <Link
               key={tab.path}
               to={tab.path}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-2.5 py-1.5 text-xs font-medium border-b-2 transition-colors ${
                 location.pathname === tab.path
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-warm-500 hover:text-warm-800'
@@ -353,11 +353,11 @@ export default function Automations() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-warm-900 flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-warm-900 flex items-center gap-2">
               <Zap className="w-6 h-6 text-primary-500" />
               Automations
             </h1>
-            <p className="text-sm text-warm-500 mt-1">Rules that run automatically when events occur in your workspace.</p>
+            <p className="text-xs text-warm-400 mt-1">Rules that run automatically when events occur in your workspace.</p>
           </div>
           <div className="flex items-center gap-2">
             <button

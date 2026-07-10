@@ -1464,26 +1464,26 @@ export default function Lists() {
       <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-warm-200 bg-white">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-warm-900">Tasks</h1>
-            <p className="text-sm text-warm-400 mt-0.5">
+            <h1 className="text-lg font-semibold text-warm-900">Tasks</h1>
+            <p className="text-xs text-warm-400 mt-0.5">
               {totalCount} tasks across {projectCount} project{projectCount !== 1 ? 's' : ''}
             </p>
           </div>
           <div className="flex items-center gap-2">
             {/* View toggle */}
-            <div className="flex items-center bg-warm-100 rounded-xl p-1 gap-0.5">
+            <div className="flex items-center bg-warm-100 rounded-lg p-0.5 gap-0.5">
               <button
                 onClick={() => setView('board')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === 'board' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-500 hover:text-warm-700'}`}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${view === 'board' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-500 hover:text-warm-700'}`}
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-3.5 h-3.5" />
                 Board
               </button>
               <button
                 onClick={() => setView('list')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === 'list' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-500 hover:text-warm-700'}`}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${view === 'list' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-500 hover:text-warm-700'}`}
               >
-                <List className="w-4 h-4" />
+                <List className="w-3.5 h-3.5" />
                 List
               </button>
             </div>
@@ -1525,12 +1525,12 @@ export default function Lists() {
         </div>
 
         {/* Compact single-row filter bar */}
-        <div className="flex flex-wrap items-center gap-2 mt-3">
+        <div className="flex flex-wrap items-center gap-2 mt-2.5">
           {/* Project inline select */}
           <select
             value={filterProject}
             onChange={e => setFilterProject(e.target.value)}
-            className="input text-sm py-1.5 max-w-[160px]"
+            className="select-inline min-w-[120px] max-w-[160px]"
           >
             <option value="">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -1541,11 +1541,11 @@ export default function Lists() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search tasks…"
-              className="input w-full py-1.5 pl-3 pr-8 text-sm"
+              className="input w-full"
             />
             {search && (
               <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-warm-400 hover:text-warm-700">
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" />
               </button>
             )}
           </div>
@@ -1555,7 +1555,11 @@ export default function Lists() {
               <button
                 key={p.v}
                 onClick={() => setFilterPriority(p.v)}
-                className={`tab-pill text-xs ${filterPriority === p.v ? 'active' : 'inactive'}`}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                  filterPriority === p.v
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
+                }`}
               >{p.l}</button>
             ))}
           </div>

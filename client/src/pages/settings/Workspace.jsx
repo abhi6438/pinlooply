@@ -42,7 +42,7 @@ function SettingsNav() {
         <Link
           key={t.to}
           to={t.to}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
             pathname === t.to
               ? 'bg-white text-primary-700 shadow-sm font-semibold'
               : 'text-warm-500 hover:text-warm-800'
@@ -140,8 +140,8 @@ export default function WorkspaceSettings() {
   return (
     <div className="px-6 py-6 max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-warm-900">Settings</h1>
-        <p className="text-sm text-warm-500 mt-1">Manage your plan and workspace.</p>
+        <h1 className="text-lg font-semibold text-warm-900">Settings</h1>
+        <p className="text-xs text-warm-400 mt-1">Manage your plan and workspace.</p>
       </div>
       <SettingsNav />
       <div className="space-y-8">

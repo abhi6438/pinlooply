@@ -260,7 +260,7 @@ export default function TopicDetail() {
                 <Tag className="w-5 h-5 text-primary-600" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-2xl font-bold text-warm-900 leading-tight">{topic.title}</h1>
+                <h1 className="text-lg font-semibold text-warm-900 leading-tight">{topic.title}</h1>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <span className="text-xs bg-warm-100 text-warm-500 rounded-full px-3 py-1">
                     Created {formatDate(topic.created_at)}

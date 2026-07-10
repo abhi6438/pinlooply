@@ -22,7 +22,7 @@ function SettingsNav() {
         <Link
           key={t.to}
           to={t.to}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
             pathname === t.to || (t.to === '/settings/plan' && pathname === '/settings')
               ? 'bg-white text-primary-700 shadow-sm font-semibold'
               : 'text-warm-500 hover:text-warm-800'
@@ -247,7 +247,7 @@ function PlanCard({ plan, isCurrent, onUpgrade, onOpenDonate, upgrading }) {
       </div>
 
       {plan.price && (
-        <p className="text-lg font-bold text-warm-900 -mt-1">{plan.price}</p>
+        <p className="text-sm font-semibold text-warm-900 -mt-1">{plan.price}</p>
       )}
 
       {/* Features */}
@@ -357,7 +357,7 @@ export default function Plan() {
         <div className="card p-5 mb-8 flex flex-col sm:flex-row sm:items-center gap-5">
           <div className="flex-1">
             <p className="text-xs text-warm-400 uppercase tracking-wide font-semibold mb-1">Current Plan</p>
-            <h2 className="text-xl font-bold text-warm-900">{info.label}</h2>
+            <h2 className="text-lg font-semibold text-warm-900">{info.label}</h2>
             <p className="text-sm text-warm-500 mt-0.5 capitalize">{info.mode} mode · {info.plan}</p>
           </div>
           <div className="flex flex-col gap-3 sm:w-64">

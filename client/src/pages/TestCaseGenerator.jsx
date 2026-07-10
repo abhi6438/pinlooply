@@ -609,11 +609,11 @@ export default function TestCases() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-warm-900 flex items-center gap-2.5">
+          <h1 className="text-lg font-semibold text-warm-900 flex items-center gap-2.5">
             <FlaskConical className="w-6 h-6 text-primary-600" />
             Test Cases
           </h1>
-          <p className="text-sm text-warm-500 mt-1">Track test runs across your project. Mark pass or fail directly on the table.</p>
+          <p className="text-xs text-warm-400 mt-1">Track test runs across your project. Mark pass or fail directly on the table.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowAIGen(true)} className="btn btn-primary btn-sm">
@@ -655,7 +655,7 @@ export default function TestCases() {
                 { label: 'Total', val: total, color: 'text-warm-800' },
               ].map(({ label, val, color }) => (
                 <div key={label} className="text-center">
-                  <p className={`text-lg font-bold leading-none ${color}`}>{val}</p>
+                  <p className={`text-sm font-semibold leading-none ${color}`}>{val}</p>
                   <p className="text-xs text-warm-400 mt-0.5">{label}</p>
                 </div>
               ))}

@@ -507,7 +507,7 @@ function StatsPanel({ stats, taskFilter, onFilterChange }) {
         {stats.map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className={`${bg} rounded-xl p-3 flex flex-col items-start gap-1`}>
             <Icon className={`w-4 h-4 ${color}`} />
-            <p className="text-xl font-bold text-warm-900 leading-none">{value}</p>
+            <p className="text-lg font-semibold text-warm-900 leading-none">{value}</p>
             <p className="text-xs text-warm-500">{label}</p>
           </div>
         ))}
@@ -699,7 +699,7 @@ function GettingStarted({ completedIds, onDismiss }) {
             <Rocket className="w-4.5 h-4.5 text-white w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-warm-900">Getting started</h3>
+            <h3 className="text-sm font-semibold text-warm-900">Getting started</h3>
             <p className="text-xs text-warm-500">{doneCount} of {total} complete</p>
           </div>
         </div>

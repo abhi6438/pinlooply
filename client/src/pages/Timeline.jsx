@@ -271,8 +271,8 @@ export default function Timeline() {
         <div className="sticky top-6 space-y-5">
 
           <div>
-            <h1 className="text-2xl font-bold text-warm-900 mb-0.5">Timeline</h1>
-            <p className="text-sm text-warm-500">{displayed.length} events</p>
+            <h1 className="text-lg font-semibold text-warm-900 mb-0.5">Timeline</h1>
+            <p className="text-xs text-warm-400">{displayed.length} events</p>
           </div>
 
           {/* Event types */}
@@ -380,7 +380,7 @@ export default function Timeline() {
       <div className="flex-1 min-w-0">
         {/* Header (mobile only — desktop shows in sidebar) */}
         <div className="lg:hidden mb-4">
-          <h1 className="text-2xl font-bold text-warm-900">Timeline</h1>
+          <h1 className="text-lg font-semibold text-warm-900">Timeline</h1>
         </div>
 
         <div className="flex items-center gap-3 mb-6">

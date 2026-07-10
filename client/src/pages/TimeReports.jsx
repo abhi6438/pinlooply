@@ -121,11 +121,11 @@ export default function TimeReports() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-warm-900 flex items-center gap-2">
-            <Timer className="w-6 h-6 text-primary-500" />
+          <h1 className="text-lg font-semibold text-warm-900 flex items-center gap-2">
+            <Timer className="w-4 h-4 text-primary-500" />
             Time Reports
           </h1>
-          <p className="text-sm text-warm-500 mt-0.5">Track time logged across projects and tasks.</p>
+          <p className="text-xs text-warm-400 mt-0.5">Track time logged across projects and tasks.</p>
         </div>
         <button
           onClick={() => exportCSV(entries)}
@@ -138,22 +138,20 @@ export default function TimeReports() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end bg-white border border-warm-200 rounded-xl px-5 py-4">
-        <div>
-          <label className="label">From</label>
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="input" />
+      <div className="flex flex-wrap gap-2 items-center bg-white border border-warm-200 rounded-xl px-4 py-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className="label mb-0 text-[10px]">FROM</span>
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="input w-auto" />
         </div>
-        <div>
-          <label className="label">To</label>
-          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="input" />
+        <div className="flex items-center gap-1.5">
+          <span className="label mb-0 text-[10px]">TO</span>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="input w-auto" />
         </div>
-        <div>
-          <label className="label">Project</label>
-          <select value={projectId} onChange={e => setProjectId(e.target.value)} className="input">
-            <option value="">All projects</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
+        <div className="h-4 w-px bg-warm-200 mx-1" />
+        <select value={projectId} onChange={e => setProjectId(e.target.value)} className="select-inline min-w-[130px]">
+          <option value="">All projects</option>
+          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
       </div>
 
       {loading ? (
@@ -170,18 +168,18 @@ export default function TimeReports() {
               { label: 'Projects',      value: report?.by_project?.length || 0,        icon: FolderOpen, color: 'text-violet-600'  },
               { label: 'Tasks tracked', value: report?.by_task?.length || 0,           icon: User,       color: 'text-green-600'   },
             ].map(s => (
-              <div key={s.label} className="bg-white border border-warm-200 rounded-xl px-5 py-4 flex items-center gap-3">
-                <s.icon className={`w-5 h-5 ${s.color} shrink-0`} />
+              <div key={s.label} className="bg-white border border-warm-200 rounded-xl px-4 py-3 flex items-center gap-2.5">
+                <s.icon className={`w-4 h-4 ${s.color} shrink-0`} />
                 <div>
-                  <p className="text-lg font-bold text-warm-900">{s.value}</p>
-                  <p className="text-xs text-warm-500">{s.label}</p>
+                  <p className="text-sm font-semibold text-warm-900">{s.value}</p>
+                  <p className="text-xs text-warm-400">{s.label}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 bg-warm-100 p-1 rounded-xl w-fit">
+          <div className="flex gap-1 bg-warm-100 p-1 rounded-lg w-fit">
             {[
               { key: 'by_project', label: 'By project' },
               { key: 'by_task',    label: 'By task'    },
@@ -190,7 +188,7 @@ export default function TimeReports() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                   tab === t.key ? 'bg-white text-primary-700 shadow-sm font-semibold' : 'text-warm-500 hover:text-warm-800'
                 }`}
               >

@@ -559,7 +559,7 @@ export default function DataManagement() {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            className={`flex items-center gap-2 px-2.5 py-1 rounded-xl text-xs font-medium transition-all ${
               activeTab === key
                 ? 'bg-white text-warm-900 shadow-sm'
                 : 'text-warm-500 hover:text-warm-700'

@@ -215,15 +215,15 @@ export default function MyTasks() {
       {/* Quick stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         <div className="card p-3 text-center">
-          <p className="text-xl font-bold text-warm-900">{total}</p>
+          <p className="text-lg font-semibold text-warm-900">{total}</p>
           <p className="text-xs text-warm-400">Active</p>
         </div>
         <div className={`card p-3 text-center ${overdueC > 0 ? 'border-red-200 bg-red-50' : ''}`}>
-          <p className={`text-xl font-bold ${overdueC > 0 ? 'text-red-600' : 'text-warm-900'}`}>{overdueC}</p>
+          <p className={`text-lg font-semibold ${overdueC > 0 ? 'text-red-600' : 'text-warm-900'}`}>{overdueC}</p>
           <p className={`text-xs ${overdueC > 0 ? 'text-red-400' : 'text-warm-400'}`}>Overdue</p>
         </div>
         <div className="card p-3 text-center">
-          <p className="text-xl font-bold text-green-600">{doneToday}</p>
+          <p className="text-lg font-semibold text-green-600">{doneToday}</p>
           <p className="text-xs text-warm-400">Done today</p>
         </div>
       </div>

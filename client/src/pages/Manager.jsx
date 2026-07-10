@@ -110,7 +110,7 @@ function MemberCard({ member }) {
             { label: 'Blocked',    value: stats.blocked,     icon: Shield,       color: stats.blocked > 0 ? 'text-amber-600' : 'text-warm-400' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="text-center p-2 rounded-xl bg-warm-50">
-              <p className={`text-lg font-bold ${color}`}>{value}</p>
+              <p className={`text-sm font-semibold ${color}`}>{value}</p>
               <p className="text-[10px] text-warm-400 mt-0.5">{label}</p>
             </div>
           ))}
@@ -168,7 +168,7 @@ function StatCard({ icon: Icon, label, value, sub, color = 'text-warm-900', bg =
         <Icon className={`w-5 h-5 ${color}`} />
       </div>
       <div>
-        <p className={`text-2xl font-bold ${color}`}>{value}</p>
+        <p className={`text-lg font-semibold ${color}`}>{value}</p>
         <p className="text-xs text-warm-500">{label}</p>
         {sub && <p className="text-[10px] text-warm-400 mt-0.5">{sub}</p>}
       </div>

@@ -172,7 +172,7 @@ function StatBox({ icon: Icon, value, label, iconBg, iconColor }) {
       <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center mb-2`}>
         <Icon className={`w-4 h-4 ${iconColor}`} />
       </div>
-      <p className="text-2xl font-bold text-warm-900">{value}</p>
+      <p className="text-lg font-semibold text-warm-900">{value}</p>
       <p className="text-xs text-warm-400 mt-0.5">{label}</p>
     </div>
   )
@@ -332,7 +332,7 @@ function NoActivityState({ period, onRegenerate }) {
         <h3 className="text-lg font-semibold text-warm-900 mb-2">
           No activity {period === 'monthly' ? 'this month' : 'this week'}
         </h3>
-        <p className="text-sm text-warm-500 leading-relaxed mb-6">
+        <p className="text-xs text-warm-400 leading-relaxed mb-6">
           Log discussions or complete tasks to see a summary here.
         </p>
         <button onClick={onRegenerate} className="btn-secondary flex items-center gap-2 mx-auto">
@@ -418,7 +418,7 @@ export default function Summary() {
       <div className="flex items-center justify-between mb-6 flex-shrink-0 flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-warm-900">{titleLabel} Summary</h1>
+            <h1 className="text-lg font-semibold text-warm-900">{titleLabel} Summary</h1>
             <span className="badge badge-purple">AI</span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5 text-sm text-warm-400">

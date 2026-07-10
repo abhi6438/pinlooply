@@ -182,7 +182,7 @@ function StandupPanel({ standup, projects, loading, copied, onCopy, onRegenerate
             { icon: Clock,      value: standup.meta?.pendingCount || 0,    label: 'Pending' },
           ].map(({ icon: Icon, value, label }) => (
             <div key={label} className="bg-white rounded-xl p-3 text-center border border-primary-100">
-              <p className="text-xl font-bold text-warm-900">{value}</p>
+              <p className="text-lg font-semibold text-warm-900">{value}</p>
               <p className="text-[11px] text-warm-400 mt-0.5">{label}</p>
             </div>
           ))}
@@ -251,8 +251,8 @@ function GenerateHero({ onGenerate }) {
           <div className="w-16 h-16 rounded-2xl bg-primary-100 flex items-center justify-center mx-auto mb-5">
             <ClipboardList className="w-8 h-8 text-primary-600" />
           </div>
-          <h2 className="text-xl font-bold text-warm-900 mb-2">Ready for today's standup?</h2>
-          <p className="text-sm text-warm-500 leading-relaxed mb-6">
+          <h2 className="text-lg font-semibold text-warm-900 mb-2">Ready for today's standup?</h2>
+          <p className="text-xs text-warm-400 leading-relaxed mb-6">
             AI will scan your recent tasks and discussions across all projects to generate a ready-to-share update.
           </p>
           <button
@@ -385,7 +385,7 @@ export default function Standup() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-warm-900">Daily Standup</h1>
+          <h1 className="text-lg font-semibold text-warm-900">Daily Standup</h1>
           <span className="badge badge-purple">AI</span>
         </div>
         <div className="flex items-center gap-3">
