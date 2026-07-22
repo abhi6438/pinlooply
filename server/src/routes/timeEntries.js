@@ -12,16 +12,32 @@ import { supabaseAdmin } from '../config/supabase.js'
 const router = Router()
 router.use(requireAuth)
 
-// ── Helper: get project IDs the user can access ───────────────
-async function getUserProjectIds(userId) {
-  const [{ data: owned }, { data: membered }] = await Promise.all([
+// ── Helper: get scoped project IDs ───────────────────────────
+async function getScopedProjectIds(userId, group_id) {
+  const [{ data: owned }, { data: membered }, { data: groupMemberships }] = await Promise.all([
     supabaseAdmin.from('projects').select('id').eq('user_id', userId),
     supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId),
+    supabaseAdmin.from('group_members').select('group_id').eq('user_id', userId),
   ])
-  return [
+  const allIds = new Set([
     ...(owned    || []).map(p => p.id),
     ...(membered || []).map(m => m.project_id),
-  ]
+  ])
+  const userGroupIds = (groupMemberships || []).map(g => g.group_id)
+  if (userGroupIds.length) {
+    const { data: gp } = await supabaseAdmin.from('projects').select('id').in('group_id', userGroupIds)
+    ;(gp || []).forEach(p => allIds.add(p.id))
+  }
+
+  let projectIds = [...allIds]
+  if (group_id && group_id !== 'personal') {
+    const { data: gp } = await supabaseAdmin.from('projects').select('id').eq('group_id', group_id).in('id', projectIds)
+    projectIds = (gp || []).map(p => p.id)
+  } else if (group_id === 'personal') {
+    const { data: pp } = await supabaseAdmin.from('projects').select('id').is('group_id', null).in('id', projectIds)
+    projectIds = (pp || []).map(p => p.id)
+  }
+  return projectIds
 }
 
 // GET /api/time-entries — list entries for the user
@@ -29,7 +45,7 @@ async function getUserProjectIds(userId) {
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id
-    const { task_id, project_id, from, to } = req.query
+    const { task_id, project_id, from, to, group_id } = req.query
 
     let query = supabaseAdmin
       .from('time_entries')
@@ -45,12 +61,18 @@ router.get('/', async (req, res) => {
     if (from)      query = query.gte('logged_at', from)
     if (to)        query = query.lte('logged_at', to)
 
-    // Filter by project: get task_ids in that project first
+    // Scope by project or workspace
     if (project_id) {
       const { data: tasks } = await supabaseAdmin
-        .from('tasks')
-        .select('id')
-        .eq('project_id', project_id)
+        .from('tasks').select('id').eq('project_id', project_id)
+      const taskIds = (tasks || []).map(t => t.id)
+      if (!taskIds.length) return res.json({ data: [] })
+      query = query.in('task_id', taskIds)
+    } else if (group_id) {
+      const scopedIds = await getScopedProjectIds(userId, group_id)
+      if (!scopedIds.length) return res.json({ data: [] })
+      const { data: tasks } = await supabaseAdmin
+        .from('tasks').select('id').in('project_id', scopedIds)
       const taskIds = (tasks || []).map(t => t.id)
       if (!taskIds.length) return res.json({ data: [] })
       query = query.in('task_id', taskIds)
@@ -68,10 +90,10 @@ router.get('/', async (req, res) => {
 router.get('/report', async (req, res) => {
   try {
     const userId = req.user.id
-    const { project_id, from, to } = req.query
+    const { project_id, from, to, group_id } = req.query
 
     // Get all accessible project IDs if no specific project
-    let projectIds = project_id ? [project_id] : await getUserProjectIds(userId)
+    let projectIds = project_id ? [project_id] : await getScopedProjectIds(userId, group_id)
     if (!projectIds.length) return res.json({ data: { total_mins: 0, by_project: [], by_task: [] } })
 
     // Get all tasks in scope
@@ -137,8 +159,8 @@ router.post('/', async (req, res) => {
     if (!task_id)                                  return res.status(400).json({ error: 'task_id is required' })
     if (!duration_mins || duration_mins <= 0)      return res.status(400).json({ error: 'duration_mins must be > 0' })
 
-    // Verify task access
-    const projectIds = await getUserProjectIds(userId)
+    // Verify task access (no group_id = all accessible projects)
+    const projectIds = await getScopedProjectIds(userId, null)
     const { data: task } = await supabaseAdmin
       .from('tasks')
       .select('id')

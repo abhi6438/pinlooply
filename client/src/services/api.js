@@ -122,12 +122,12 @@ export const notificationsApi = {
 }
 
 export const standupApi = {
-  generate: () => api.post('/api/standup/generate'),
+  generate: (payload = {}) => api.post('/api/standup/generate', payload),
 }
 
 export const summaryApi = {
-  weekly:  (week)  => api.get(`/api/summary/weekly${week   ? `?week=${week}`   : ''}`),
-  monthly: (month) => api.get(`/api/summary/monthly${month ? `?month=${month}` : ''}`),
+  weekly:  (week, extraParams = {})  => api.get('/api/summary/weekly',  { params: { week,  ...extraParams } }),
+  monthly: (month, extraParams = {}) => api.get('/api/summary/monthly', { params: { month, ...extraParams } }),
 }
 
 export const planApi = {
@@ -164,8 +164,8 @@ export const testCasesApi = {
 }
 
 export const managerApi = {
-  overview:    ()           => api.get('/api/manager/overview'),
-  memberTasks: (memberId)   => api.get(`/api/manager/member/${memberId}/tasks`),
+  overview:    (params = {}) => api.get('/api/manager/overview', { params }),
+  memberTasks: (memberId)    => api.get(`/api/manager/member/${memberId}/tasks`),
 }
 
 export const customFieldsApi = {
@@ -196,7 +196,9 @@ export const timeEntriesApi = {
 }
 
 export const searchApi = {
-  query: (q, limit = 20) => api.get('/api/search', { params: { q, limit } }),
+  query: (q, { groupId, limit = 20 } = {}) => api.get('/api/search', {
+    params: { q, limit, group_id: groupId || 'personal' },
+  }),
 }
 
 export const suggestionsApi = {

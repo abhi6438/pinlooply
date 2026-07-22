@@ -1283,13 +1283,9 @@ export default function Lists() {
 
   async function loadGroupMembers() {
     try {
-      const res = await groupsApi.list()
-      const groups = res.data.data || []
-      if (groups.length > 0) {
-        const groupRes = await groupsApi.get(groups[0].id)
-        const members = groupRes.data.data?.members || []
-        setGroupMembers(members)
-      }
+      if (!activeGroupId) { setGroupMembers([]); return }
+      const groupRes = await groupsApi.get(activeGroupId)
+      setGroupMembers(groupRes.data.data?.members || [])
     } catch { /* non-fatal */ }
   }
 

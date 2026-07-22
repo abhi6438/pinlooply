@@ -208,12 +208,12 @@ export default function Timeline() {
   const [fTo,      setFTo]      = useState('')
 
   useEffect(() => { if (user) fetchProjects(user.id, { groupId: activeGroupId }) }, [user, activeGroupId]) // eslint-disable-line
-  useEffect(() => { load() }, []) // eslint-disable-line
+  useEffect(() => { load() }, [activeGroupId]) // eslint-disable-line
 
   async function load() {
     setLoading(true)
     try {
-      const res = await timelineApi.list({ limit: 300 })
+      const res = await timelineApi.list({ limit: 300, group_id: activeGroupId || 'personal' })
       setEvents(res.data.data || [])
     } catch { toast.error('Failed to load') }
     finally  { setLoading(false) }

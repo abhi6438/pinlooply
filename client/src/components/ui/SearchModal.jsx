@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { searchApi } from '../../services/api'
+import { useWorkspace } from '../../context/WorkspaceContext'
 import { Search, Loader2, ListChecks, FolderOpen, Tag, MessageSquare, X } from 'lucide-react'
 
 // ── Highlight matching text ───────────────────────────────────
@@ -56,6 +57,7 @@ export default function SearchModal({ open, onClose }) {
   const inputRef = useRef(null)
   const navigate = useNavigate()
   const debounceRef = useRef(null)
+  const { activeGroupId } = useWorkspace()
 
   // Focus input when opened
   useEffect(() => {
@@ -83,11 +85,11 @@ export default function SearchModal({ open, onClose }) {
   const search = useCallback((q) => {
     if (!q || q.length < 2) { setResults(null); return }
     setLoading(true)
-    searchApi.query(q)
+    searchApi.query(q, { groupId: activeGroupId })
       .then(r => setResults(r.data.data))
       .catch(() => setResults(null))
       .finally(() => setLoading(false))
-  }, [])
+  }, [activeGroupId])
 
   function handleChange(e) {
     const q = e.target.value

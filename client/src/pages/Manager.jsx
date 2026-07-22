@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { managerApi } from '../services/api'
+import { useWorkspace } from '../context/WorkspaceContext'
 import {
   Users, CheckSquare2, AlertTriangle, Clock, TrendingUp,
   ChevronDown, ChevronRight, BarChart3, Shield, Loader2,
@@ -178,12 +179,16 @@ function StatCard({ icon: Icon, label, value, sub, color = 'text-warm-900', bg =
 
 // ── Main Page ─────────────────────────────────────────────────
 export default function Manager() {
+  const { activeGroupId } = useWorkspace()
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
 
   useEffect(() => {
-    managerApi.overview()
+    setLoading(true)
+    setData(null)
+    setError(null)
+    managerApi.overview({ group_id: activeGroupId || 'personal' })
       .then(res => setData(res.data.data))
       .catch(err => {
         if (err.response?.status === 403) {
@@ -194,7 +199,7 @@ export default function Manager() {
         }
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [activeGroupId])
 
   if (loading) return <PageShell><PageLoader /></PageShell>
 

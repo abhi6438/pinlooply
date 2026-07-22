@@ -577,6 +577,7 @@ export default function ProjectDetail() {
   const { id: projectId } = useParams()
   const navigate = useNavigate()
   const { projects } = useProjectStore()
+  const { activeGroupId } = useWorkspace()
 
   const [tab,     setTab]     = useState('overview')
   const [project, setProject] = useState(null)
@@ -600,13 +601,13 @@ export default function ProjectDetail() {
   // Also load project basic info if not in store
   useEffect(() => {
     if (!project) {
-      projectsApi.list()
+      projectsApi.list({ groupId: activeGroupId })
         .then(r => {
           const p = (r.data.data || []).find(p => p.id === projectId)
           if (p) setProject(p)
         })
     }
-  }, [projectId]) // eslint-disable-line
+  }, [projectId, activeGroupId]) // eslint-disable-line
 
   async function handleUpdate(payload) {
     await projectsApi.update(projectId, payload)

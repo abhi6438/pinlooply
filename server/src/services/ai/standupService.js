@@ -3,25 +3,41 @@ import { callGroq } from './groqService.js'
 import { callClaude } from './claudeService.js'
 
 // ── Fetch data needed for standup ─────────────────────────────
-async function fetchStandupData(userId) {
-  // 1. User's projects (owned + member)
-  const { data: ownedProjects } = await supabaseAdmin
-    .from('projects')
-    .select('id, name, color')
-    .eq('user_id', userId)
-
-  const { data: memberedProjects } = await supabaseAdmin
-    .from('project_members')
-    .select('project_id, projects(id, name, color)')
-    .eq('user_id', userId)
+async function fetchStandupData(userId, groupId = null) {
+  // 1. User's projects (owned + member + group)
+  const [{ data: ownedProjects }, { data: memberedProjects }, { data: groupMemberships }] = await Promise.all([
+    supabaseAdmin.from('projects').select('id, name, color').eq('user_id', userId),
+    supabaseAdmin.from('project_members').select('project_id, projects(id, name, color)').eq('user_id', userId),
+    supabaseAdmin.from('group_members').select('group_id').eq('user_id', userId),
+  ])
 
   const projectMap = new Map()
   for (const p of ownedProjects || []) projectMap.set(p.id, p)
   for (const m of memberedProjects || []) {
     if (m.projects) projectMap.set(m.projects.id, m.projects)
   }
-  const projects = [...projectMap.values()]
-  const projectIds = projects.map(p => p.id)
+  const userGroupIds = (groupMemberships || []).map(g => g.group_id)
+  if (userGroupIds.length) {
+    const { data: gp } = await supabaseAdmin
+      .from('projects').select('id, name, color').in('group_id', userGroupIds)
+    for (const p of gp || []) projectMap.set(p.id, p)
+  }
+
+  let allProjectIds = [...projectMap.keys()]
+
+  // Scope by workspace
+  if (groupId && groupId !== 'personal') {
+    const { data: gp } = await supabaseAdmin
+      .from('projects').select('id').eq('group_id', groupId).in('id', allProjectIds)
+    allProjectIds = (gp || []).map(p => p.id)
+  } else if (groupId === 'personal') {
+    const { data: pp } = await supabaseAdmin
+      .from('projects').select('id').is('group_id', null).in('id', allProjectIds)
+    allProjectIds = (pp || []).map(p => p.id)
+  }
+
+  const projects = allProjectIds.map(id => projectMap.get(id)).filter(Boolean)
+  const projectIds = allProjectIds
 
   if (!projectIds.length) return { projects: [], recentDone: [], pending: [] }
 
@@ -115,7 +131,7 @@ Return ONLY valid JSON (no markdown, no extra text):
 }
 
 // ── Main: generate standup ────────────────────────────────────
-export async function generateStandup(userId, userName) {
+export async function generateStandup(userId, userName, groupId = null) {
   // 1. Get AI config + workspace context
   const { data: userData } = await supabaseAdmin
     .from('users')
@@ -136,7 +152,7 @@ export async function generateStandup(userId, userName) {
   const model = aiConfig?.model_name
 
   // 2. Fetch data
-  const { projects, recentDone, pending } = await fetchStandupData(userId)
+  const { projects, recentDone, pending } = await fetchStandupData(userId, groupId)
 
   // 3. Build prompt + call AI
   const prompt = buildPrompt(projects, recentDone, pending, userName, workspaceCtx)

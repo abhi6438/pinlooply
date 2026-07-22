@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { projectsApi, testCasesApi, topicsApi, tasksApi } from '../services/api'
+import { useWorkspace } from '../context/WorkspaceContext'
 import {
   FlaskConical, Plus, Trash2, Loader2, Sparkles, X,
   CheckCircle2, XCircle, Clock, CheckSquare2, ChevronRight,
@@ -546,6 +547,7 @@ function AIGenerateModal({ projects, defaultProjectId, onClose, onSaved }) {
 
 // ── Main Page ─────────────────────────────────────────────────
 export default function TestCases() {
+  const { activeGroupId } = useWorkspace()
   const [projects,     setProjects]     = useState([])
   const [projectId,    setProjectId]    = useState('')
   const [testCases,    setTestCases]    = useState([])
@@ -556,7 +558,7 @@ export default function TestCases() {
   const [selectedTc,   setSelectedTc]  = useState(null)
 
   useEffect(() => {
-    projectsApi.list().then(r => {
+    projectsApi.list({ groupId: activeGroupId }).then(r => {
       const list = r.data.data || []
       setProjects(list)
       if (list.length) {
@@ -566,7 +568,7 @@ export default function TestCases() {
         setLoading(false) // no projects → nothing to load
       }
     }).catch(() => setLoading(false))
-  }, [])
+  }, [activeGroupId])
 
   useEffect(() => { if (projectId) loadTestCases() }, [projectId]) // eslint-disable-line
 

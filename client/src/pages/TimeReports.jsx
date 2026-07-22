@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { timeEntriesApi, projectsApi } from '../services/api'
+import { useWorkspace } from '../context/WorkspaceContext'
 import { Timer, Download, ChevronDown, ChevronUp, Loader2, BarChart3, FolderOpen, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -78,6 +79,7 @@ function exportCSV(entries) {
 
 // ── Main page ─────────────────────────────────────────────────
 export default function TimeReports() {
+  const { activeGroupId } = useWorkspace()
   const [report,   setReport]   = useState(null)
   const [entries,  setEntries]  = useState([])
   const [projects, setProjects] = useState([])
@@ -91,14 +93,14 @@ export default function TimeReports() {
   const [tab, setTab] = useState('by_project') // by_project | by_task | log
 
   useEffect(() => {
-    projectsApi.list()
+    projectsApi.list({ groupId: activeGroupId })
       .then(r => setProjects(r.data.data || []))
       .catch(() => {})
-  }, [])
+  }, [activeGroupId])
 
   useEffect(() => {
     setLoading(true)
-    const params = { from, to }
+    const params = { from, to, group_id: activeGroupId || 'personal' }
     if (projectId) params.project_id = projectId
 
     Promise.all([
@@ -111,7 +113,7 @@ export default function TimeReports() {
       })
       .catch(() => toast.error('Failed to load time report'))
       .finally(() => setLoading(false))
-  }, [from, to, projectId])
+  }, [from, to, projectId, activeGroupId])
 
   const maxProjMins = report?.by_project?.[0]?.total_mins || 1
   const maxTaskMins = report?.by_task?.[0]?.total_mins || 1

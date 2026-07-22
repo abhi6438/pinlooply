@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { standupApi } from '../services/api'
+import { useWorkspace } from '../context/WorkspaceContext'
 import {
   Copy, RefreshCw, Loader2, ChevronDown,
   ChevronUp, CheckCheck, AlertCircle, FolderOpen,
@@ -331,6 +332,7 @@ function GeneratingState() {
 
 // ── Main ──────────────────────────────────────────────────────
 export default function Standup() {
+  const { activeGroupId } = useWorkspace()
   const [standup, setStandup]   = useState(null)
   const [loading, setLoading]   = useState(true)   // start loading immediately
   const [failed,  setFailed]    = useState(false)
@@ -341,7 +343,7 @@ export default function Standup() {
     setLoading(true)
     setFailed(false)
     try {
-      const res = await standupApi.generate()
+      const res = await standupApi.generate({ group_id: activeGroupId || 'personal' })
       const data = res.data.data
       setStandup(data)
       setProjects(data.projects || [])
@@ -356,8 +358,8 @@ export default function Standup() {
     }
   }
 
-  // Auto-generate on mount
-  useEffect(() => { generate() }, []) // eslint-disable-line
+  // Auto-generate on mount and when workspace changes
+  useEffect(() => { generate() }, [activeGroupId]) // eslint-disable-line
 
   async function copyToClipboard() {
     const text = formatAsText(projects, standup?.summary)

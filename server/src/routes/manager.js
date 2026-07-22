@@ -24,22 +24,44 @@ async function getOwnedGroup(userId) {
 // Returns per-member task stats for the owner's group
 router.get('/overview', async (req, res) => {
   const userId = req.user.id
+  const { group_id } = req.query
 
   try {
-    const group = await getOwnedGroup(userId)
-    // Also allow members with 'admin' role
-    let groupId = group?.id
-    if (!groupId) {
-      const { data: adminMembership } = await supabaseAdmin
+    let groupId = null
+    let groupName = ''
+
+    if (group_id && group_id !== 'personal') {
+      // Verify user is owner/admin of the requested group
+      const { data: membership } = await supabaseAdmin
         .from('group_members')
         .select('group_id, groups(id, name)')
         .eq('user_id', userId)
+        .eq('group_id', group_id)
         .in('role', ['owner', 'admin'])
         .maybeSingle()
-      if (!adminMembership) {
+      if (!membership) {
         return res.status(403).json({ error: 'Manager access requires owner or admin role' })
       }
-      groupId = adminMembership.group_id
+      groupId = membership.group_id
+      groupName = membership.groups?.name || ''
+    } else {
+      // Personal workspace — no team group; fall back to auto-detect
+      const group = await getOwnedGroup(userId)
+      groupId = group?.id
+      groupName = group?.name || ''
+      if (!groupId) {
+        const { data: adminMembership } = await supabaseAdmin
+          .from('group_members')
+          .select('group_id, groups(id, name)')
+          .eq('user_id', userId)
+          .in('role', ['owner', 'admin'])
+          .maybeSingle()
+        if (!adminMembership) {
+          return res.status(403).json({ error: 'Manager access requires owner or admin role' })
+        }
+        groupId = adminMembership.group_id
+        groupName = adminMembership.groups?.name || ''
+      }
     }
 
     // Get all members of this group
@@ -51,10 +73,23 @@ router.get('/overview', async (req, res) => {
 
     if (membErr) throw membErr
 
-    // Get all tasks across all projects (owner sees all)
-    const { data: tasks, error: taskErr } = await supabaseAdmin
+    // Get projects belonging to this group, then fetch tasks in those projects
+    const { data: groupProjects } = await supabaseAdmin
+      .from('projects')
+      .select('id')
+      .eq('group_id', groupId)
+    const groupProjectIds = (groupProjects || []).map(p => p.id)
+
+    let tasksQuery = supabaseAdmin
       .from('tasks')
       .select('id, title, status, priority, due_date, assigned_to, project_id, projects(id, name, color)')
+    if (groupProjectIds.length) {
+      tasksQuery = tasksQuery.in('project_id', groupProjectIds)
+    } else {
+      // No projects in this group — return empty
+      tasksQuery = tasksQuery.eq('project_id', '__none__')
+    }
+    const { data: tasks, error: taskErr } = await tasksQuery
 
     if (taskErr) throw taskErr
 
@@ -127,7 +162,7 @@ router.get('/overview', async (req, res) => {
     )
     const groupSummary = {
       group_id:         groupId,
-      group_name:       group?.name || '',
+      group_name:       groupName,
       member_count:     members?.length || 0,
       total_tasks:      allAssigned.length,
       done_tasks:       allAssigned.filter(t => t.status === 'done' || t.status === 'resolved' || t.status === 'closed').length,

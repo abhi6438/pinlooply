@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { summaryApi } from '../services/api'
+import { useWorkspace } from '../context/WorkspaceContext'
 import {
   ChevronLeft, ChevronRight, Copy, CheckCheck, Loader2,
   CheckCircle2, Clock, AlertCircle, RefreshCw, BarChart3,
@@ -345,6 +346,7 @@ function NoActivityState({ period, onRegenerate }) {
 
 // ── Main ──────────────────────────────────────────────────────
 export default function Summary() {
+  const { activeGroupId } = useWorkspace()
   const today     = new Date().toISOString().slice(0, 10)
   const thisWeek  = currentWeekStr()
   const thisMonth = currentMonthStr()
@@ -366,18 +368,19 @@ export default function Summary() {
     setLoading(true)
     setData(null)
     try {
+      const groupParams = { group_id: activeGroupId || 'personal' }
       const res = mode === 'monthly'
-        ? await summaryApi.monthly(key)
-        : await summaryApi.weekly(key)
+        ? await summaryApi.monthly(key, groupParams)
+        : await summaryApi.weekly(key, groupParams)
       setData(res.data.data)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to load summary')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeGroupId])
 
-  useEffect(() => { load(apiMode, apiKey) }, [picker, date, week, month]) // eslint-disable-line
+  useEffect(() => { load(apiMode, apiKey) }, [picker, date, week, month, activeGroupId]) // eslint-disable-line
 
   // Week navigation
   function prevWeek() { setWeek(w => weekOffset(w, -1)) }

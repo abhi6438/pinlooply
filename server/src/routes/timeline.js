@@ -4,25 +4,37 @@ import { supabaseAdmin } from '../config/supabase.js'
 
 const router = Router()
 
-// ── Helper: get user's project IDs ────────────────────────────
-async function getUserProjectIds(userId) {
-  const [{ data: owned }, { data: membered }] = await Promise.all([
-    supabaseAdmin.from('projects').select('id').eq('user_id', userId),
-    supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId),
-  ])
-  const ids = new Set([
-    ...(owned    || []).map(p => p.id),
-    ...(membered || []).map(m => m.project_id),
-  ])
-  return [...ids]
-}
-
 // ── GET /api/timeline — assembled event feed ──────────────────
 router.get('/', requireAuth, async (req, res) => {
   const userId = req.user.id
-  const { project_id, type, from, to, limit = 100 } = req.query
+  const { project_id, type, from, to, limit = 100, group_id } = req.query
 
-  const projectIds = await getUserProjectIds(userId)
+  // Get all accessible project IDs for this user
+  const [{ data: owned }, { data: membered }, { data: groupMemberships }] = await Promise.all([
+    supabaseAdmin.from('projects').select('id').eq('user_id', userId),
+    supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId),
+    supabaseAdmin.from('group_members').select('group_id').eq('user_id', userId),
+  ])
+  const allIds = new Set([
+    ...(owned    || []).map(p => p.id),
+    ...(membered || []).map(m => m.project_id),
+  ])
+  const userGroupIds = (groupMemberships || []).map(g => g.group_id)
+  if (userGroupIds.length) {
+    const { data: gp } = await supabaseAdmin.from('projects').select('id').in('group_id', userGroupIds)
+    ;(gp || []).forEach(p => allIds.add(p.id))
+  }
+
+  // Scope by workspace
+  let projectIds = [...allIds]
+  if (group_id && group_id !== 'personal') {
+    const { data: gp } = await supabaseAdmin.from('projects').select('id').eq('group_id', group_id).in('id', projectIds)
+    projectIds = (gp || []).map(p => p.id)
+  } else if (group_id === 'personal') {
+    const { data: pp } = await supabaseAdmin.from('projects').select('id').is('group_id', null).in('id', projectIds)
+    projectIds = (pp || []).map(p => p.id)
+  }
+
   if (!projectIds.length) return res.json({ success: true, data: [] })
 
   const targetProjectIds = project_id ? [project_id] : projectIds
