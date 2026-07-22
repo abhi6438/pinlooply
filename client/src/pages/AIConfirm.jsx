@@ -6,7 +6,7 @@ import { supabase } from '../config/supabase'
 import {
   CheckCircle2, Tag, ListChecks, AlertTriangle, FileText,
   Trash2, ArrowLeft, Save, Loader2, Pencil, X, Check,
-  UserCircle, FlaskConical, Zap,
+  UserCircle, FlaskConical, Zap, Plus,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../components/ui'
@@ -139,6 +139,75 @@ function TaskRow({ task, index, groupMembers, onUpdate, onDelete }) {
   )
 }
 
+// ── Quick add-task inline form ────────────────────────────────
+function AddTaskRow({ groupMembers, onAdd, onCancel }) {
+  const [title, setTitle]       = useState('')
+  const [type, setType]         = useState('task')
+  const [priority, setPriority] = useState('medium')
+  const [assignedTo, setAssignedTo] = useState('')
+
+  function handleAdd() {
+    if (!title.trim()) return
+    const member = groupMembers.find(m => (m.users || m).id === assignedTo)
+    onAdd({
+      title: title.trim(),
+      type,
+      priority,
+      due_date: null,
+      assigned_to: assignedTo || null,
+      assigned_to_name: member ? (member.users || member).name : null,
+      description: '',
+    })
+    setTitle('')
+    setType('task')
+    setPriority('medium')
+    setAssignedTo('')
+  }
+
+  return (
+    <div className="border-2 border-dashed border-primary-300 rounded-xl p-3 bg-primary-50/20 space-y-2 animate-fade-in">
+      <input
+        autoFocus
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') onCancel() }}
+        placeholder="Task title…"
+        className="input text-sm py-1.5"
+      />
+      <div className="flex gap-2 flex-wrap">
+        <select value={type} onChange={e => setType(e.target.value)}
+          className="text-xs border border-warm-200 rounded-lg px-2 py-1 bg-white text-warm-700 focus:outline-none focus:ring-1 focus:ring-primary-400">
+          {Object.entries(TASK_TYPES).map(([v, { label }]) => <option key={v} value={v}>{label}</option>)}
+        </select>
+        <select value={priority} onChange={e => setPriority(e.target.value)}
+          className="text-xs border border-warm-200 rounded-lg px-2 py-1 bg-white text-warm-700 focus:outline-none focus:ring-1 focus:ring-primary-400">
+          {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        {groupMembers.length > 0 && (
+          <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
+            className="text-xs border border-warm-200 rounded-lg px-2 py-1 bg-white text-warm-700 focus:outline-none focus:ring-1 focus:ring-primary-400">
+            <option value="">Unassigned</option>
+            {groupMembers.map(m => {
+              const u = m.users || m
+              return <option key={u.id} value={u.id}>{u.name || u.email}</option>
+            })}
+          </select>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <button onClick={handleAdd} disabled={!title.trim()}
+          className="flex items-center gap-1 text-xs bg-primary-600 text-white px-2.5 py-1 rounded-lg hover:bg-primary-700 disabled:opacity-40">
+          <Check className="w-3 h-3" /> Add
+        </button>
+        <button onClick={onCancel}
+          className="flex items-center gap-1 text-xs text-warm-500 px-2 py-1 rounded-lg hover:bg-warm-100">
+          <X className="w-3 h-3" /> Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function TopicRow({ topic, onDelete, index }) {
   return (
     <div className="flex items-start gap-3 p-3 border-l-4 border-primary-500 bg-white rounded-xl shadow-sm mb-2 last:mb-0 group animate-fade-in">
@@ -181,6 +250,7 @@ export default function AIConfirm() {
   const [conflicts]                 = useState(aiResult.conflicts || [])
   const [saving, setSaving]         = useState(false)
   const [groupMembers, setGroupMembers] = useState([])
+  const [addingTask, setAddingTask] = useState(false)
 
   // Load group members for assignee resolution
   useEffect(() => {
@@ -204,6 +274,7 @@ export default function AIConfirm() {
   function deleteTask(i)  { setTasks(t => t.filter((_, idx) => idx !== i)) }
   function updateTask(i, updated) { setTasks(t => t.map((item, idx) => idx === i ? updated : item)) }
   function deleteTopic(i) { setTopics(t => t.filter((_, idx) => idx !== i)) }
+  function addTask(task)  { setTasks(t => [...t, task]); setAddingTask(false) }
 
   async function handleSave() {
     setSaving(true)
@@ -278,19 +349,30 @@ export default function AIConfirm() {
         <div className="card animate-fade-in">
           <div className="flex items-center gap-2 mb-4">
             <h2 className="section-title">✅ Tasks</h2>
-            <span className="ml-auto text-xs text-warm-400 bg-warm-100 px-2 py-0.5 rounded-full">{tasks.length}</span>
+            <span className="text-xs text-warm-400 bg-warm-100 px-2 py-0.5 rounded-full">{tasks.length}</span>
+            <button
+              onClick={() => setAddingTask(true)}
+              className="ml-auto flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium px-2.5 py-1 rounded-lg hover:bg-primary-50 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add task
+            </button>
           </div>
-          {tasks.length > 0
-            ? tasks.map((t, i) => (
-                <TaskRow key={i} task={t} index={i} groupMembers={groupMembers} onUpdate={updateTask} onDelete={deleteTask} />
-              ))
-            : (
-              <div className="empty-state py-6">
-                <ListChecks className="empty-state-icon w-8 h-8 mx-auto mb-2" />
-                <p className="empty-state-title">No tasks found</p>
-              </div>
-            )
-          }
+          {tasks.map((t, i) => (
+            <TaskRow key={i} task={t} index={i} groupMembers={groupMembers} onUpdate={updateTask} onDelete={deleteTask} />
+          ))}
+          {addingTask && (
+            <AddTaskRow groupMembers={groupMembers} onAdd={addTask} onCancel={() => setAddingTask(false)} />
+          )}
+          {tasks.length === 0 && !addingTask && (
+            <div className="empty-state py-4">
+              <ListChecks className="empty-state-icon w-8 h-8 mx-auto mb-2" />
+              <p className="empty-state-title text-sm">No tasks found — AI missed something?</p>
+              <button onClick={() => setAddingTask(true)}
+                className="mt-3 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium mx-auto">
+                <Plus className="w-3.5 h-3.5" /> Add one manually
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Test Cases — auto-generated after save */}

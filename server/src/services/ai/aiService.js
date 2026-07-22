@@ -25,8 +25,17 @@ A team member just logged this ${discussionLabel.toLowerCase().replace(/s$/, '')
 Existing ${topicLabel.toLowerCase()} in this ${projectLabel.toLowerCase().replace(/s$/, '')}:
 ${topicsStr}
 
-Extract ALL information and return ONLY valid JSON with no explanation or markdown.
-Use the team's vocabulary: "${taskSingular}" (not "task"), "${topicSingular}" (not "topic").
+Your job: read the text and extract every ${topicSingular} AND every ${taskSingular} implied by it.
+
+A ${taskSingular} is anything that requires someone to DO something — even if not explicitly stated.
+Announcements, status updates, and change notices always imply follow-up ${taskSingular.toLowerCase()}s
+(e.g. "X has been deployed" → verify/test X; "X is ready for review" → review X).
+When no person is mentioned, leave assigned_to_name null. Never skip a ${taskSingular} just because no one is assigned.
+Use type "deployment_check" when an environment (UAT, staging, prod) is mentioned.
+
+Return ONLY valid JSON — no explanation, no markdown.
+Use the team's vocabulary: "${taskSingular}" and "${topicSingular}".
+
 {
   "project_match": "${projectLabel.toLowerCase().replace(/s$/, '')} name if mentioned or null",
   "topics": [
@@ -39,8 +48,8 @@ Use the team's vocabulary: "${taskSingular}" (not "task"), "${topicSingular}" (n
   ],
   "tasks": [
     {
-      "title": "${taskSingular} title",
-      "description": "clear description of what needs to be done and why, 1-3 sentences",
+      "title": "specific ${taskSingular} title",
+      "description": "what needs to be done and why, 1-3 sentences",
       "type": "task|test_case|deployment_check|backlog",
       "priority": "high|medium|low",
       "due_date": "YYYY-MM-DD or null",
@@ -54,7 +63,7 @@ Use the team's vocabulary: "${taskSingular}" (not "task"), "${topicSingular}" (n
       "new_value": "what it changed to"
     }
   ],
-  "overall_summary": "2-3 line summary of entire ${discussionLabel.toLowerCase().replace(/s$/, '')}"
+  "overall_summary": "2-3 line summary of the ${discussionLabel.toLowerCase().replace(/s$/, '')}"
 }`
 }
 
