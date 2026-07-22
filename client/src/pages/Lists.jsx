@@ -1267,7 +1267,10 @@ export default function Lists() {
   async function loadTasks() {
     setLoading(true)
     try {
-      const res = await tasksApi.list({ excludeTestCases: true })
+      const params = { excludeTestCases: true }
+      if (activeGroupId) params.group_id = activeGroupId
+      else params.group_id = 'personal'
+      const res = await tasksApi.list(params)
       const all = res.data.data || []
       // Filter out test_case on frontend
       setTasks(all.filter(t => t.type !== 'test_case'))

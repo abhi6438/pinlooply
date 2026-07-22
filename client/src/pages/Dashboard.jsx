@@ -786,7 +786,11 @@ export default function Dashboard() {
 
   async function loadTasks() {
     try {
-      const res = await tasksApi.list({ show_done: 'true' })
+      // Filter by group: personal workspace passes group_id=personal, team passes the group UUID
+      const params = { show_done: 'true' }
+      if (activeGroupId) params.group_id = activeGroupId
+      else params.group_id = 'personal'
+      const res = await tasksApi.list(params)
       setAllTasks(res.data.data || [])
     } catch { /* non-fatal */ }
   }
@@ -806,7 +810,7 @@ export default function Dashboard() {
       .then(r => setSuggestions(r.data.data || []))
       .catch(() => {})
       .finally(() => setSuggestLoading(false))
-  }, [user]) // eslint-disable-line
+  }, [user, activeGroupId]) // eslint-disable-line
 
   function refreshSuggestions() {
     setSuggestLoading(true)

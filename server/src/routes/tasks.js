@@ -76,15 +76,34 @@ const TASK_SELECT = `
 router.get('/', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id
-    const { type, status, project_id, priority, assignee, show_done, mine, assigned_by_me } = req.query
+    const { type, status, project_id, priority, assignee, show_done, mine, assigned_by_me, group_id } = req.query
 
-    const projectIds = await getUserProjectIds(userId)
-    if (!projectIds.length) return res.json({ success: true, data: [] })
+    const allProjectIds = await getUserProjectIds(userId)
+    if (!allProjectIds.length) return res.json({ success: true, data: [] })
+
+    // Workspace scoping: narrow to the right subset of projects
+    let scopedProjectIds = allProjectIds
+    if (project_id) {
+      // Specific project requested — verify access
+      scopedProjectIds = allProjectIds.includes(project_id) ? [project_id] : []
+    } else if (group_id && group_id !== 'personal') {
+      // Team workspace: only projects in this group
+      const { data: groupProjects } = await supabaseAdmin
+        .from('projects').select('id').eq('group_id', group_id).in('id', allProjectIds)
+      scopedProjectIds = (groupProjects || []).map(p => p.id)
+    } else if (group_id === 'personal') {
+      // Personal workspace: only projects with no group
+      const { data: personalProjects } = await supabaseAdmin
+        .from('projects').select('id').is('group_id', null).in('id', allProjectIds)
+      scopedProjectIds = (personalProjects || []).map(p => p.id)
+    }
+
+    if (!scopedProjectIds.length) return res.json({ success: true, data: [] })
 
     let query = supabaseAdmin
       .from('tasks')
       .select(TASK_SELECT)
-      .in('project_id', project_id ? [project_id] : projectIds)
+      .in('project_id', scopedProjectIds)
       .order('created_at', { ascending: false })
 
     if (type)          query = query.eq('type', type)

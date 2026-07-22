@@ -121,7 +121,7 @@ function TaskGroup({ title, tasks, onComplete, defaultOpen = true }) {
 // ── Main Page ─────────────────────────────────────────────────
 export default function MyTasks() {
   const { user }               = useAuth()
-  const { vocabulary }         = useWorkspace()
+  const { vocabulary, activeGroupId } = useWorkspace()
   const taskLabel              = vocabulary?.tasks || 'Tasks'
 
   const [tasks,   setTasks]   = useState([])
@@ -129,12 +129,15 @@ export default function MyTasks() {
   const [sort,    setSort]    = useState('due')
   const [filter,  setFilter]  = useState('active') // active | all | overdue
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [activeGroupId]) // eslint-disable-line
 
   async function load() {
     setLoading(true)
     try {
-      const res = await tasksApi.list({ mine: 'true', show_done: 'true' })
+      const params = { mine: 'true', show_done: 'true' }
+      if (activeGroupId) params.group_id = activeGroupId
+      else params.group_id = 'personal'
+      const res = await tasksApi.list(params)
       setTasks(res.data.data || [])
     } catch {
       toast.error('Failed to load tasks')
