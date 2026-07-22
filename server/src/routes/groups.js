@@ -189,24 +189,26 @@ router.post('/:groupId/members', requireAuth, checkMemberLimit, async (req, res)
       return res.json({ success: true, data: invitee, invited: false })
     }
 
-    // Case 2: user doesn't have an account — send a Supabase invite email
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${process.env.CLIENT_URL || 'http://localhost:5173'}/onboarding`,
-    })
+    // Case 2: user doesn't have an account — send a Supabase invite email.
+    // Pass group_id + invite_code in the redirectTo URL so the onboarding page
+    // can auto-join the group after the user sets up their account.
+    // We do NOT pre-create the group_members row here because public.users
+    // doesn't exist yet for the invited user (trigger fires only on email confirm).
+    const { data: grpData } = await supabaseAdmin
+      .from('groups')
+      .select('invite_code')
+      .eq('id', groupId)
+      .single()
+
+    const inviteCode = grpData?.invite_code || ''
+    const base = process.env.CLIENT_URL || 'http://localhost:5173'
+    const redirectTo = `${base}/onboarding?group_id=${groupId}&invite_code=${inviteCode}`
+
+    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo })
 
     if (inviteError) {
       console.error('Invite email error:', inviteError)
       return res.status(500).json({ error: inviteError.message || 'Failed to send invite email' })
-    }
-
-    // Pre-create the group_members row so when they sign up they're already in the group.
-    // The new user's ID comes from the invite response.
-    const newUserId = inviteData?.user?.id
-    if (newUserId) {
-      // Upsert — ignore if already exists
-      await supabaseAdmin
-        .from('group_members')
-        .upsert({ group_id: groupId, user_id: newUserId, role: 'member' }, { onConflict: 'group_id,user_id' })
     }
 
     res.json({ success: true, data: { email }, invited: true })

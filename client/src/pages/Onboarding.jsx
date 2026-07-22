@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useWorkspace } from '../context/WorkspaceContext'
 import { supabase } from '../config/supabase'
@@ -339,6 +339,13 @@ export default function Onboarding() {
   const { user }         = useAuth()
   const { saveProfession, setActiveWorkspace } = useWorkspace()
   const navigate         = useNavigate()
+  const [searchParams]   = useSearchParams()
+
+  // Detect group invite from email link: /onboarding?group_id=xxx&invite_code=yyy
+  const urlGroupId    = searchParams.get('group_id')
+  const urlInviteCode = searchParams.get('invite_code')
+  const hasGroupInvite = !!(urlGroupId && urlInviteCode)
+
   const [loading, setLoading]   = useState(false)
   const [step, setStep]         = useState(1)
   const [name, setName]         = useState('')
@@ -397,11 +404,26 @@ export default function Onboarding() {
   async function handleStep1() {
     setLoading(true)
     try {
+      // Existing localStorage invite (legacy flow)
       if (pendingInvite) {
         await saveProfile({ name, mode: 'team', onboarding_complete: true })
         navigate(`/invite/${pendingInvite.inviteCode}`)
         return
       }
+
+      // URL-param invite from email link (new flow)
+      if (hasGroupInvite) {
+        await saveProfile({ name, mode: 'team', onboarding_complete: true })
+        try {
+          await api.post(`/api/groups/${urlGroupId}/join`, { invite_code: urlInviteCode })
+        } catch {
+          // Non-fatal — user may already be a member, or join fails silently
+        }
+        setActiveWorkspace({ mode: 'team', groupId: urlGroupId, groupName: null })
+        window.location.replace('/dashboard')
+        return
+      }
+
       await saveProfile({ name, onboarding_step: 2 })
       setStep(2)
     } catch (err) {
@@ -519,7 +541,7 @@ export default function Onboarding() {
         )}
 
         {/* Step content */}
-        {step === 1 && <StepName value={name} onChange={setName} onNext={handleStep1} hasInvite={!!pendingInvite} />}
+        {step === 1 && <StepName value={name} onChange={setName} onNext={handleStep1} hasInvite={!!pendingInvite || hasGroupInvite} />}
         {step === 2 && <StepProfession value={profession} onChange={setProfession} onNext={handleStep2} />}
         {step === 3 && <StepMode value={mode} onChange={setMode} onNext={handleStep3} />}
         {step === 4 && <StepProject value={project} onChange={setProject} onNext={handleStep4} loading={loading} vocab={activeVocab} />}
