@@ -12,6 +12,43 @@ function calcHealth(overdueCount, deadlineSoon) {
   return 'good'
 }
 
+// ── Helper: check if user can access a project ────────────────────
+// Returns the project row (with group_id) if allowed, null if not.
+// Access is granted if the user is: (1) owner, (2) explicit project_member,
+// or (3) a member of the group the project belongs to.
+async function canUserAccessProject(projectId, userId) {
+  const { data: proj } = await supabaseAdmin
+    .from('projects')
+    .select('id, user_id, group_id, name')
+    .eq('id', projectId)
+    .maybeSingle()
+
+  if (!proj) return null
+  if (proj.user_id === userId) return proj
+
+  // Check explicit project_members
+  const { data: pm } = await supabaseAdmin
+    .from('project_members')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (pm) return proj
+
+  // Check group membership
+  if (proj.group_id) {
+    const { data: gm } = await supabaseAdmin
+      .from('group_members')
+      .select('id')
+      .eq('group_id', proj.group_id)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (gm) return proj
+  }
+
+  return null
+}
+
 // ── GET /api/projects — all projects for user ─────────────────────
 // ?group_id=<uuid>  → return only projects belonging to that group
 // ?group_id=personal → return only personal projects (group_id IS NULL)
@@ -156,15 +193,8 @@ router.patch('/:projectId', requireAuth, async (req, res) => {
   const { projectId } = req.params
   const { name, description, color, custom_statuses } = req.body
 
-  // Only owner can edit
-  const { data: proj } = await supabaseAdmin
-    .from('projects')
-    .select('user_id')
-    .eq('id', projectId)
-    .single()
-
-  if (!proj || proj.user_id !== userId)
-    return res.status(403).json({ error: 'Forbidden' })
+  const proj = await canUserAccessProject(projectId, userId)
+  if (!proj) return res.status(403).json({ error: 'Forbidden' })
 
   const patch = {}
   if (name !== undefined)            patch.name            = name.trim()
@@ -188,14 +218,8 @@ router.delete('/:projectId', requireAuth, async (req, res) => {
   const userId = req.user.id
   const { projectId } = req.params
 
-  const { data: proj } = await supabaseAdmin
-    .from('projects')
-    .select('user_id')
-    .eq('id', projectId)
-    .single()
-
-  if (!proj || proj.user_id !== userId)
-    return res.status(403).json({ error: 'Forbidden' })
+  const proj = await canUserAccessProject(projectId, userId)
+  if (!proj) return res.status(403).json({ error: 'Forbidden' })
 
   const { error } = await supabaseAdmin
     .from('projects')
@@ -275,14 +299,8 @@ router.post('/:projectId/publish', requireAuth, async (req, res) => {
   const { projectId } = req.params
   const userId = req.user.id
 
-  const { data: proj } = await supabaseAdmin
-    .from('projects')
-    .select('user_id, name')
-    .eq('id', projectId)
-    .single()
-
-  if (!proj || proj.user_id !== userId)
-    return res.status(403).json({ error: 'Forbidden' })
+  const proj = await canUserAccessProject(projectId, userId)
+  if (!proj) return res.status(403).json({ error: 'Forbidden' })
 
   // Check if already published
   const { data: existing } = await supabaseAdmin
@@ -310,14 +328,8 @@ router.delete('/:projectId/publish', requireAuth, async (req, res) => {
   const { projectId } = req.params
   const userId = req.user.id
 
-  const { data: proj } = await supabaseAdmin
-    .from('projects')
-    .select('user_id')
-    .eq('id', projectId)
-    .single()
-
-  if (!proj || proj.user_id !== userId)
-    return res.status(403).json({ error: 'Forbidden' })
+  const proj = await canUserAccessProject(projectId, userId)
+  if (!proj) return res.status(403).json({ error: 'Forbidden' })
 
   const { error } = await supabaseAdmin
     .from('publish_pages')

@@ -5,17 +5,31 @@ import { onStatusChange, spawnRecurringTask } from '../services/automationEngine
 
 const router = Router()
 
-// ── Helper: get all project IDs the user owns or is a member of ──
+// ── Helper: get all project IDs the user can access ──────────────
+// Includes: projects the user owns, projects they're a member of,
+// and ALL projects belonging to any group the user is in.
 async function getUserProjectIds(userId) {
-  // Run both queries in parallel — cuts latency in half vs sequential
-  const [{ data: owned }, { data: membered }] = await Promise.all([
+  const [{ data: owned }, { data: membered }, { data: groupMemberships }] = await Promise.all([
     supabaseAdmin.from('projects').select('id').eq('user_id', userId),
     supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId),
+    supabaseAdmin.from('group_members').select('group_id').eq('user_id', userId),
   ])
+
   const ids = new Set([
     ...(owned    || []).map(p => p.id),
     ...(membered || []).map(m => m.project_id),
   ])
+
+  // Add all projects that belong to any group the user is a member of
+  const groupIds = (groupMemberships || []).map(g => g.group_id)
+  if (groupIds.length) {
+    const { data: groupProjects } = await supabaseAdmin
+      .from('projects')
+      .select('id')
+      .in('group_id', groupIds)
+    ;(groupProjects || []).forEach(p => ids.add(p.id))
+  }
+
   return [...ids]
 }
 
