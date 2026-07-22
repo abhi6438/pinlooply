@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../../config/supabase.js'
 import { callGroq } from './groqService.js'
 import { callClaude } from './claudeService.js'
+import { resolveVocabulary } from '../../config/professions.js'
 
 // ── Prompt builder ────────────────────────────────────────────
 function buildPrompt(rawText, existingTopics, workspaceCtx = {}) {
@@ -76,8 +77,11 @@ export async function processDiscussion(rawText, projectId, userId) {
     .eq('id', userId)
     .single()
 
-  const plan         = userData?.plan       || 'free'
-  const workspaceCtx = { profession: userData?.profession || 'general', vocabulary: userData?.vocabulary || {} }
+  const plan       = userData?.plan       || 'free'
+  const profession = userData?.profession || 'general'
+  // Merge profession defaults with any user-saved custom overrides
+  const vocabulary = resolveVocabulary(profession, userData?.vocabulary || {})
+  const workspaceCtx = { profession, vocabulary }
 
   // 2. Get AI config for this plan
   const { data: aiConfig } = await supabaseAdmin

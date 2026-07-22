@@ -237,6 +237,29 @@ router.patch('/:taskId/assign', requireAuth, async (req, res) => {
   }
 })
 
+// ── GET /api/tasks/:taskId ───────────────────────────────────
+router.get('/:taskId', requireAuth, async (req, res) => {
+  try {
+    const { taskId } = req.params
+    const userId = req.user.id
+
+    const existing = await canAccessTask(taskId, userId)
+    if (!existing) return res.status(403).json({ error: 'Access denied' })
+
+    const { data, error } = await supabaseAdmin
+      .from('tasks')
+      .select(TASK_SELECT)
+      .eq('id', taskId)
+      .single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    return res.json({ success: true, data })
+  } catch (err) {
+    console.error('Get task error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
 // ── PATCH /api/tasks/:taskId ─────────────────────────────────
 router.patch('/:taskId', requireAuth, async (req, res) => {
   try {
