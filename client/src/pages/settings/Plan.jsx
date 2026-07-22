@@ -4,7 +4,7 @@ import { planApi } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import {
   Check, Zap, Loader2, ExternalLink, Star,
-  ChevronRight, X, Coffee, Rocket,
+  ChevronRight, X, Coffee,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../../components/ui'
@@ -130,89 +130,69 @@ function UsageBar({ used, max, label }) {
   )
 }
 
-// ── Donate & Activate Modal ───────────────────────────────────
-function DonateModal({ plan, onClose, onActivate, activating }) {
-  const [step, setStep] = useState(1) // 1 = donate prompt, 2 = activate
+// ── Upgrade Modal (paid plans) ────────────────────────────────
+// No self-serve activation — user pays on BMC then contacts support.
+// Admin activates the plan manually from the Admin Panel.
+function DonateModal({ plan, onClose }) {
+  const [donated, setDonated] = useState(false)
+  const supportEmail = 'support@pinlooply.com'
 
   function openBmc() {
     window.open(BMC_URL, '_blank', 'noopener,noreferrer')
-    setStep(2)
+    setDonated(true)
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="card w-full max-w-md p-6 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1 rounded-lg hover:bg-warm-100 text-warm-400"
-        >
+        <button onClick={onClose} className="absolute top-4 right-4 p-1 rounded-lg hover:bg-warm-100 text-warm-400">
           <X className="w-4 h-4" />
         </button>
 
-        <div className="text-center mb-6">
+        <div className="text-center mb-5">
           <span className="text-4xl">{plan.icon}</span>
           <h2 className="text-lg font-bold text-warm-900 mt-2">Upgrade to {plan.label}</h2>
-          {plan.price && (
-            <p className="text-sm text-warm-500 mt-0.5">{plan.price} · billed monthly</p>
-          )}
+          {plan.price && <p className="text-sm text-warm-500 mt-0.5">{plan.price} · billed monthly</p>}
         </div>
 
-        {/* Steps */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className={`flex-1 h-1.5 rounded-full ${step >= 1 ? 'bg-primary-500' : 'bg-warm-100'}`} />
-          <div className={`flex-1 h-1.5 rounded-full ${step >= 2 ? 'bg-primary-500' : 'bg-warm-100'}`} />
-        </div>
+        <ul className="space-y-2 mb-5">
+          {plan.features.map((f, i) => (
+            <li key={i} className="flex items-center gap-2 text-sm text-warm-600">
+              <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+              {f}
+            </li>
+          ))}
+        </ul>
 
-        {step === 1 ? (
+        {!donated ? (
           <>
-            <p className="text-sm text-warm-600 mb-5 text-center">
-              Pinlooply runs on community support. A one-time or recurring donation on Buy Me a Coffee
-              unlocks the Team plan.
+            <p className="text-sm text-warm-500 text-center mb-4">
+              Pinlooply runs on community support. Support us on Buy Me a Coffee to unlock this plan.
             </p>
-            <ul className="space-y-2 mb-6">
-              {plan.features.map((f, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm text-warm-600">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <button
-              onClick={openBmc}
-              className="btn-primary w-full flex items-center justify-center gap-2"
-            >
+            <button onClick={openBmc} className="btn-primary w-full flex items-center justify-center gap-2 mb-3">
               <Coffee className="w-4 h-4" />
               Support on Buy Me a Coffee
               <ExternalLink className="w-3.5 h-3.5 opacity-70" />
             </button>
-            <p className="text-center text-xs text-warm-400 mt-3">
-              After donating, come back here and click Activate.
-            </p>
           </>
         ) : (
-          <>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-5 text-sm text-emerald-700">
-              Thank you for supporting Pinlooply! 🎉 Click below to activate your plan.
-            </div>
-            <button
-              onClick={() => onActivate(plan.upgradeMode)}
-              disabled={activating}
-              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 mb-3"
-            >
-              {activating
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Rocket className="w-4 h-4" />
-              }
-              {activating ? 'Activating…' : `Activate ${plan.label} Plan`}
-            </button>
-            <button
-              onClick={() => setStep(1)}
-              className="w-full text-center text-xs text-warm-400 hover:text-warm-600"
-            >
-              ← Back
-            </button>
-          </>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4 text-sm text-emerald-700">
+            🎉 Thank you for supporting Pinlooply!
+          </div>
         )}
+
+        {/* Always-visible activation instructions */}
+        <div className="bg-warm-50 border border-warm-200 rounded-xl px-4 py-3 text-sm text-warm-600 space-y-1">
+          <p className="font-semibold text-warm-800">How to activate</p>
+          <p>After donating, email us your BMC receipt at:</p>
+          <a href={`mailto:${supportEmail}?subject=Team Plan Activation`}
+            className="font-mono text-primary-600 hover:underline break-all">
+            {supportEmail}
+          </a>
+          <p className="text-warm-400 text-xs mt-1">We'll activate your plan within 24 hours.</p>
+        </div>
+
+        <button onClick={onClose} className="btn-secondary w-full mt-4">Close</button>
       </div>
     </div>
   )
@@ -405,8 +385,6 @@ export default function Plan() {
         <DonateModal
           plan={donateModal}
           onClose={() => setDonateModal(null)}
-          onActivate={handleUpgrade}
-          activating={upgrading}
         />
       )}
     </PageShell>
