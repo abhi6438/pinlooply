@@ -47,10 +47,14 @@ router.patch('/profile', requireAuth, async (req, res) => {
   }
 
   try {
+    // Use upsert so the row is created if it was deleted (e.g. after "Reset All Data")
+    // but the auth session still exists. plain update() silently does nothing on missing rows.
     const { error } = await supabaseAdmin
       .from('users')
-      .update(patch)
-      .eq('id', userId)
+      .upsert(
+        { id: userId, email: req.user.email, ...patch },
+        { onConflict: 'id' }
+      )
 
     if (error) return res.status(500).json({ error: error.message })
     res.json({ success: true })

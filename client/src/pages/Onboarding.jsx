@@ -477,13 +477,16 @@ export default function Onboarding() {
         const results = await Promise.allSettled(
           group.invites.map(email => groupsApi.inviteMember(grp.id, email))
         )
-        const failed = results.filter(r => r.status === 'rejected')
-        if (failed.length === group.invites.length) {
-          toast.error('Invites could not be sent — teammates must sign up first before being added')
+        const failed  = results.filter(r => r.status === 'rejected')
+        const sent    = results.length - failed.length
+        if (failed.length === results.length) {
+          // Show the actual error from the first failure so it's debuggable
+          const firstErr = failed[0]?.reason?.response?.data?.error || 'Failed to send invites'
+          toast.error(firstErr)
         } else if (failed.length > 0) {
-          toast(`${group.invites.length - failed.length} invite(s) sent. ${failed.length} failed (user may not be signed up yet).`)
+          toast(`${sent} invite(s) sent. ${failed.length} failed.`)
         } else {
-          toast.success(`${group.invites.length} invite(s) sent!`)
+          toast.success(`${sent} invite(s) sent — they'll get an email to join!`)
         }
       }
 

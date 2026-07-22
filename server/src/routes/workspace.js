@@ -46,11 +46,22 @@ router.patch('/', async (req, res) => {
       return res.status(400).json({ error: 'Nothing to update' })
     }
 
+    // upsert: if the row was deleted (e.g. Reset All Data) but auth session persists,
+    // plain update() silently does nothing. upsert creates the row if missing.
+    const { error: upsertErr } = await supabaseAdmin
+      .from('users')
+      .upsert(
+        { id: req.user.id, email: req.user.email, ...patch },
+        { onConflict: 'id' }
+      )
+
+    if (upsertErr) return res.status(500).json({ error: upsertErr.message })
+
+    // Re-fetch so we return the current row state
     const { data, error } = await supabaseAdmin
       .from('users')
-      .update(patch)
-      .eq('id', req.user.id)
       .select('profession, vocabulary, enabled_modules, custom_statuses, workspace_name, workspace_logo_url, accent_color')
+      .eq('id', req.user.id)
       .single()
 
     if (error) return res.status(500).json({ error: error.message })

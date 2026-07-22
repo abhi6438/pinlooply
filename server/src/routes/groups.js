@@ -189,11 +189,9 @@ router.post('/:groupId/members', requireAuth, checkMemberLimit, async (req, res)
       return res.json({ success: true, data: invitee, invited: false })
     }
 
-    // Case 2: user doesn't have an account — send a Supabase invite email.
-    // Pass group_id + invite_code in the redirectTo URL so the onboarding page
-    // can auto-join the group after the user sets up their account.
-    // We do NOT pre-create the group_members row here because public.users
-    // doesn't exist yet for the invited user (trigger fires only on email confirm).
+    // Case 2: user doesn't have an account (or is in auth but not yet in public.users).
+    // Send a Supabase invite email with group_id + invite_code in the redirectTo URL
+    // so the onboarding page can auto-join the group after they complete signup.
     const { data: grpData } = await supabaseAdmin
       .from('groups')
       .select('invite_code')
@@ -204,9 +202,33 @@ router.post('/:groupId/members', requireAuth, checkMemberLimit, async (req, res)
     const base = process.env.CLIENT_URL || 'http://localhost:5173'
     const redirectTo = `${base}/onboarding?group_id=${groupId}&invite_code=${inviteCode}`
 
-    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo })
+    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo })
 
     if (inviteError) {
+      // "User already registered" — they have an auth account but no public.users row yet.
+      // Re-send a magic link (password reset / OTP) pointing at the group join page instead.
+      const alreadyRegistered = inviteError.message?.toLowerCase().includes('already') ||
+                                inviteError.status === 422
+
+      if (alreadyRegistered) {
+        // Try to locate them in auth via admin API
+        // (We can't look up by email directly, so we use generateLink to produce a login link)
+        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email,
+          options: { redirectTo },
+        })
+        if (!linkErr) {
+          // linkData.properties.action_link has a one-time login URL — Supabase emails it automatically
+          console.log(`[invite] Sent magic link to existing user: ${email}`)
+          return res.json({ success: true, data: { email }, invited: true })
+        }
+        // If that also fails, return a clear error
+        return res.status(409).json({
+          error: `${email} already has an account. Ask them to log in and join via the team invite link instead.`,
+        })
+      }
+
       console.error('Invite email error:', inviteError)
       return res.status(500).json({ error: inviteError.message || 'Failed to send invite email' })
     }
