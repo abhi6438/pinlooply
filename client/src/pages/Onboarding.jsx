@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useWorkspace } from '../context/WorkspaceContext'
 import { supabase } from '../config/supabase'
 import { projectsApi } from '../services/api'
-import api from '../services/api'
+import api, { groupsApi } from '../services/api'
 import { PROFESSIONS } from '../config/professions'
 import toast from 'react-hot-toast'
 import { ChevronLeft, Check, Plus, X } from 'lucide-react'
@@ -332,7 +332,7 @@ function StepDone({ name, profession, onFinish }) {
 // ─────────────────────────────────────────────
 export default function Onboarding() {
   const { user }         = useAuth()
-  const { saveProfession } = useWorkspace()
+  const { saveProfession, setActiveWorkspace } = useWorkspace()
   const navigate         = useNavigate()
   const [loading, setLoading]   = useState(false)
   const [step, setStep]         = useState(1)
@@ -341,6 +341,7 @@ export default function Onboarding() {
   const [mode, setMode]         = useState('')
   const [project, setProject]   = useState({ name: '', description: '', color: COLORS[0] })
   const [group, setGroup]       = useState({ name: '', invites: [] })
+  const [createdGroup, setCreatedGroup] = useState(null)
 
   // Active profession vocab for dynamic labels
   const activeVocab = PROFESSIONS.find(p => p.value === profession)?.vocabulary || {}
@@ -407,10 +408,8 @@ export default function Onboarding() {
 
   async function handleStep2() {
     setLoading(true)
-    try {
-      await saveProfession(profession)
-      await save({ profession, onboarding_step: 3 })
-    } catch { /* non-fatal */ }
+    try { await saveProfession(profession) } catch { /* non-fatal */ }
+    try { await save({ profession, onboarding_step: 3 }) } catch { /* non-fatal */ }
     setLoading(false)
     setStep(3)
   }
@@ -437,7 +436,25 @@ export default function Onboarding() {
   async function handleStep5() {
     setLoading(true)
     try {
-      await api.post('/api/groups', { name: group.name })
+      const res = await api.post('/api/groups', { name: group.name })
+      const grp = res.data?.data
+      if (grp) setCreatedGroup(grp)
+
+      // Send invites — handle each independently so one failure doesn't block the rest
+      if (grp && group.invites.length > 0) {
+        const results = await Promise.allSettled(
+          group.invites.map(email => groupsApi.inviteMember(grp.id, email))
+        )
+        const failed = results.filter(r => r.status === 'rejected')
+        if (failed.length === group.invites.length) {
+          toast.error('Invites could not be sent — teammates must sign up first before being added')
+        } else if (failed.length > 0) {
+          toast(`${group.invites.length - failed.length} invite(s) sent. ${failed.length} failed (user may not be signed up yet).`)
+        } else {
+          toast.success(`${group.invites.length} invite(s) sent!`)
+        }
+      }
+
       await save({ onboarding_step: 6 })
       setStep(6)
     } catch (err) {
@@ -453,6 +470,12 @@ export default function Onboarding() {
   async function handleFinish() {
     setLoading(true)
     await save({ onboarding_complete: true })
+    // Apply the chosen workspace mode to the session so the dashboard opens correctly
+    if (needsGroup && createdGroup) {
+      setActiveWorkspace({ mode: 'team', groupId: createdGroup.id, groupName: createdGroup.name })
+    } else {
+      setActiveWorkspace({ mode: 'personal', groupId: null, groupName: null })
+    }
     window.location.replace('/dashboard')
   }
 
