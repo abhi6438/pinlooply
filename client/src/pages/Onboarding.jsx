@@ -5,6 +5,11 @@ import { useWorkspace } from '../context/WorkspaceContext'
 import { supabase } from '../config/supabase'
 import { projectsApi } from '../services/api'
 import api, { groupsApi } from '../services/api'
+
+// Save profile fields via server (supabaseAdmin) — bypasses RLS
+async function saveProfile(fields) {
+  await api.patch('/api/auth/profile', fields)
+}
 import { PROFESSIONS } from '../config/professions'
 import toast from 'react-hot-toast'
 import { ChevronLeft, Check, Plus, X } from 'lucide-react'
@@ -374,7 +379,7 @@ export default function Onboarding() {
       if (invite) {
         const { inviteCode } = JSON.parse(invite)
         if (savedName) {
-          await supabase.from('users').update({ mode: 'team', onboarding_complete: true }).eq('id', user.id)
+          await saveProfile({ mode: 'team', onboarding_complete: true })
           navigate(`/invite/${inviteCode}`)
           return
         }
@@ -389,36 +394,41 @@ export default function Onboarding() {
     loadProgress()
   }, [user]) // eslint-disable-line
 
-  async function save(updates) {
-    await supabase.from('users').update(updates).eq('id', user.id)
-  }
-
   async function handleStep1() {
     setLoading(true)
-    if (pendingInvite) {
-      await save({ name, mode: 'team', onboarding_complete: true })
-      setLoading(false)
-      navigate(`/invite/${pendingInvite.inviteCode}`)
-      return
-    }
-    await save({ name, onboarding_step: 2 })
-    setLoading(false)
-    setStep(2)
+    try {
+      if (pendingInvite) {
+        await saveProfile({ name, mode: 'team', onboarding_complete: true })
+        navigate(`/invite/${pendingInvite.inviteCode}`)
+        return
+      }
+      await saveProfile({ name, onboarding_step: 2 })
+      setStep(2)
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to save — please try again')
+    } finally { setLoading(false) }
   }
 
   async function handleStep2() {
     setLoading(true)
-    try { await saveProfession(profession) } catch { /* non-fatal */ }
-    try { await save({ profession, onboarding_step: 3 }) } catch { /* non-fatal */ }
+    try { await saveProfession(profession) } catch { /* non-fatal — WorkspaceContext update */ }
+    try {
+      await saveProfile({ profession, onboarding_step: 3 })
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to save profession')
+    }
     setLoading(false)
     setStep(3)
   }
 
   async function handleStep3() {
     setLoading(true)
-    await save({ mode, onboarding_step: 4 })
-    setLoading(false)
-    setStep(4)
+    try {
+      await saveProfile({ mode, onboarding_step: 4 })
+      setStep(4)
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to save — please try again')
+    } finally { setLoading(false) }
   }
 
   async function handleStep4() {
@@ -426,7 +436,7 @@ export default function Onboarding() {
     try {
       await projectsApi.create({ name: project.name, description: project.description || null, color: project.color })
       const next = needsGroup ? 5 : 6
-      await save({ onboarding_step: next })
+      await saveProfile({ onboarding_step: next })
       setStep(next)
     } catch (err) {
       toast.error(err?.response?.data?.error || err.message || 'Failed to create project')
@@ -440,7 +450,7 @@ export default function Onboarding() {
       const grp = res.data?.data
       if (grp) setCreatedGroup(grp)
 
-      // Send invites — handle each independently so one failure doesn't block the rest
+      // Send invites — each independently so one failure doesn't block the rest
       if (grp && group.invites.length > 0) {
         const results = await Promise.allSettled(
           group.invites.map(email => groupsApi.inviteMember(grp.id, email))
@@ -455,7 +465,7 @@ export default function Onboarding() {
         }
       }
 
-      await save({ onboarding_step: 6 })
+      await saveProfile({ onboarding_step: 6 })
       setStep(6)
     } catch (err) {
       toast.error(err?.response?.data?.error || err.message || 'Failed to create team')
@@ -463,16 +473,16 @@ export default function Onboarding() {
   }
 
   async function handleSkipGroup() {
-    await save({ onboarding_step: 6 })
+    try { await saveProfile({ onboarding_step: 6 }) } catch { /* non-fatal */ }
     setStep(6)
   }
 
   async function handleFinish() {
     setLoading(true)
-    await save({ onboarding_complete: true })
-    // Apply the chosen workspace mode to the session so the dashboard opens correctly
-    if (needsGroup && createdGroup) {
-      setActiveWorkspace({ mode: 'team', groupId: createdGroup.id, groupName: createdGroup.name })
+    try { await saveProfile({ onboarding_complete: true }) } catch { /* non-fatal */ }
+    // Apply chosen mode to session so dashboard opens correctly
+    if (needsGroup) {
+      setActiveWorkspace({ mode: 'team', groupId: createdGroup?.id || null, groupName: createdGroup?.name || null })
     } else {
       setActiveWorkspace({ mode: 'personal', groupId: null, groupName: null })
     }

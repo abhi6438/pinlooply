@@ -304,4 +304,88 @@ router.post('/groups/merge', async (req, res) => {
   }
 })
 
+// ── POST /api/data-management/reset-all ──────────────────────
+// Hard-delete ALL data owned by the current user.
+// Order matters: delete child rows before parents to avoid FK violations.
+router.post('/reset-all', async (req, res) => {
+  const userId = req.user.id
+  try {
+    // 1. Get all project IDs owned by this user
+    const { data: projects } = await supabaseAdmin
+      .from('projects')
+      .select('id')
+      .eq('owner_id', userId)
+    const projectIds = (projects || []).map(p => p.id)
+
+    if (projectIds.length > 0) {
+      // 2. Get all topic IDs to delete topic_versions
+      const { data: topicRows } = await supabaseAdmin
+        .from('topics')
+        .select('id')
+        .in('project_id', projectIds)
+      const topicIds = (topicRows || []).map(t => t.id)
+
+      // 3. Get all task IDs to delete task_custom_values and test cases (stored as tasks)
+      const { data: taskRows } = await supabaseAdmin
+        .from('tasks')
+        .select('id')
+        .in('project_id', projectIds)
+      const taskIds = (taskRows || []).map(t => t.id)
+
+      // 4. Get all discussion IDs to delete discussion_topic_map
+      const { data: discRows } = await supabaseAdmin
+        .from('discussions')
+        .select('id')
+        .in('project_id', projectIds)
+      const discIds = (discRows || []).map(d => d.id)
+
+      // Delete child rows
+      if (topicIds.length > 0) {
+        await supabaseAdmin.from('topic_versions').delete().in('topic_id', topicIds)
+        await supabaseAdmin.from('discussion_topic_map').delete().in('topic_id', topicIds)
+      }
+      if (discIds.length > 0) {
+        await supabaseAdmin.from('discussion_topic_map').delete().in('discussion_id', discIds)
+      }
+      if (taskIds.length > 0) {
+        await supabaseAdmin.from('task_custom_values').delete().in('task_id', taskIds)
+      }
+
+      // Delete project-scoped rows
+      await supabaseAdmin.from('tasks').delete().in('project_id', projectIds)
+      await supabaseAdmin.from('discussions').delete().in('project_id', projectIds)
+      await supabaseAdmin.from('topics').delete().in('project_id', projectIds)
+      await supabaseAdmin.from('publish_pages').delete().in('project_id', projectIds)
+      await supabaseAdmin.from('workspace_custom_fields').delete().in('project_id', projectIds)
+      // Delete the projects themselves
+      await supabaseAdmin.from('projects').delete().in('id', projectIds)
+    }
+
+    // 5. Delete groups owned by user (remove members first)
+    const { data: ownedGroups } = await supabaseAdmin
+      .from('groups')
+      .select('id')
+      .eq('owner_id', userId)
+    const ownedGroupIds = (ownedGroups || []).map(g => g.id)
+    if (ownedGroupIds.length > 0) {
+      await supabaseAdmin.from('group_members').delete().in('group_id', ownedGroupIds)
+      await supabaseAdmin.from('groups').delete().in('id', ownedGroupIds)
+    }
+    // Also remove this user from any groups they're a member of (but don't own)
+    await supabaseAdmin.from('group_members').delete().eq('user_id', userId)
+
+    // 6. Delete user-level records
+    await supabaseAdmin.from('time_entries').delete().eq('user_id', userId)
+    await supabaseAdmin.from('notifications').delete().eq('user_id', userId)
+    await supabaseAdmin.from('automation_rules').delete().eq('user_id', userId)
+    await supabaseAdmin.from('workspace_custom_fields').delete().eq('user_id', userId)
+    await supabaseAdmin.from('conflicts').delete().eq('user_id', userId)
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('Reset-all error:', err)
+    res.status(500).json({ error: err.message || 'Reset failed' })
+  }
+})
+
 export default router

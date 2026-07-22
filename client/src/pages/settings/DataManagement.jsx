@@ -4,13 +4,14 @@ import api from '../../services/api'
 import {
   FolderOpen, ListChecks, Users, UsersRound, Trash2,
   Loader2, AlertTriangle, GitMerge, ChevronRight, X,
-  Search, RefreshCw,
+  Search, RefreshCw, ShieldAlert,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../../components/ui'
 
 // ── API helpers ───────────────────────────────────────────────
 const dmApi = {
+  resetAll: ()       => api.post('/api/data-management/reset-all'),
   projects: ()       => api.get('/api/data-management/projects'),
   tasks:    (pid)    => api.get('/api/data-management/tasks', { params: pid ? { project_id: pid } : {} }),
   members:  ()       => api.get('/api/data-management/members'),
@@ -512,6 +513,117 @@ function GroupsTab() {
   )
 }
 
+// ── Danger Zone — Delete All Data ────────────────────────────
+function DangerZone() {
+  const [step, setStep]       = useState(0)   // 0=idle 1=confirm-dialog 2=type-confirm
+  const [typed, setTyped]     = useState('')
+  const [loading, setLoading] = useState(false)
+  const CONFIRM_PHRASE = 'delete my data'
+
+  async function handleReset() {
+    if (typed.trim().toLowerCase() !== CONFIRM_PHRASE) return
+    setLoading(true)
+    try {
+      await dmApi.resetAll()
+      toast.success('All data deleted. Reloading…')
+      setTimeout(() => window.location.replace('/dashboard'), 1500)
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Reset failed')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="mt-8 border-2 border-red-200 rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-3 bg-red-50 px-5 py-4 border-b border-red-200">
+        <ShieldAlert className="w-5 h-5 text-red-500 flex-shrink-0" />
+        <div>
+          <p className="text-sm font-bold text-red-700">Danger Zone</p>
+          <p className="text-xs text-red-500 mt-0.5">These actions are irreversible. Proceed with extreme caution.</p>
+        </div>
+      </div>
+      <div className="px-5 py-4 bg-white">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-warm-900">Delete all my data</p>
+            <p className="text-xs text-warm-500 mt-1">
+              Permanently removes all your projects, tasks, topics, discussions, test cases, time entries, groups, and workspace settings.
+              Your account remains but the workspace will be empty.
+            </p>
+          </div>
+          <button
+            onClick={() => setStep(1)}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-xs font-semibold transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete Everything
+          </button>
+        </div>
+      </div>
+
+      {/* Step 1 — initial confirm dialog */}
+      {step === 1 && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-fade-in">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="w-6 h-6 text-red-500" />
+            </div>
+            <h3 className="text-base font-bold text-warm-900 text-center mb-1">Delete all data?</h3>
+            <p className="text-sm text-warm-500 text-center mb-5">
+              This will permanently erase every project, task, topic, discussion, test case, group, and time entry from your account. <strong>This cannot be undone.</strong>
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setStep(0)} className="flex-1 btn btn-secondary">Cancel</button>
+              <button
+                onClick={() => { setTyped(''); setStep(2) }}
+                className="flex-1 btn bg-red-600 text-white hover:bg-red-700 border-red-600"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2 — type-to-confirm */}
+      {step === 2 && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-warm-900">Final confirmation</h3>
+              <button onClick={() => setStep(0)} className="p-1.5 text-warm-400 hover:text-warm-700 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-warm-500 mb-4">
+              Type <strong className="text-warm-900 font-mono">{CONFIRM_PHRASE}</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              value={typed}
+              onChange={e => setTyped(e.target.value)}
+              placeholder={CONFIRM_PHRASE}
+              className="input mb-5"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setStep(0)} disabled={loading} className="flex-1 btn btn-secondary">Cancel</button>
+              <button
+                onClick={handleReset}
+                disabled={typed.trim().toLowerCase() !== CONFIRM_PHRASE || loading}
+                className="flex-1 btn bg-red-600 text-white hover:bg-red-700 border-red-600 flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Delete Everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────
 const TABS = [
   { key: 'projects', label: 'Projects', icon: FolderOpen },
@@ -578,6 +690,8 @@ export default function DataManagement() {
         {activeTab === 'members'  && <MembersTab />}
         {activeTab === 'groups'   && <GroupsTab />}
       </div>
+
+      <DangerZone />
     </PageShell>
   )
 }

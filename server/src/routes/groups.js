@@ -161,31 +161,55 @@ router.post('/:groupId/join', requireAuth, async (req, res) => {
 })
 
 // ── POST /api/groups/:groupId/members — invite by email ──────────
+// If the user already has an account → add them directly.
+// If not → send a Supabase invite email so they sign up and land in the app.
 router.post('/:groupId/members', requireAuth, checkMemberLimit, async (req, res) => {
   try {
     const userId = req.user.id
     const { groupId } = req.params
-    const email = req.body?.email  // safe guard against undefined body
+    const email = req.body?.email?.trim().toLowerCase()
 
     const member = await getMember(groupId, userId)
     if (!member || !['owner', 'admin'].includes(member.role))
       return res.status(403).json({ error: 'Only owners/admins can invite' })
 
-    if (!email?.trim()) return res.status(400).json({ error: 'Email required' })
+    if (!email) return res.status(400).json({ error: 'Email required' })
 
-    // Find the invitee — checks public.users then falls back to auth.users
+    // Case 1: user already has an account — add them immediately
     const invitee = await findUserByEmail(email)
-    if (!invitee) return res.status(404).json({ error: 'User not found — they must sign up first' })
+    if (invitee) {
+      const existing = await getMember(groupId, invitee.id)
+      if (existing) return res.status(409).json({ error: 'User is already a member' })
 
-    const existing = await getMember(groupId, invitee.id)
-    if (existing) return res.status(409).json({ error: 'User is already a member' })
+      const { error } = await supabaseAdmin
+        .from('group_members')
+        .insert({ group_id: groupId, user_id: invitee.id, role: 'member' })
 
-    const { error } = await supabaseAdmin
-      .from('group_members')
-      .insert({ group_id: groupId, user_id: invitee.id, role: 'member' })
+      if (error) return res.status(500).json({ error: error.message })
+      return res.json({ success: true, data: invitee, invited: false })
+    }
 
-    if (error) return res.status(500).json({ error: error.message })
-    res.json({ success: true, data: invitee })
+    // Case 2: user doesn't have an account — send a Supabase invite email
+    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${process.env.CLIENT_URL || 'http://localhost:5173'}/onboarding`,
+    })
+
+    if (inviteError) {
+      console.error('Invite email error:', inviteError)
+      return res.status(500).json({ error: inviteError.message || 'Failed to send invite email' })
+    }
+
+    // Pre-create the group_members row so when they sign up they're already in the group.
+    // The new user's ID comes from the invite response.
+    const newUserId = inviteData?.user?.id
+    if (newUserId) {
+      // Upsert — ignore if already exists
+      await supabaseAdmin
+        .from('group_members')
+        .upsert({ group_id: groupId, user_id: newUserId, role: 'member' }, { onConflict: 'group_id,user_id' })
+    }
+
+    res.json({ success: true, data: { email }, invited: true })
   } catch (err) {
     console.error('Invite member error:', err)
     res.status(500).json({ error: err.message || 'Internal server error' })
