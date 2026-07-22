@@ -9,6 +9,7 @@ const router = Router()
 router.get('/', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id
+    const { group_id } = req.query
 
     // Get user context (profession, vocabulary) for AI hints
     const { data: profile } = await supabaseAdmin
@@ -20,6 +21,8 @@ router.get('/', requireAuth, async (req, res) => {
     const suggestions = await generateSuggestions(userId, {
       profession: profile?.profession,
       vocabulary: profile?.vocabulary,
+      groupId: group_id && group_id !== 'personal' ? group_id : null,
+      personalOnly: group_id === 'personal',
     })
 
     res.json({ data: suggestions })

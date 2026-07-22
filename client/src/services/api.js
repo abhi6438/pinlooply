@@ -200,5 +200,7 @@ export const searchApi = {
 }
 
 export const suggestionsApi = {
-  get: () => api.get('/api/suggestions'),
+  get: ({ groupId } = {}) => api.get('/api/suggestions', {
+    params: groupId ? { group_id: groupId } : { group_id: 'personal' },
+  }),
 }

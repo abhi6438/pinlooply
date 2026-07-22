@@ -5,16 +5,35 @@
 import { supabaseAdmin } from '../../config/supabase.js'
 import { callGroq } from './groqService.js'
 
-// ── Fetch open tasks for the user ─────────────────────────────
-async function fetchOpenTasks(userId) {
-  const [{ data: owned }, { data: membered }] = await Promise.all([
-    supabaseAdmin.from('projects').select('id').eq('user_id', userId),
-    supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId),
-  ])
-  const projectIds = [
-    ...(owned    || []).map(p => p.id),
-    ...(membered || []).map(m => m.project_id),
-  ]
+// ── Fetch open tasks scoped to workspace ──────────────────────
+async function fetchOpenTasks(userId, { groupId = null, personalOnly = false } = {}) {
+  let projectIds = []
+
+  if (groupId) {
+    // Team workspace: tasks from all projects in the group
+    const { data: groupProjects } = await supabaseAdmin
+      .from('projects').select('id').eq('group_id', groupId)
+    projectIds = (groupProjects || []).map(p => p.id)
+  } else {
+    // Personal or unscoped: owned + project_members, no group
+    const [{ data: owned }, { data: membered }] = await Promise.all([
+      supabaseAdmin.from('projects').select('id').eq('user_id', userId),
+      supabaseAdmin.from('project_members').select('project_id').eq('user_id', userId),
+    ])
+    const allIds = [
+      ...(owned    || []).map(p => p.id),
+      ...(membered || []).map(m => m.project_id),
+    ]
+    if (personalOnly && allIds.length) {
+      // Filter to only projects with no group_id
+      const { data: personal } = await supabaseAdmin
+        .from('projects').select('id').is('group_id', null).in('id', allIds)
+      projectIds = (personal || []).map(p => p.id)
+    } else {
+      projectIds = allIds
+    }
+  }
+
   if (!projectIds.length) return []
 
   const { data: tasks } = await supabaseAdmin
@@ -103,12 +122,13 @@ Respond with a JSON array of strings (one sentence per task, same order):
 
 // ── Main export ───────────────────────────────────────────────
 export async function generateSuggestions(userId, userContext = {}) {
-  const allTasks = await fetchOpenTasks(userId)
+  const { groupId, personalOnly, ...ctx } = userContext
+  const allTasks = await fetchOpenTasks(userId, { groupId, personalOnly })
   if (!allTasks.length) return []
 
   const ranked = scoreTasks(allTasks)
   const top5   = ranked.slice(0, 5)
-  const withReasons = await generateRationale(top5, userContext)
+  const withReasons = await generateRationale(top5, ctx)
 
   return withReasons.map(t => ({
     id:            t.id,

@@ -806,7 +806,7 @@ export default function Dashboard() {
       })
     // Load AI suggestions (non-blocking, fire-and-forget style)
     setSuggestLoading(true)
-    suggestionsApi.get()
+    suggestionsApi.get({ groupId: activeGroupId })
       .then(r => setSuggestions(r.data.data || []))
       .catch(() => {})
       .finally(() => setSuggestLoading(false))
@@ -814,23 +814,19 @@ export default function Dashboard() {
 
   function refreshSuggestions() {
     setSuggestLoading(true)
-    suggestionsApi.get()
+    suggestionsApi.get({ groupId: activeGroupId })
       .then(r => setSuggestions(r.data.data || []))
       .catch(() => {})
       .finally(() => setSuggestLoading(false))
   }
 
   useEffect(() => {
-    if (userMode !== 'team' && userMode !== 'org') return
-    groupsApi.list()
-      .then(r => {
-        const list = r.data.data || []
-        if (!list.length) return
-        return groupsApi.get(list[0].id)
-      })
+    // Only load group data if we're actively in a team workspace session
+    if (!activeGroupId) { setGroup(null); return }
+    groupsApi.get(activeGroupId)
       .then(r => r && setGroup(r.data.data))
       .catch(() => {})
-  }, [userMode])
+  }, [activeGroupId])
 
   function handleProjectCreated() {
     fetchProjects(user.id, { groupId: activeGroupId, force: true })
