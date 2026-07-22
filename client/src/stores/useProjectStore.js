@@ -1,30 +1,28 @@
 import { create } from 'zustand'
-import { supabase } from '../config/supabase'
+import { projectsApi } from '../services/api'
 
-const STALE_MS = 30_000 // 30 seconds — skip re-fetch if data is this fresh
+const STALE_MS = 30_000 // 30 seconds
 
 export const useProjectStore = create((set, get) => ({
   projects: [],
   activeProject: null,
   loading: false,
   fetchedAt: null,
+  lastGroupId: undefined, // track which workspace we last fetched for
 
-  fetchProjects: async (userId, { force = false } = {}) => {
-    const { fetchedAt, loading } = get()
-    // Skip if already loading or data is fresh (unless forced)
+  fetchProjects: async (userId, { force = false, groupId = null } = {}) => {
+    const { fetchedAt, loading, lastGroupId } = get()
     if (loading) return
-    if (!force && fetchedAt && Date.now() - fetchedAt < STALE_MS) return
+    // Force refetch when workspace changes
+    const workspaceChanged = lastGroupId !== groupId
+    if (!force && !workspaceChanged && fetchedAt && Date.now() - fetchedAt < STALE_MS) return
 
     set({ loading: true })
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-    if (error) {
-      console.error('[fetchProjects] error:', error.message)
-    } else {
-      set({ projects: data ?? [], fetchedAt: Date.now() })
+    try {
+      const res = await projectsApi.list({ groupId })
+      set({ projects: res.data.data ?? [], fetchedAt: Date.now(), lastGroupId: groupId })
+    } catch (err) {
+      console.error('[fetchProjects] error:', err.message)
     }
     set({ loading: false })
   },

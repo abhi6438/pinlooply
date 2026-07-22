@@ -314,7 +314,7 @@ function ProjectCard({ project, onEdit, onArchive }) {
 
 // ── Main Page ─────────────────────────────────────────────────
 export default function Projects() {
-  const { profession } = useWorkspace()
+  const { profession, activeGroupId } = useWorkspace()
   const [projects,      setProjects]      = useState([])
   const [loading,       setLoading]       = useState(true)
   const [modal,         setModal]         = useState(null)   // null | 'create' | project object
@@ -323,12 +323,12 @@ export default function Projects() {
   const [upgradeMsg,    setUpgradeMsg]    = useState(null)
   const [archiveTarget, setArchiveTarget] = useState(null)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [activeGroupId]) // eslint-disable-line
 
   async function load() {
     setLoading(true)
     try {
-      const res = await projectsApi.list()
+      const res = await projectsApi.list({ groupId: activeGroupId })
       setProjects(res.data.data || [])
     } catch { toast.error('Failed to load projects') }
     finally { setLoading(false) }
@@ -343,6 +343,7 @@ export default function Projects() {
       // Create new project — attach template statuses if chosen
       const createPayload = {
         ...payload,
+        group_id: activeGroupId || null,
         custom_statuses: selectedTpl && selectedTpl.id !== 'blank'
           ? selectedTpl.statuses
           : null,

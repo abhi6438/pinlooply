@@ -456,7 +456,7 @@ export default function Onboarding() {
   async function handleStep4() {
     setLoading(true)
     try {
-      await projectsApi.create({ name: project.name, description: project.description || null, color: project.color })
+      await projectsApi.create({ name: project.name, description: project.description || null, color: project.color, group_id: needsGroup ? (createdGroup?.id || null) : null })
       const next = needsGroup ? 5 : 6
       await saveProfile({ onboarding_step: next })
       setStep(next)

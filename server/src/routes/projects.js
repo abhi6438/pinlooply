@@ -13,36 +13,53 @@ function calcHealth(overdueCount, deadlineSoon) {
 }
 
 // ── GET /api/projects — all projects for user ─────────────────────
+// ?group_id=<uuid>  → return only projects belonging to that group
+// ?group_id=personal → return only personal projects (group_id IS NULL)
 router.get('/', requireAuth, async (req, res) => {
   const userId = req.user.id
+  const { group_id } = req.query
   const now = new Date().toISOString()
   const in3days = new Date(Date.now() + 3 * 86400000).toISOString()
 
-  // Owned + membered projects
-  const { data: owned } = await supabaseAdmin
-    .from('projects')
-    .select('id, name, description, color, created_at, user_id, custom_statuses')
-    .eq('user_id', userId)
-    .neq('status', 'archived')
-    .order('created_at', { ascending: false })
+  let projects = []
 
-  const { data: membered } = await supabaseAdmin
-    .from('project_members')
-    .select('project_id, projects(id, name, description, color, created_at, user_id, archived)')
-    .eq('user_id', userId)
+  if (group_id && group_id !== 'personal') {
+    // Team workspace: fetch ALL projects belonging to this group
+    const { data } = await supabaseAdmin
+      .from('projects')
+      .select('id, name, description, color, created_at, user_id, custom_statuses, group_id')
+      .eq('group_id', group_id)
+      .neq('status', 'archived')
+      .order('created_at', { ascending: false })
+    projects = data || []
+  } else {
+    // Personal workspace: fetch only the user's own projects with no group
+    const { data: owned } = await supabaseAdmin
+      .from('projects')
+      .select('id, name, description, color, created_at, user_id, custom_statuses, group_id')
+      .eq('user_id', userId)
+      .is('group_id', null)
+      .neq('status', 'archived')
+      .order('created_at', { ascending: false })
 
-  const memberProjects = (membered || [])
-    .map(m => m.projects)
-    .filter(p => p && p.status !== 'archived')
+    const { data: membered } = await supabaseAdmin
+      .from('project_members')
+      .select('project_id, projects(id, name, description, color, created_at, user_id, archived, group_id)')
+      .eq('user_id', userId)
 
-  // Merge, deduplicate
-  const allProjects = [...(owned || []), ...memberProjects]
-  const seen = new Set()
-  const projects = allProjects.filter(p => {
-    if (seen.has(p.id)) return false
-    seen.add(p.id)
-    return true
-  })
+    const memberProjects = (membered || [])
+      .map(m => m.projects)
+      .filter(p => p && p.status !== 'archived' && !p.group_id)
+
+    // Merge, deduplicate
+    const allProjects = [...(owned || []), ...memberProjects]
+    const seen = new Set()
+    projects = allProjects.filter(p => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }
 
   if (!projects.length) return res.json({ success: true, data: [] })
 
@@ -105,7 +122,7 @@ router.get('/', requireAuth, async (req, res) => {
 // ── POST /api/projects — create project ───────────────────────────
 router.post('/', requireAuth, checkProjectLimit, async (req, res) => {
   const userId = req.user.id
-  const { name, description, color, custom_statuses } = req.body
+  const { name, description, color, custom_statuses, group_id } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' })
 
   // Ensure the user row exists in public.users before inserting (guards against
@@ -119,6 +136,7 @@ router.post('/', requireAuth, checkProjectLimit, async (req, res) => {
     description: description?.trim() || null,
     color: color || '#6366f1',
     user_id: userId,
+    group_id: group_id || null,
   }
   if (custom_statuses) insert.custom_statuses = custom_statuses
 

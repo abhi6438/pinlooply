@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProjectStore } from '../stores/useProjectStore'
+import { useWorkspace } from '../context/WorkspaceContext'
 import { topicsApi } from '../services/api'
 import {
   Tag, AlertTriangle, MessageSquare,
@@ -83,6 +84,7 @@ function TopicCard({ topic, onClick }) {
 // ── Main ──────────────────────────────────────────────────────
 export default function Topics() {
   const { user } = useAuth()
+  const { activeGroupId } = useWorkspace()
   const { projects, fetchProjects } = useProjectStore()
   const navigate = useNavigate()
 
@@ -94,8 +96,8 @@ export default function Topics() {
   const [sort, setSort]       = useState('updated_at:desc')
 
   useEffect(() => {
-    if (user && !projects.length) fetchProjects(user.id)
-  }, [user]) // eslint-disable-line
+    if (user) fetchProjects(user.id, { groupId: activeGroupId })
+  }, [user, activeGroupId]) // eslint-disable-line
 
   useEffect(() => {
     if (projects.length && !selectedProject) setSelectedProject(projects[0].id)

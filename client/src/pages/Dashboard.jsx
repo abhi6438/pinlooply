@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useProjectStore } from '../stores/useProjectStore'
+import { useWorkspace } from '../context/WorkspaceContext'
 import { supabase } from '../config/supabase'
 import { discussionsApi, groupsApi, projectsApi, tasksApi, suggestionsApi } from '../services/api'
 import { format } from 'date-fns'
@@ -32,7 +33,7 @@ function healthColor(count) {
 // ── New Project Modal ─────────────────────────────────────────
 const PROJECT_COLORS = ['#7C3AED', '#3B82F6', '#0D9488', '#16A34A', '#CA8A04', '#EA580C', '#DC2626', '#6366F1']
 
-function NewProjectModal({ onClose, onCreated }) {
+function NewProjectModal({ onClose, onCreated, groupId }) {
   const [name,   setName]   = useState('')
   const [desc,   setDesc]   = useState('')
   const [color,  setColor]  = useState(PROJECT_COLORS[0])
@@ -46,7 +47,7 @@ function NewProjectModal({ onClose, onCreated }) {
     if (!name.trim()) return
     setSaving(true)
     try {
-      const res = await projectsApi.create({ name: name.trim(), description: desc.trim(), color })
+      const res = await projectsApi.create({ name: name.trim(), description: desc.trim(), color, group_id: groupId || null })
       toast.success('Project created!')
       onCreated(res.data.data || res.data)
     } catch (err) {
@@ -762,6 +763,7 @@ function GettingStarted({ completedIds, onDismiss }) {
 // ── Dashboard ─────────────────────────────────────────────────
 export default function Dashboard() {
   const { user } = useAuth()
+  const { activeGroupId } = useWorkspace()
   const { projects, loading: projectsLoading, fetchProjects } = useProjectStore()
   const [userName, setUserName]         = useState('')
   const [userMode, setUserMode]         = useState('personal')
@@ -792,7 +794,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return
     loadTasks()
-    fetchProjects(user.id)
+    fetchProjects(user.id, { groupId: activeGroupId })
     supabase.from('users').select('name, mode').eq('id', user.id).single()
       .then(({ data }) => {
         setUserName(data?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'there')
@@ -827,7 +829,7 @@ export default function Dashboard() {
   }, [userMode])
 
   function handleProjectCreated() {
-    fetchProjects(user.id)
+    fetchProjects(user.id, { groupId: activeGroupId, force: true })
     setShowNewProject(false)
   }
 
@@ -1074,6 +1076,7 @@ export default function Dashboard() {
         <NewProjectModal
           onClose={() => setShowNewProject(false)}
           onCreated={handleProjectCreated}
+          groupId={activeGroupId}
         />
       )}
     </PageShell>

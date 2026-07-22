@@ -1224,7 +1224,7 @@ function ListView({ tasks, groupMembers, filterProject, setFilterProject, filter
 // ── Main Component ────────────────────────────────────────────
 export default function Lists() {
   const { user } = useAuth()
-  const { getEffectiveStatuses } = useWorkspace()
+  const { getEffectiveStatuses, activeGroupId } = useWorkspace()
   const { projects, loading: projectsLoading, fetchProjects } = useProjectStore()
 
   const [view, setView]           = useState('board') // 'board' | 'list'
@@ -1259,10 +1259,10 @@ export default function Lists() {
   // Load data on mount
   useEffect(() => {
     if (!user) return
-    fetchProjects(user.id)
+    fetchProjects(user.id, { groupId: activeGroupId })
     loadTasks()
     loadGroupMembers()
-  }, [user]) // eslint-disable-line
+  }, [user, activeGroupId]) // eslint-disable-line
 
   async function loadTasks() {
     setLoading(true)

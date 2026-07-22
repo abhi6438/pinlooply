@@ -532,6 +532,7 @@ function QuickCreateFAB() {
 export default function AppLayout({ children }) {
   const { user, logout } = useAuth()
   const { fetchProjects } = useProjectStore()
+  const { activeGroupId } = useWorkspace()
   const navigate = useNavigate()
   const [userProfile, setUserProfile] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -548,7 +549,7 @@ export default function AppLayout({ children }) {
       if (data) setUserProfile(data)
     }
     loadProfile()
-    fetchProjects(user.id)
+    fetchProjects(user.id, { groupId: activeGroupId })
 
     async function loadNotifications() {
       try {
@@ -573,7 +574,7 @@ export default function AppLayout({ children }) {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [user?.id]) // eslint-disable-line
+  }, [user?.id, activeGroupId]) // eslint-disable-line
 
   async function markRead(id) {
     setNotifications(ns => ns.map(n => n.id === id ? { ...n, is_read: true } : n))

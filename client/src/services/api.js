@@ -52,7 +52,7 @@ export const groupsApi = {
 }
 
 export const projectsApi = {
-  list: () => api.get('/api/projects'),
+  list: ({ groupId } = {}) => api.get('/api/projects', { params: groupId ? { group_id: groupId } : { group_id: 'personal' } }),
   create: (payload) => api.post('/api/projects', payload),
   update: (projectId, payload) => api.patch(`/api/projects/${projectId}`, payload),
   archive: (projectId) => api.delete(`/api/projects/${projectId}`),

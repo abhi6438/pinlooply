@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useAuth } from '../context/AuthContext'
+import { useWorkspace } from '../context/WorkspaceContext'
 import { timelineApi } from '../services/api'
 import {
   MessageSquare, CheckSquare2, Tag, AlertTriangle,
@@ -195,6 +196,7 @@ function EventCard({ e, q }) {
 // ── Main ──────────────────────────────────────────────────────
 export default function Timeline() {
   const { user } = useAuth()
+  const { activeGroupId } = useWorkspace()
   const { projects, fetchProjects } = useProjectStore()
 
   const [events,   setEvents]   = useState([])
@@ -205,7 +207,7 @@ export default function Timeline() {
   const [fFrom,    setFFrom]    = useState('')
   const [fTo,      setFTo]      = useState('')
 
-  useEffect(() => { if (user && !projects.length) fetchProjects(user.id) }, [user]) // eslint-disable-line
+  useEffect(() => { if (user) fetchProjects(user.id, { groupId: activeGroupId }) }, [user, activeGroupId]) // eslint-disable-line
   useEffect(() => { load() }, []) // eslint-disable-line
 
   async function load() {
