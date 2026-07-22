@@ -1,37 +1,38 @@
 import { supabaseAdmin } from '../config/supabase.js'
 
 // ── Plan definitions ──────────────────────────────────────────
+// All plans are free — no payment required for any mode.
 export const PLAN_LIMITS = {
   personal_free: {
-    projects:       3,
+    projects:       Infinity,
     group_members:  0,
-    history_days:   90,
+    history_days:   Infinity,
     ai_provider:    'groq',
-    label:          'Personal (Free)',
+    label:          'Personal',
     mode:           'personal',
   },
   group_free: {
-    projects:       3,
-    group_members:  5,
-    history_days:   90,
+    projects:       Infinity,
+    group_members:  Infinity,
+    history_days:   Infinity,
     ai_provider:    'groq',
-    label:          'Group (Free)',
+    label:          'Group',
     mode:           'group',
   },
   team_paid: {
     projects:       Infinity,
-    group_members:  20,
+    group_members:  Infinity,
     history_days:   Infinity,
-    ai_provider:    'claude',
-    label:          'Team (Paid)',
+    ai_provider:    'groq',
+    label:          'Team',
     mode:           'team',
   },
   org_paid: {
     projects:       Infinity,
     group_members:  Infinity,
     history_days:   Infinity,
-    ai_provider:    'claude',
-    label:          'Org (Paid)',
+    ai_provider:    'groq',
+    label:          'Org',
     mode:           'org',
   },
 }
@@ -39,11 +40,10 @@ export const PLAN_LIMITS = {
 // ── Derive plan key from user row ─────────────────────────────
 export function getPlanKey(user) {
   const mode = user?.mode || 'personal'
-  const plan = user?.plan || 'free'
   if (mode === 'personal') return 'personal_free'
   if (mode === 'group')    return 'group_free'
-  if (mode === 'team')     return plan === 'paid' ? 'team_paid' : 'group_free'
-  if (mode === 'org')      return plan === 'paid' ? 'org_paid'  : 'team_paid'
+  if (mode === 'team')     return 'team_paid'
+  if (mode === 'org')      return 'org_paid'
   return 'personal_free'
 }
 

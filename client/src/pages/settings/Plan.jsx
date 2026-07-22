@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { planApi } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
-import {
-  Check, Zap, Loader2, ExternalLink, Star,
-  ChevronRight, X, Coffee,
-} from 'lucide-react'
+import { Check, Zap, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../../components/ui'
 
@@ -36,170 +33,67 @@ function SettingsNav() {
 }
 
 // ── Plan definitions ──────────────────────────────────────────
-const BMC_URL = 'https://buymeacoffee.com/pinlooply'
-
 const PLANS = [
   {
-    key:   'personal_free',
-    label: 'Personal',
-    badge: 'Free',
-    icon:  '👤',
+    key:         'personal',
+    planKey:     'personal_free',
+    label:       'Personal',
+    icon:        '👤',
+    description: 'For individuals tracking their own work.',
     features: [
-      '3 projects',
-      '90 days history',
-      'Fast AI processing',
+      'Unlimited projects',
+      'Unlimited history',
+      'AI task extraction',
       'Standup generator',
       'Weekly summary',
     ],
-    cta: null,
   },
   {
-    key:   'group_free',
-    label: 'Group',
-    badge: 'Free',
-    icon:  '👥',
+    key:         'group',
+    planKey:     'group_free',
+    label:       'Group',
+    icon:        '👥',
+    description: 'For small teams collaborating together.',
     features: [
       'Everything in Personal',
-      'Up to 5 members',
+      'Unlimited team members',
       'Task assignment',
       'Member notifications',
       'Team standup',
     ],
-    cta: 'upgrade_free',
-    ctaLabel: 'Switch to Group (Free)',
-    upgradeMode: 'group',
   },
   {
-    key:   'team_paid',
-    label: 'Team',
-    badge: 'Paid',
-    icon:  '🏢',
-    price: '$5 / month',
+    key:         'team',
+    planKey:     'team_paid',
+    label:       'Team',
+    icon:        '🏢',
+    description: 'For growing teams that need more structure.',
     features: [
-      'Unlimited projects',
-      'Up to 20 members',
-      'Unlimited history',
-      'Advanced AI (better quality)',
-      'Priority support',
+      'Everything in Group',
+      'Multiple workspaces',
+      'Advanced board views',
+      'Custom status pipelines',
+      'Automation rules',
     ],
-    cta: 'donate',
-    ctaLabel: 'Upgrade to Team',
-    upgradeMode: 'team',
   },
   {
-    key:   'org_paid',
-    label: 'Org',
-    badge: 'Paid',
-    icon:  '🏗️',
-    price: 'Custom',
+    key:         'org',
+    planKey:     'org_paid',
+    label:       'Org',
+    icon:        '🏗️',
+    description: 'For organisations managing multiple teams.',
     features: [
       'Everything in Team',
-      'Unlimited members',
       'Multiple teams',
-      'Org dashboard',
+      'Org-level dashboard',
+      'Cross-team reporting',
       'Custom integrations',
     ],
-    cta: 'contact',
-    ctaLabel: 'Contact Us',
   },
 ]
 
-// ── Usage bar ─────────────────────────────────────────────────
-function UsageBar({ used, max, label }) {
-  const isInfinity  = max === Infinity
-  const pct         = isInfinity ? 0 : Math.min(100, Math.round((used / max) * 100))
-  const isNearLimit = pct >= 80
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs text-warm-500">{label}</span>
-        <span className={`text-xs font-semibold ${isNearLimit && !isInfinity ? 'text-amber-600' : 'text-warm-900'}`}>
-          {isInfinity ? `${used} used` : `${used} / ${max}`}
-        </span>
-      </div>
-      {!isInfinity && (
-        <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${isNearLimit ? 'bg-amber-500' : 'bg-primary-600'}`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Upgrade Modal (paid plans) ────────────────────────────────
-// No self-serve activation — user pays on BMC then contacts support.
-// Admin activates the plan manually from the Admin Panel.
-function DonateModal({ plan, onClose }) {
-  const [donated, setDonated] = useState(false)
-  const supportEmail = 'support@pinlooply.com'
-
-  function openBmc() {
-    window.open(BMC_URL, '_blank', 'noopener,noreferrer')
-    setDonated(true)
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="card w-full max-w-md p-6 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 p-1 rounded-lg hover:bg-warm-100 text-warm-400">
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="text-center mb-5">
-          <span className="text-4xl">{plan.icon}</span>
-          <h2 className="text-lg font-bold text-warm-900 mt-2">Upgrade to {plan.label}</h2>
-          {plan.price && <p className="text-sm text-warm-500 mt-0.5">{plan.price} · billed monthly</p>}
-        </div>
-
-        <ul className="space-y-2 mb-5">
-          {plan.features.map((f, i) => (
-            <li key={i} className="flex items-center gap-2 text-sm text-warm-600">
-              <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-              {f}
-            </li>
-          ))}
-        </ul>
-
-        {!donated ? (
-          <>
-            <p className="text-sm text-warm-500 text-center mb-4">
-              Pinlooply runs on community support. Support us on Buy Me a Coffee to unlock this plan.
-            </p>
-            <button onClick={openBmc} className="btn-primary w-full flex items-center justify-center gap-2 mb-3">
-              <Coffee className="w-4 h-4" />
-              Support on Buy Me a Coffee
-              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-            </button>
-          </>
-        ) : (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4 text-sm text-emerald-700">
-            🎉 Thank you for supporting Pinlooply!
-          </div>
-        )}
-
-        {/* Always-visible activation instructions */}
-        <div className="bg-warm-50 border border-warm-200 rounded-xl px-4 py-3 text-sm text-warm-600 space-y-1">
-          <p className="font-semibold text-warm-800">How to activate</p>
-          <p>After donating, email us your BMC receipt at:</p>
-          <a href={`mailto:${supportEmail}?subject=Team Plan Activation`}
-            className="font-mono text-primary-600 hover:underline break-all">
-            {supportEmail}
-          </a>
-          <p className="text-warm-400 text-xs mt-1">We'll activate your plan within 24 hours.</p>
-        </div>
-
-        <button onClick={onClose} className="btn-secondary w-full mt-4">Close</button>
-      </div>
-    </div>
-  )
-}
-
 // ── Plan card ─────────────────────────────────────────────────
-function PlanCard({ plan, isCurrent, onUpgrade, onOpenDonate, upgrading }) {
+function PlanCard({ plan, isCurrent, onSwitch, switching }) {
   return (
     <div className={`relative rounded-2xl p-5 flex flex-col gap-4 transition-all ${
       isCurrent ? 'card border-2 border-primary-500' : 'card-hover'
@@ -211,24 +105,17 @@ function PlanCard({ plan, isCurrent, onUpgrade, onOpenDonate, upgrading }) {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{plan.icon}</span>
-          <div>
-            <h3 className="text-sm font-bold text-warm-900">{plan.label}</h3>
-            <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${
-              plan.badge === 'Paid' ? 'bg-amber-100 text-amber-700' : 'bg-warm-100 text-warm-500'
-            }`}>
-              {plan.badge}
-            </span>
-          </div>
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">{plan.icon}</span>
+        <div>
+          <h3 className="text-sm font-bold text-warm-900">{plan.label}</h3>
+          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+            Free
+          </span>
         </div>
-        {plan.badge === 'Paid' && <Star className="w-4 h-4 text-amber-400" />}
       </div>
 
-      {plan.price && (
-        <p className="text-sm font-semibold text-warm-900 -mt-1">{plan.price}</p>
-      )}
+      <p className="text-xs text-warm-500 -mt-1">{plan.description}</p>
 
       {/* Features */}
       <ul className="space-y-1.5 flex-1">
@@ -241,43 +128,19 @@ function PlanCard({ plan, isCurrent, onUpgrade, onOpenDonate, upgrading }) {
       </ul>
 
       {/* CTA */}
-      {!isCurrent && plan.cta && (
-        <>
-          {plan.cta === 'upgrade_free' && (
-            <button
-              onClick={() => onUpgrade(plan.upgradeMode)}
-              disabled={upgrading}
-              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {upgrading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-              {plan.ctaLabel}
-            </button>
-          )}
-          {plan.cta === 'donate' && (
-            <button
-              onClick={() => onOpenDonate(plan)}
-              className="btn-primary w-full flex items-center justify-center gap-2"
-            >
-              <Coffee className="w-3.5 h-3.5" />
-              {plan.ctaLabel}
-            </button>
-          )}
-          {plan.cta === 'contact' && (
-            <a
-              href="mailto:support@pinlooply.com"
-              className="btn-secondary w-full flex items-center justify-center gap-2"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-              {plan.ctaLabel}
-            </a>
-          )}
-        </>
-      )}
-
-      {isCurrent && (
+      {isCurrent ? (
         <div className="w-full py-2.5 rounded-xl text-xs font-semibold text-center text-primary-700 bg-primary-50">
           ✓ Your current plan
         </div>
+      ) : (
+        <button
+          onClick={() => onSwitch(plan.key)}
+          disabled={switching}
+          className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {switching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+          Switch to {plan.label}
+        </button>
       )}
     </div>
   )
@@ -285,11 +148,9 @@ function PlanCard({ plan, isCurrent, onUpgrade, onOpenDonate, upgrading }) {
 
 // ── Main ──────────────────────────────────────────────────────
 export default function Plan() {
-  const { user } = useAuth()
-  const [info, setInfo]             = useState(null)
-  const [loading, setLoading]       = useState(true)
-  const [upgrading, setUpgrading]   = useState(false)
-  const [donateModal, setDonateModal] = useState(null) // plan object when open
+  const [info, setInfo]           = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [switching, setSwitching] = useState(false)
 
   useEffect(() => {
     planApi.get().then(res => setInfo(res.data.data))
@@ -297,20 +158,18 @@ export default function Plan() {
       .finally(() => setLoading(false))
   }, [])
 
-  async function handleUpgrade(mode) {
-    setUpgrading(true)
+  async function handleSwitch(mode) {
+    setSwitching(true)
     try {
       await planApi.upgrade(mode)
-      toast.success('Plan updated!')
+      toast.success('Plan switched!')
       const res = await planApi.get()
       setInfo(res.data.data)
-      setDonateModal(null)
-      setTimeout(() => window.location.reload(), 800)
+      setTimeout(() => window.location.reload(), 600)
     } catch (err) {
-      const msg = err.response?.data?.error || 'Upgrade failed'
-      toast.error(msg)
+      toast.error(err.response?.data?.error || 'Switch failed')
     } finally {
-      setUpgrading(false)
+      setSwitching(false)
     }
   }
 
@@ -328,34 +187,21 @@ export default function Plan() {
     <PageShell>
       <PageHeader
         title="Settings"
-        subtitle="Manage your plan and workspace."
+        subtitle="Switch between plans anytime — all plans are free."
       />
       <SettingsNav />
 
       {/* Current plan summary */}
       {info && (
-        <div className="card p-5 mb-8 flex flex-col sm:flex-row sm:items-center gap-5">
+        <div className="card p-5 mb-8 flex items-center gap-4">
           <div className="flex-1">
             <p className="text-xs text-warm-400 uppercase tracking-wide font-semibold mb-1">Current Plan</p>
             <h2 className="text-lg font-semibold text-warm-900">{info.label}</h2>
-            <p className="text-sm text-warm-500 mt-0.5 capitalize">{info.mode} mode · {info.plan}</p>
+            <p className="text-sm text-warm-500 mt-0.5 capitalize">{info.mode} mode</p>
           </div>
-          <div className="flex flex-col gap-3 sm:w-64">
-            <UsageBar used={info.usage.projects.used} max={info.usage.projects.max} label="Projects" />
-            {info.usage.group_members?.max > 0 && (
-              <UsageBar used={info.usage.group_members.used} max={info.usage.group_members.max} label="Team members" />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Near-limit warning */}
-      {info && info.usage.projects.max !== Infinity && info.usage.projects.used >= info.usage.projects.max - 1 && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
-          <span className="text-lg">⚠️</span>
-          <p className="text-sm text-amber-800">
-            You're using {info.usage.projects.used} of {info.usage.projects.max} projects. Upgrade to add more.
-          </p>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+            Free Forever
+          </span>
         </div>
       )}
 
@@ -365,28 +211,16 @@ export default function Plan() {
           <PlanCard
             key={plan.key}
             plan={plan}
-            isCurrent={currentPlanKey === plan.key}
-            onUpgrade={handleUpgrade}
-            onOpenDonate={setDonateModal}
-            upgrading={upgrading}
+            isCurrent={currentPlanKey === plan.planKey}
+            onSwitch={handleSwitch}
+            switching={switching}
           />
         ))}
       </div>
 
       <p className="mt-6 text-center text-xs text-warm-400">
-        Need help?{' '}
-        <a href="mailto:support@pinlooply.com" className="text-primary-600 hover:underline">
-          Contact support
-        </a>
+        All plans include full access to every feature. Switch anytime.
       </p>
-
-      {/* Donate modal */}
-      {donateModal && (
-        <DonateModal
-          plan={donateModal}
-          onClose={() => setDonateModal(null)}
-        />
-      )}
     </PageShell>
   )
 }

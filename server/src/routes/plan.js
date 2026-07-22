@@ -16,26 +16,15 @@ router.get('/', requireAuth, async (req, res) => {
   }
 })
 
-// ── POST /api/plan/upgrade — upgrade mode ────────────────────
-// Free-tier switches (personal ↔ group) are self-serve.
-// Paid plans (team / org) can ONLY be activated by an admin via the Admin Panel.
+// ── POST /api/plan/upgrade — switch mode (all free) ──────────
 router.post('/upgrade', requireAuth, async (req, res) => {
   try {
     const userId   = req.user.id
     const { mode } = req.body
 
-    const paidModes = ['team', 'org']
-    const freeModes = ['personal', 'group']
-
-    if (paidModes.includes(mode)) {
-      // Paid plan activation is admin-only — users must contact support
-      return res.status(403).json({
-        error: 'Paid plan activation requires manual review. Please contact support@pinlooply.com with your payment receipt.',
-      })
-    }
-
-    if (!freeModes.includes(mode)) {
-      return res.status(400).json({ error: 'Invalid plan' })
+    const validModes = ['personal', 'group', 'team', 'org']
+    if (!validModes.includes(mode)) {
+      return res.status(400).json({ error: 'Invalid mode' })
     }
 
     const { data, error } = await supabaseAdmin
