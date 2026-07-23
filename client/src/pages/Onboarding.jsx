@@ -156,7 +156,7 @@ function StepMode({ value, onChange, onNext }) {
 // ─────────────────────────────────────────────
 // Step 4 — Create First Project
 // ─────────────────────────────────────────────
-function StepProject({ value, onChange, onNext, loading, vocab }) {
+function StepProject({ value, onChange, onNext, onSkip, loading, vocab }) {
   const projectLabel = vocab?.project || 'Project'
   return (
     <div className="space-y-6 animate-fade-in">
@@ -204,13 +204,18 @@ function StepProject({ value, onChange, onNext, loading, vocab }) {
           </div>
         </div>
       </div>
-      <button
-        onClick={onNext}
-        disabled={!value.name.trim() || loading}
-        className="btn-primary btn-lg w-full"
-      >
-        {loading ? 'Creating...' : `Create ${projectLabel}`}
-      </button>
+      <div className="space-y-2">
+        <button
+          onClick={onNext}
+          disabled={!value.name.trim() || loading}
+          className="btn-primary btn-lg w-full"
+        >
+          {loading ? 'Creating...' : `Create ${projectLabel}`}
+        </button>
+        <button onClick={onSkip} className="btn-ghost btn-sm w-full text-warm-500">
+          Skip for now
+        </button>
+      </div>
     </div>
   )
 }
@@ -465,6 +470,12 @@ export default function Onboarding() {
     } finally { setLoading(false) }
   }
 
+  async function handleSkipProject() {
+    const next = needsGroup ? 5 : 6
+    try { await saveProfile({ onboarding_step: next }) } catch { /* non-fatal */ }
+    setStep(next)
+  }
+
   async function handleStep5() {
     setLoading(true)
     try {
@@ -547,7 +558,7 @@ export default function Onboarding() {
         {step === 1 && <StepName value={name} onChange={setName} onNext={handleStep1} hasInvite={!!pendingInvite || hasGroupInvite} />}
         {step === 2 && <StepProfession value={profession} onChange={setProfession} onNext={handleStep2} />}
         {step === 3 && <StepMode value={mode} onChange={setMode} onNext={handleStep3} />}
-        {step === 4 && <StepProject value={project} onChange={setProject} onNext={handleStep4} loading={loading} vocab={activeVocab} />}
+        {step === 4 && <StepProject value={project} onChange={setProject} onNext={handleStep4} onSkip={handleSkipProject} loading={loading} vocab={activeVocab} />}
         {step === 5 && needsGroup && <StepGroup value={group} onChange={setGroup} onNext={handleStep5} onSkip={handleSkipGroup} loading={loading} />}
         {(step === 6 || (step === 5 && !needsGroup)) && <StepDone name={name} profession={profession} onFinish={handleFinish} />}
 
