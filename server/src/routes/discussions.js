@@ -20,27 +20,26 @@ router.post('/process', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'projectId is required' })
   }
 
-  // Verify user has access to this project (owner or member)
+  // Verify user has access to this project (owner, member, or group member)
   const { data: project } = await supabaseAdmin
-    .from('projects')
-    .select('id, name, user_id')
-    .eq('id', projectId)
-    .single()
+    .from('projects').select('id, name, user_id, group_id').eq('id', projectId).single()
 
-  if (!project) {
-    return res.status(403).json({ error: 'Project not found' })
-  }
-
-  const { data: membership } = await supabaseAdmin
-    .from('project_members')
-    .select('id')
-    .eq('project_id', projectId)
-    .eq('user_id', userId)
-    .single()
+  if (!project) return res.status(403).json({ error: 'Project not found' })
 
   const isOwner = project.user_id === userId
-  if (!isOwner && !membership) {
-    return res.status(403).json({ error: 'Access denied' })
+  if (!isOwner) {
+    const { data: pm } = await supabaseAdmin
+      .from('project_members').select('id').eq('project_id', projectId).eq('user_id', userId).maybeSingle()
+    const hasProjectMembership = !!pm
+    let hasGroupMembership = false
+    if (!hasProjectMembership && project.group_id) {
+      const { data: gm } = await supabaseAdmin
+        .from('group_members').select('id').eq('group_id', project.group_id).eq('user_id', userId).maybeSingle()
+      hasGroupMembership = !!gm
+    }
+    if (!hasProjectMembership && !hasGroupMembership) {
+      return res.status(403).json({ error: 'Access denied' })
+    }
   }
 
   try {
@@ -65,16 +64,23 @@ router.post('/save', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'rawText, projectId, and aiResult are required' })
   }
 
-  // Verify access
-  const { data: project, error: projErr } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .eq('user_id', userId)
-    .single()
+  // Verify access (owner, project member, or group member)
+  const { data: saveProj } = await supabaseAdmin
+    .from('projects').select('id, user_id, group_id').eq('id', projectId).single()
 
-  if (projErr || !project) {
-    return res.status(403).json({ error: 'Project not found or access denied' })
+  if (!saveProj) return res.status(403).json({ error: 'Project not found or access denied' })
+
+  const isSaveOwner = saveProj.user_id === userId
+  if (!isSaveOwner) {
+    const { data: spm } = await supabaseAdmin
+      .from('project_members').select('id').eq('project_id', projectId).eq('user_id', userId).maybeSingle()
+    let canSave = !!spm
+    if (!canSave && saveProj.group_id) {
+      const { data: sgm } = await supabaseAdmin
+        .from('group_members').select('id').eq('group_id', saveProj.group_id).eq('user_id', userId).maybeSingle()
+      canSave = !!sgm
+    }
+    if (!canSave) return res.status(403).json({ error: 'Project not found or access denied' })
   }
 
   try {

@@ -4,15 +4,21 @@ import { supabaseAdmin } from '../config/supabase.js'
 
 const router = Router()
 
-// ── Helper: verify user has access to project ─────────────────
-async function getProject(projectId, userId) {
-  const { data } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .eq('user_id', userId)
-    .single()
-  return data
+// ── Helper: verify user has access to project (owner, member, or group) ──
+async function canAccessProject(projectId, userId) {
+  const { data: proj } = await supabaseAdmin
+    .from('projects').select('id, user_id, group_id').eq('id', projectId).maybeSingle()
+  if (!proj) return false
+  if (proj.user_id === userId) return true
+  const { data: pm } = await supabaseAdmin
+    .from('project_members').select('id').eq('project_id', projectId).eq('user_id', userId).maybeSingle()
+  if (pm) return true
+  if (proj.group_id) {
+    const { data: gm } = await supabaseAdmin
+      .from('group_members').select('id').eq('group_id', proj.group_id).eq('user_id', userId).maybeSingle()
+    if (gm) return true
+  }
+  return false
 }
 
 // GET /api/topics/:projectId — all topics for a project
@@ -20,8 +26,8 @@ router.get('/:projectId', requireAuth, async (req, res) => {
   const { projectId } = req.params
   const userId = req.user.id
 
-  const project = await getProject(projectId, userId)
-  if (!project) return res.status(403).json({ error: 'Access denied' })
+  if (!(await canAccessProject(projectId, userId)))
+    return res.status(403).json({ error: 'Access denied' })
 
   const { data, error } = await supabaseAdmin
     .from('topics')
@@ -60,7 +66,8 @@ router.get('/detail/:topicId', requireAuth, async (req, res) => {
     .single()
 
   if (topicErr || !topic) return res.status(404).json({ error: 'Topic not found' })
-  if (topic.projects.user_id !== userId) return res.status(403).json({ error: 'Access denied' })
+  if (!(await canAccessProject(topic.projects.id || topic.project_id, userId)))
+    return res.status(403).json({ error: 'Access denied' })
 
   // Versions
   const { data: versions } = await supabaseAdmin
@@ -124,7 +131,7 @@ router.patch('/:topicId/status', requireAuth, async (req, res) => {
     .eq('id', topicId)
     .single()
 
-  if (!topic || topic.projects.user_id !== userId) {
+  if (!topic || !(await canAccessProject(topic.project_id, userId))) {
     return res.status(403).json({ error: 'Access denied' })
   }
 
