@@ -253,9 +253,9 @@ export default function AIConfirm() {
   const [addingTask, setAddingTask] = useState(false)
 
   // Test cases state
-  const [generateTestCases, setGenerateTestCases] = useState(true)  // toggle on/off
+  const [generateTestCases, setGenerateTestCases] = useState(false)  // toggle on/off
   const [previewedTestCases, setPreviewedTestCases] = useState(null) // null = not previewed yet
-  const [tcPreviewing, setTcPreviewing]     = useState(false)
+  const [tcPreviewing, setTcPreviewing]     = useState(true)
   const [tcExpanded, setTcExpanded]         = useState(true)
 
   // Load group members for assignee resolution
