@@ -228,11 +228,22 @@ export async function saveDiscussion({ rawText, projectId, userId, source, aiRes
     if (newTask) savedTasks.push(newTask)
   }
 
-  // 4a. Auto-generate test cases for all saved tasks (fire-and-forget)
-  if (savedTasks.length > 0) {
-    autoGenerateTestCases(userId, projectId, savedTasks).catch(err =>
-      console.error('[saveDiscussion] auto test case generation error:', err.message)
-    )
+  // 4a. Test cases: use previewed ones if provided, auto-generate otherwise (skip if opted out)
+  const skipTestCases = aiResult.skip_test_cases === true
+  const previewedTestCases = aiResult.previewed_test_cases
+
+  if (!skipTestCases && savedTasks.length > 0) {
+    if (previewedTestCases?.length) {
+      // Save the user-reviewed test cases directly (no AI call needed)
+      savePreviouedTestCases(projectId, userId, previewedTestCases).catch(err =>
+        console.error('[saveDiscussion] previewed TC save error:', err.message)
+      )
+    } else {
+      // Fall back to auto-generate in background
+      autoGenerateTestCases(userId, projectId, savedTasks).catch(err =>
+        console.error('[saveDiscussion] auto test case generation error:', err.message)
+      )
+    }
   }
 
   // 5. Save conflicts
@@ -250,6 +261,31 @@ export async function saveDiscussion({ rawText, projectId, userId, source, aiRes
   }
 
   return discussion
+}
+
+// ── Save pre-reviewed test cases from the confirm screen ─────
+async function savePreviouedTestCases(projectId, userId, testCases) {
+  const rows = testCases.map(tc => ({
+    project_id: projectId,
+    title: tc.title || tc.scenario || tc.name || 'Test case',
+    type: 'test_case',
+    status: 'pending',
+    priority: tc.priority || 'medium',
+    assigned_by: userId,
+    category: tc.test_type || tc.category || 'happy_path',
+    steps: tc.steps || [],
+    expected_result: tc.expected_result || '',
+    description: [
+      tc.expected_result ? `Expected: ${tc.expected_result}` : '',
+      tc.steps?.length ? `Steps:\n${tc.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : '',
+    ].filter(Boolean).join('\n\n') || null,
+  }))
+  const { error } = await supabaseAdmin.from('tasks').insert(rows)
+  if (error) {
+    // Fallback: base columns only
+    const rowsBase = rows.map(({ category, steps, expected_result, ...rest }) => rest)
+    await supabaseAdmin.from('tasks').insert(rowsBase)
+  }
 }
 
 // ── Auto-generate test cases for tasks (background) ───────────

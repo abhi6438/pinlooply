@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { discussionsApi, groupsApi } from '../services/api'
+import { discussionsApi, groupsApi, testCasesApi } from '../services/api'
 import { supabase } from '../config/supabase'
 import {
   CheckCircle2, Tag, ListChecks, AlertTriangle, FileText,
   Trash2, ArrowLeft, Save, Loader2, Pencil, X, Check,
-  UserCircle, FlaskConical, Zap, Plus,
+  UserCircle, FlaskConical, Zap, Plus, ChevronDown, ChevronUp, ToggleLeft, ToggleRight,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../components/ui'
@@ -252,6 +252,12 @@ export default function AIConfirm() {
   const [groupMembers, setGroupMembers] = useState([])
   const [addingTask, setAddingTask] = useState(false)
 
+  // Test cases state
+  const [generateTestCases, setGenerateTestCases] = useState(true)  // toggle on/off
+  const [previewedTestCases, setPreviewedTestCases] = useState(null) // null = not previewed yet
+  const [tcPreviewing, setTcPreviewing]     = useState(false)
+  const [tcExpanded, setTcExpanded]         = useState(true)
+
   // Load group members for assignee resolution
   useEffect(() => {
     if (!user) return
@@ -276,11 +282,50 @@ export default function AIConfirm() {
   function deleteTopic(i) { setTopics(t => t.filter((_, idx) => idx !== i)) }
   function addTask(task)  { setTasks(t => [...t, task]); setAddingTask(false) }
 
+  async function handlePreviewTestCases() {
+    if (!tasks.length) return
+    setTcPreviewing(true)
+    try {
+      // Generate test cases for all tasks in parallel
+      const results = await Promise.allSettled(
+        tasks.filter(t => t.type !== 'test_case').map(task =>
+          testCasesApi.generate({ taskTitle: task.title, taskDescription: task.description, projectId })
+            .then(r => (r.data.test_cases || []).map(tc => ({
+              ...tc,
+              _taskTitle: task.title,
+              type: 'test_case',
+              priority: tc.priority || 'medium',
+            })))
+        )
+      )
+      const all = results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+      setPreviewedTestCases(all)
+      setTcExpanded(true)
+    } catch {
+      toast.error('Failed to preview test cases')
+    } finally {
+      setTcPreviewing(false)
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
-      await discussionsApi.save(rawText, projectId, source, { ...aiResult, topics, tasks, conflicts })
-      toast.success('Saved! Test cases generating in background…')
+      await discussionsApi.save(rawText, projectId, source, {
+        ...aiResult,
+        topics,
+        tasks,
+        conflicts,
+        // Tell server whether to auto-generate test cases, and pass any previewed ones directly
+        skip_test_cases: !generateTestCases,
+        previewed_test_cases: generateTestCases && previewedTestCases ? previewedTestCases : null,
+      })
+      const tcMsg = !generateTestCases
+        ? 'Saved!'
+        : previewedTestCases
+          ? `Saved! ${previewedTestCases.length} test case${previewedTestCases.length !== 1 ? 's' : ''} saved.`
+          : 'Saved! Test cases generating in background…'
+      toast.success(tcMsg)
       navigate(`/projects/${projectId}`)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to save')
@@ -375,35 +420,116 @@ export default function AIConfirm() {
           )}
         </div>
 
-        {/* Test Cases — auto-generated after save */}
-        {tasks.length > 0 && (
-          <div className="card animate-fade-in border border-purple-100">
+        {/* Test Cases */}
+        {tasks.filter(t => t.type !== 'test_case').length > 0 && (
+          <div className={`card animate-fade-in border ${generateTestCases ? 'border-purple-100' : 'border-warm-200'}`}>
+            {/* Header row */}
             <div className="flex items-center gap-2 mb-3">
               <h2 className="section-title">🧪 Test Cases</h2>
-              <span className="ml-auto text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                Auto-generated
-              </span>
-            </div>
-            <div className="bg-purple-50/60 rounded-xl p-4 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Zap className="w-4 h-4 text-purple-600" />
+              {previewedTestCases && (
+                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                  {previewedTestCases.length} cases
+                </span>
+              )}
+              <div className="ml-auto flex items-center gap-2">
+                {/* Toggle on/off */}
+                <button
+                  onClick={() => setGenerateTestCases(v => !v)}
+                  className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg transition-colors ${
+                    generateTestCases
+                      ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                      : 'bg-warm-100 text-warm-500 hover:bg-warm-200'
+                  }`}
+                >
+                  {generateTestCases
+                    ? <><ToggleRight className="w-3.5 h-3.5" /> Enabled</>
+                    : <><ToggleLeft className="w-3.5 h-3.5" /> Skipped</>
+                  }
+                </button>
+                {/* Collapse */}
+                {generateTestCases && (
+                  <button onClick={() => setTcExpanded(v => !v)} className="p-1 hover:bg-warm-100 rounded-lg text-warm-400">
+                    {tcExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                )}
               </div>
-              <div>
-                <p className="text-sm font-medium text-purple-900">
-                  {tasks.length * 8}+ test cases will be generated automatically
-                </p>
-                <p className="text-xs text-purple-600 mt-1 leading-relaxed">
-                  After saving, AI will generate happy path, edge case, negative, and UI/UX tests for each of your {tasks.length} task{tasks.length !== 1 ? 's' : ''}. Find them in the <strong>Test Cases</strong> page.
-                </p>
-                <div className="flex gap-2 mt-2.5 flex-wrap">
-                  {['Happy path', 'Edge cases', 'Negative', 'UI/UX'].map(label => (
-                    <span key={label} className="text-xs bg-white border border-purple-200 text-purple-700 px-2 py-0.5 rounded-full">
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
+
+            {generateTestCases && tcExpanded && (
+              <>
+                {/* Not yet previewed */}
+                {!previewedTestCases && (
+                  <div className="bg-purple-50/60 rounded-xl p-4 flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Zap className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-purple-900">
+                        AI will generate test cases for your {tasks.filter(t => t.type !== 'test_case').length} task{tasks.filter(t => t.type !== 'test_case').length !== 1 ? 's' : ''}
+                      </p>
+                      <p className="text-xs text-purple-600 mt-1">Happy path, edge cases, negative, and UI/UX tests.</p>
+                      <button
+                        onClick={handlePreviewTestCases}
+                        disabled={tcPreviewing}
+                        className="mt-3 flex items-center gap-1.5 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-60"
+                      >
+                        {tcPreviewing ? <Loader2 className="w-3 h-3 animate-spin" /> : <FlaskConical className="w-3 h-3" />}
+                        {tcPreviewing ? 'Generating preview…' : 'Preview test cases'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Previewed test cases — editable */}
+                {previewedTestCases && (
+                  <div className="space-y-2">
+                    {previewedTestCases.map((tc, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 border-l-4 border-purple-400 bg-white rounded-xl shadow-sm group animate-fade-in">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-warm-900">{tc.title || tc.name || tc.scenario}</p>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">Test Case</span>
+                            {tc.test_type && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-warm-100 text-warm-600">{tc.test_type}</span>
+                            )}
+                            <span className={`badge ${tc.priority === 'high' ? 'badge-high' : tc.priority === 'medium' ? 'badge-medium' : 'badge-low'}`}>
+                              {tc.priority || 'medium'}
+                            </span>
+                            {tc._taskTitle && (
+                              <span className="text-xs text-warm-400 truncate max-w-[160px]">for: {tc._taskTitle}</span>
+                            )}
+                          </div>
+                          {tc.steps && (
+                            <p className="text-xs text-warm-500 mt-1 line-clamp-2">{Array.isArray(tc.steps) ? tc.steps.join(' → ') : tc.steps}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setPreviewedTestCases(prev => prev.filter((_, idx) => idx !== i))}
+                          className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg text-warm-400 hover:text-red-500 transition-opacity flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {previewedTestCases.length === 0 && (
+                      <p className="text-xs text-warm-400 text-center py-3">All test cases removed. Toggle off to skip generation.</p>
+                    )}
+                    <button
+                      onClick={handlePreviewTestCases}
+                      disabled={tcPreviewing}
+                      className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1 mt-1"
+                    >
+                      {tcPreviewing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                      Regenerate
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!generateTestCases && (
+              <p className="text-xs text-warm-400">Test case generation is off — no test cases will be created.</p>
+            )}
           </div>
         )}
 
