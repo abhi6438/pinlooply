@@ -290,7 +290,7 @@ export default function AIConfirm() {
       const results = await Promise.allSettled(
         tasks.filter(t => t.type !== 'test_case').map(task =>
           testCasesApi.generate({ taskTitle: task.title, taskDescription: task.description, projectId })
-            .then(r => (r.data.test_cases || []).map(tc => ({
+            .then(r => (r.data.data?.test_cases || r.data.test_cases || []).map(tc => ({
               ...tc,
               _taskTitle: task.title,
               type: 'test_case',
