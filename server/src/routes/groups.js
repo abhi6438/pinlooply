@@ -148,6 +148,25 @@ router.post('/:groupId/join', requireAuth, async (req, res) => {
     const existing = await getMember(groupId, userId)
     if (existing) return res.json({ success: true, data: { already_member: true } })
 
+    // Ensure public.users row exists before inserting into group_members.
+    // New signups via invite link have auth.users but no public.users yet.
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!existingUser) {
+      const { data: authData } = await supabaseAdmin.auth.admin.getUserById(userId)
+      const authUser = authData?.user
+      await supabaseAdmin.from('users').upsert({
+        id: userId,
+        email: authUser?.email || '',
+        name: authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '',
+        onboarding_complete: false,
+      }, { onConflict: 'id' })
+    }
+
     const { error } = await supabaseAdmin
       .from('group_members')
       .insert({ group_id: groupId, user_id: userId, role: 'member' })
