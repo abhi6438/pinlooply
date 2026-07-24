@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useWorkspace, clearSessionWorkspace } from '../../context/WorkspaceContext'
-import api, { groupsApi } from '../../services/api'
+import api from '../../services/api'
 import toast from 'react-hot-toast'
 
 export default function Login() {
@@ -47,18 +47,9 @@ export default function Login() {
         return
       }
 
-      // 3. Check if user belongs to any groups — if yes, show workspace selector
-      clearSessionWorkspace() // clear any previous session choice
-      try {
-        const res = await groupsApi.list()
-        const groups = res.data.data || []
-        if (groups.length > 0) {
-          navigate('/choose-workspace')
-          return
-        }
-      } catch { /* non-fatal — fall through to dashboard */ }
-
-      navigate('/dashboard')
+      // Always show workspace selector — it auto-redirects to dashboard if no groups
+      clearSessionWorkspace()
+      navigate('/choose-workspace')
     } catch (err) {
       // login() threw — email exists but password is wrong
       setErrorMsg('Wrong password. Please try again or reset your password.')
@@ -70,10 +61,10 @@ export default function Login() {
   async function handleGoogle() {
     setGoogleLoading(true)
     try {
-      // Google OAuth redirect goes to invite page when present
+      // After Google OAuth, go to invite page if coming from invite, else workspace selector
       const redirectTo = inviteCode
         ? `${window.location.origin}/invite/${inviteCode}`
-        : undefined
+        : `${window.location.origin}/choose-workspace`
       await loginWithGoogle(redirectTo)
     } catch (err) {
       toast.error(err.message || 'Google login failed')

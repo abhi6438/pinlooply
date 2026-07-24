@@ -24,13 +24,21 @@ export default function WorkspaceSelect() {
           groupsApi.list(),
           supabase.from('users').select('name').eq('id', user.id).single(),
         ])
-        setGroups(groupRes.data.data || [])
+        const fetchedGroups = groupRes.data.data || []
+        setGroups(fetchedGroups)
         setUserName(userRes.data?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'You')
+
+        // If user has no groups, skip the selector and go straight to dashboard
+        if (fetchedGroups.length === 0) {
+          setActiveWorkspace({ mode: 'personal', groupId: null, groupName: null })
+          navigate('/dashboard')
+          return
+        }
       } catch { /* non-fatal */ }
       finally { setLoading(false) }
     }
     load()
-  }, [user])
+  }, [user]) // eslint-disable-line
 
   function pick(ws) {
     setChoosing(ws.mode === 'personal' ? 'personal' : ws.groupId)
