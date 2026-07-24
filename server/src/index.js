@@ -48,13 +48,19 @@ app.use('/api', limiter)
 app.get('/api/health', (req, res) => {
   const key = process.env.SUPABASE_SERVICE_KEY || ''
   let keyRole = 'missing'
+  let keyDecodeError = null
   try {
-    const parts = key.split('.')
-    if (parts.length === 3) {
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'))
+    const parts = key.trim().split('.')
+    if (parts.length !== 3) {
+      keyDecodeError = `expected 3 JWT parts, got ${parts.length}`
+    } else {
+      // base64url → base64: replace URL-safe chars and add padding
+      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+      const padded = b64 + '='.repeat((4 - b64.length % 4) % 4)
+      const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'))
       keyRole = payload.role || 'unknown'
     }
-  } catch { /* ignore decode errors */ }
+  } catch (e) { keyDecodeError = e.message }
 
   res.json({
     status: 'ok',
@@ -62,7 +68,8 @@ app.get('/api/health', (req, res) => {
     env: {
       hasSupabaseUrl: !!process.env.SUPABASE_URL,
       hasServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
-      keyRole,   // MUST be "service_role" — if "anon" the DB queries will fail
+      keyRole,          // MUST be "service_role" — "anon" or "missing" means wrong key
+      keyDecodeError,   // null if decode succeeded
       vercelUrl: process.env.VERCEL_URL || 'not set',
     },
   })
