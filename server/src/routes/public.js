@@ -35,7 +35,7 @@ router.get('/:slug', async (req, res) => {
     ] = await Promise.all([
       supabaseAdmin
         .from('projects')
-        .select('id, name, description, color, updated_at')
+        .select('id, name, description, color, created_at')
         .eq('id', projectId)
         .maybeSingle(),
 
@@ -125,7 +125,7 @@ router.get('/:slug', async (req, res) => {
           name:        project.name,
           description: project.description,
           color:       project.color,
-          updated_at:  project.updated_at,
+          updated_at:  project.created_at,
         },
         health,
         taskProgress,
