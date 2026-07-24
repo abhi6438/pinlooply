@@ -98,6 +98,7 @@ import searchRouter from './routes/search.js'
 import suggestionsRouter from './routes/suggestions.js'
 import authRouter from './routes/auth.js'
 import dataManagementRouter from './routes/dataManagement.js'
+import collectionsRouter from './routes/collections.js'
 app.use('/api/discussions', discussionsRouter)
 app.use('/api/topics', topicsRouter)
 app.use('/api/tasks', tasksRouter)
@@ -120,6 +121,7 @@ app.use('/api/search',           searchRouter)
 app.use('/api/suggestions',      suggestionsRouter)
 app.use('/api/auth',             authRouter)
 app.use('/api/data-management',  dataManagementRouter)
+app.use('/api/collections',      collectionsRouter)
 
 // ── Global JSON error handler — MUST be last ─────────────────────────
 // Catches errors from middleware (e.g. CORS, body-parser) and returns JSON

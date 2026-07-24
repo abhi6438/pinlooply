@@ -32,6 +32,7 @@ import DataManagement from './pages/settings/DataManagement'
 import WorkspaceSelect from './pages/WorkspaceSelect'
 import AdminPanel from './pages/admin/AdminPanel'
 import PublicProject from './pages/PublicProject'
+import PublicCollection from './pages/PublicCollection'
 import TestCaseGenerator from './pages/TestCaseGenerator'
 import Manager from './pages/Manager'
 import MyTasks from './pages/MyTasks'
@@ -124,6 +125,7 @@ function AppRoutes() {
 
       {/* Public project status page — no auth wrapper */}
       <Route path="/p/:slug" element={<PublicProject />} />
+      <Route path="/c/:slug" element={<PublicCollection />} />
 
       <Route path="/test-cases" element={
         <ProtectedRoute>

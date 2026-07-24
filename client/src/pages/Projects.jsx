@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { projectsApi, tasksApi, publishApi } from '../services/api'
+import { projectsApi, tasksApi, publishApi, collectionsApi } from '../services/api'
 import {
   Plus, FolderOpen, CheckSquare2, Tag, Clock,
   MoreVertical, Archive, Pencil, Loader2, Sparkles, ChevronLeft, GitBranch,
@@ -147,6 +147,200 @@ function ShareModal({ project, onClose, onPublish, onUnpublish }) {
               </button>
             </div>
           </>
+        )}
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ── Collection Modal — multi-project shared link ───────────────
+function CollectionModal({ projects, groupId, onClose }) {
+  const [selected,  setSelected]  = useState(new Set())
+  const [title,     setTitle]     = useState('')
+  const [existing,  setExisting]  = useState(null)   // existing collection if any
+  const [slug,      setSlug]      = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [saving,    setSaving]    = useState(false)
+  const [copied,    setCopied]    = useState(false)
+  const [stopping,  setStopping]  = useState(false)
+
+  const publicUrl = slug ? `${window.location.origin}/c/${slug}` : null
+
+  // Load existing collection on mount
+  useEffect(() => {
+    collectionsApi.get(groupId || null)
+      .then(res => {
+        const coll = res.data?.data
+        if (coll) {
+          setExisting(coll)
+          setSlug(coll.slug)
+          setTitle(coll.title || '')
+          setSelected(new Set(coll.project_ids))
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [groupId])
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function selectAll()   { setSelected(new Set(projects.map(p => p.id))) }
+  function clearAll()    { setSelected(new Set()) }
+
+  async function handleSave() {
+    if (selected.size === 0) return
+    setSaving(true)
+    try {
+      const res = await collectionsApi.save(
+        { project_ids: [...selected], title: title.trim() || null, group_id: groupId || null },
+        groupId || null
+      )
+      const coll = res.data?.data
+      setExisting(coll)
+      setSlug(coll.slug)
+    } catch { toast.error('Failed to save link') }
+    finally { setSaving(false) }
+  }
+
+  async function handleStop() {
+    setStopping(true)
+    try {
+      await collectionsApi.remove(groupId || null)
+      setExisting(null)
+      setSlug(null)
+      setSelected(new Set())
+    } catch { toast.error('Failed to stop sharing') }
+    finally { setStopping(false) }
+  }
+
+  async function handleCopy() {
+    if (!publicUrl) return
+    await navigator.clipboard.writeText(publicUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+              <Globe className="w-4 h-4 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Multi-Project Share Link</h3>
+              <p className="text-xs text-gray-400">One link showing selected projects</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+          </div>
+        ) : (
+          <div className="flex flex-col flex-1 overflow-hidden">
+            {/* Link (if exists) */}
+            {slug && (
+              <div className="px-6 py-3 bg-emerald-50 border-b border-emerald-100 flex-shrink-0">
+                <p className="text-[11px] text-emerald-600 font-medium mb-1.5">🟢 Live link</p>
+                <div className="flex items-center gap-2">
+                  <p className="flex-1 text-xs font-mono text-gray-700 truncate">{publicUrl}</p>
+                  <button
+                    onClick={handleCopy}
+                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg flex-shrink-0 transition-all ${
+                      copied ? 'bg-emerald-600 text-white' : 'bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                  </button>
+                  <a href={publicUrl} target="_blank" rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100">
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Title input */}
+            <div className="px-6 pt-4 pb-2 flex-shrink-0">
+              <input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Page title (optional, e.g. Q3 Projects)"
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+            </div>
+
+            {/* Project list */}
+            <div className="px-6 pb-2 flex-shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-gray-700">Select projects to include</p>
+                <div className="flex gap-2 text-xs">
+                  <button onClick={selectAll} className="text-indigo-600 hover:underline">All</button>
+                  <span className="text-gray-300">·</span>
+                  <button onClick={clearAll} className="text-gray-500 hover:underline">None</button>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-2 min-h-0">
+              {projects.map(p => (
+                <label
+                  key={p.id}
+                  className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                    selected.has(p.id)
+                      ? 'border-indigo-300 bg-indigo-50'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(p.id)}
+                    onChange={() => toggle(p.id)}
+                    className="w-4 h-4 accent-indigo-600"
+                  />
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ background: p.color }}
+                  />
+                  <span className="text-sm text-gray-800 truncate flex-1">{p.name}</span>
+                </label>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 space-y-2">
+              <button
+                onClick={handleSave}
+                disabled={saving || selected.size === 0}
+                className="w-full btn-primary btn-sm disabled:opacity-40"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                {slug ? `Update link (${selected.size} projects)` : `Generate link (${selected.size} projects)`}
+              </button>
+              {slug && (
+                <button
+                  onClick={handleStop}
+                  disabled={stopping}
+                  className="w-full text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg py-2 transition-all disabled:opacity-50"
+                >
+                  {stopping ? 'Stopping…' : 'Stop sharing'}
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>,
@@ -453,6 +647,7 @@ export default function Projects() {
   const [archiveTarget,  setArchiveTarget]  = useState(null)
   const [shareTarget,    setShareTarget]    = useState(null)   // project being shared
   const [publishedSlugs, setPublishedSlugs] = useState({})    // { projectId: slug }
+  const [showCollection, setShowCollection] = useState(false) // multi-project link modal
 
   useEffect(() => { load() }, [activeGroupId]) // eslint-disable-line
 
@@ -556,9 +751,19 @@ export default function Projects() {
         title="Projects"
         subtitle={`${projects.length} project${projects.length !== 1 ? 's' : ''}`}
         actions={
-          <button onClick={openCreate} className="btn-primary btn-sm">
-            <Plus className="w-4 h-4" /> New Project
-          </button>
+          <div className="flex items-center gap-2">
+            {projects.length > 1 && (
+              <button
+                onClick={() => setShowCollection(true)}
+                className="btn btn-secondary btn-sm flex items-center gap-1.5"
+              >
+                <Share2 className="w-4 h-4" /> Share Portfolio
+              </button>
+            )}
+            <button onClick={openCreate} className="btn-primary btn-sm">
+              <Plus className="w-4 h-4" /> New Project
+            </button>
+          </div>
         }
       />
 
@@ -621,6 +826,14 @@ export default function Projects() {
           confirmLabel="Archive"
           onConfirm={doArchive}
           onCancel={() => setArchiveTarget(null)}
+        />
+      )}
+
+      {showCollection && (
+        <CollectionModal
+          projects={projects}
+          groupId={activeGroupId}
+          onClose={() => setShowCollection(false)}
         />
       )}
 

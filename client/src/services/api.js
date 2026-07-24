@@ -155,6 +155,12 @@ export const publishApi = {
   disable:   (projectId) => api.delete(`/api/projects/${projectId}/publish`),
 }
 
+export const collectionsApi = {
+  get:    (groupId) => api.get('/api/collections',  { headers: groupId ? { 'x-group-id': groupId } : {} }),
+  save:   (body, groupId) => api.post('/api/collections', body, { headers: groupId ? { 'x-group-id': groupId } : {} }),
+  remove: (groupId) => api.delete('/api/collections', { headers: groupId ? { 'x-group-id': groupId } : {} }),
+}
+
 export const testCasesApi = {
   generate:     (payload)         => api.post('/api/testcases/generate', payload),
   save:         (payload)         => api.post('/api/testcases/save', payload),
