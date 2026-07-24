@@ -312,12 +312,23 @@ router.post('/:projectId/publish', requireAuth, async (req, res) => {
   let slug = existing?.slug
   if (!slug) slug = generateSlug(proj.name)
 
-  // Upsert publish page
-  const { data, error } = await supabaseAdmin
-    .from('publish_pages')
-    .upsert({ project_id: projectId, slug, is_active: true }, { onConflict: 'project_id' })
-    .select()
-    .single()
+  let data, error
+  if (existing) {
+    // Row exists — update it
+    ;({ data, error } = await supabaseAdmin
+      .from('publish_pages')
+      .update({ is_active: true, slug })
+      .eq('project_id', projectId)
+      .select()
+      .single())
+  } else {
+    // No row yet — insert
+    ;({ data, error } = await supabaseAdmin
+      .from('publish_pages')
+      .insert({ project_id: projectId, slug, is_active: true })
+      .select()
+      .single())
+  }
 
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true, data: { slug: data.slug, url: `/p/${data.slug}` } })
