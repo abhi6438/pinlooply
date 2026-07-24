@@ -9,37 +9,35 @@ router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params
 
-    // 1. Find active publish page — JOIN project data in one query to avoid RLS on projects table
+    // 1. Find active publish page
     const { data: pages } = await supabaseAdmin
       .from('publish_pages')
-      .select('id, slug, project_id, is_active, projects(id, name, description, color, updated_at)')
+      .select('id, slug, project_id, is_active')
       .eq('slug', slug)
       .eq('is_active', true)
       .limit(1)
 
     const page = pages?.[0] || null
     if (!page) {
-      console.log('[public] no publish_pages row for slug:', slug)
       return res.status(404).json({ error: 'Page not found or unpublished' })
     }
 
     const projectId = page.project_id
-    const project = page.projects || null
-    console.log('[public] found page, projectId:', projectId, 'project:', !!project)
-
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found', projectId })
-    }
-
     const now = new Date().toISOString()
     const in3days = new Date(Date.now() + 3 * 86400000).toISOString()
 
-    // 2. Fetch remaining data in parallel
+    // 2. Fetch all data in parallel
     const [
+      { data: project },
       { data: tasks },
       { data: topics },
       { data: discussions },
     ] = await Promise.all([
+      supabaseAdmin
+        .from('projects')
+        .select('id, name, description, color, updated_at')
+        .eq('id', projectId)
+        .maybeSingle(),
 
       supabaseAdmin
         .from('tasks')
@@ -63,6 +61,8 @@ router.get('/:slug', async (req, res) => {
         .order('created_at', { ascending: false })
         .limit(5),
     ])
+
+    if (!project) return res.status(404).json({ error: 'Project not found', projectId })
 
     // 3. Compute health
     const allTasks      = (tasks || []).filter(t => t.type !== 'test_case')
