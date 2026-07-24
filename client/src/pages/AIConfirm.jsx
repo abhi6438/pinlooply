@@ -11,12 +11,14 @@ import {
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../components/ui'
 
+
 const TASK_TYPES = {
   task:             { label: 'Task',          color: 'bg-blue-100 text-blue-700' },
   test_case:        { label: 'Test Case',     color: 'bg-purple-100 text-purple-700' },
   deployment_check: { label: 'Deploy Check',  color: 'bg-amber-100 text-amber-700' },
   backlog:          { label: 'Backlog',       color: 'bg-warm-100 text-warm-600' },
 }
+
 const PRIORITIES = ['high', 'medium', 'low']
 
 // ── Editable task row with assignee picker ────────────────────
