@@ -307,7 +307,7 @@ router.post('/:projectId/publish', requireAuth, async (req, res) => {
     .from('publish_pages')
     .select('id, slug, is_active')
     .eq('project_id', projectId)
-    .single()
+    .maybeSingle()
 
   let slug = existing?.slug
   if (!slug) slug = generateSlug(proj.name)
@@ -360,7 +360,7 @@ router.get('/:projectId/publish-status', requireAuth, async (req, res) => {
     .from('publish_pages')
     .select('slug, is_active')
     .eq('project_id', projectId)
-    .single()
+    .maybeSingle()
 
   res.json({ success: true, data: data || { slug: null, is_active: false } })
 })
