@@ -28,10 +28,10 @@ router.get('/:slug', async (req, res) => {
 
     // 2. Fetch all data in parallel
     const [
-      { data: project },
-      { data: tasks },
-      { data: topics },
-      { data: discussions },
+      { data: project, error: projectErr },
+      { data: tasks,   error: tasksErr   },
+      { data: topics,  error: topicsErr  },
+      { data: discussions, error: discErr },
     ] = await Promise.all([
       supabaseAdmin
         .from('projects')
@@ -62,7 +62,22 @@ router.get('/:slug', async (req, res) => {
         .limit(5),
     ])
 
-    if (!project) return res.status(404).json({ error: 'Project not found', projectId })
+    // Log errors to Vercel function logs for diagnostics
+    if (projectErr) console.error('[public] project query error:', JSON.stringify(projectErr))
+    if (tasksErr)   console.error('[public] tasks query error:',   JSON.stringify(tasksErr))
+    if (topicsErr)  console.error('[public] topics query error:',  JSON.stringify(topicsErr))
+    if (discErr)    console.error('[public] discussions query error:', JSON.stringify(discErr))
+
+    if (!project) {
+      return res.status(404).json({
+        error: 'Project not found',
+        projectId,
+        // Surface Supabase error so we can diagnose from the browser response
+        supabaseError: projectErr
+          ? { message: projectErr.message, code: projectErr.code, hint: projectErr.hint }
+          : 'no data returned (null)',
+      })
+    }
 
     // 3. Compute health
     const allTasks      = (tasks || []).filter(t => t.type !== 'test_case')
