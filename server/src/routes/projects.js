@@ -302,33 +302,26 @@ router.post('/:projectId/publish', requireAuth, async (req, res) => {
   const proj = await canUserAccessProject(projectId, userId)
   if (!proj) return res.status(403).json({ error: 'Forbidden' })
 
-  // Check if already published
-  const { data: existing } = await supabaseAdmin
+  // Fetch any existing rows (there may be duplicates from old failed upserts)
+  const { data: existingRows } = await supabaseAdmin
     .from('publish_pages')
-    .select('id, slug, is_active')
+    .select('id, slug')
     .eq('project_id', projectId)
-    .maybeSingle()
+    .order('created_at', { ascending: false })
+    .limit(10)
 
-  let slug = existing?.slug
-  if (!slug) slug = generateSlug(proj.name)
+  // Keep the slug from the most recent row so the URL doesn't change
+  const slug = existingRows?.[0]?.slug || generateSlug(proj.name)
 
-  let data, error
-  if (existing) {
-    // Row exists — update it
-    ;({ data, error } = await supabaseAdmin
-      .from('publish_pages')
-      .update({ is_active: true, slug })
-      .eq('project_id', projectId)
-      .select()
-      .single())
-  } else {
-    // No row yet — insert
-    ;({ data, error } = await supabaseAdmin
-      .from('publish_pages')
-      .insert({ project_id: projectId, slug, is_active: true })
-      .select()
-      .single())
-  }
+  // Delete all existing rows for this project (cleans up duplicates)
+  await supabaseAdmin.from('publish_pages').delete().eq('project_id', projectId)
+
+  // Insert a single clean row
+  const { data, error } = await supabaseAdmin
+    .from('publish_pages')
+    .insert({ project_id: projectId, slug, is_active: true })
+    .select()
+    .single()
 
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true, data: { slug: data.slug, url: `/p/${data.slug}` } })
@@ -356,13 +349,14 @@ router.delete('/:projectId/publish', requireAuth, async (req, res) => {
 router.get('/:projectId/publish-status', requireAuth, async (req, res) => {
   const { projectId } = req.params
 
-  const { data } = await supabaseAdmin
+  const { data: rows } = await supabaseAdmin
     .from('publish_pages')
     .select('slug, is_active')
     .eq('project_id', projectId)
-    .maybeSingle()
+    .order('created_at', { ascending: false })
+    .limit(1)
 
-  res.json({ success: true, data: data || { slug: null, is_active: false } })
+  res.json({ success: true, data: rows?.[0] || { slug: null, is_active: false } })
 })
 
 export default router

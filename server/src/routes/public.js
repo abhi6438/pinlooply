@@ -10,13 +10,14 @@ router.get('/:slug', async (req, res) => {
     const { slug } = req.params
 
     // 1. Find active publish page
-    const { data: page } = await supabaseAdmin
+    const { data: pages } = await supabaseAdmin
       .from('publish_pages')
       .select('id, slug, project_id, is_active')
       .eq('slug', slug)
       .eq('is_active', true)
-      .maybeSingle()
+      .limit(1)
 
+    const page = pages?.[0] || null
     if (!page) {
       return res.status(404).json({ error: 'Page not found or unpublished' })
     }
