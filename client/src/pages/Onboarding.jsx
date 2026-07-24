@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useWorkspace } from '../context/WorkspaceContext'
+import { useWorkspace, clearSessionWorkspace } from '../context/WorkspaceContext'
 import { supabase } from '../config/supabase'
 import { projectsApi } from '../services/api'
 import api, { groupsApi } from '../services/api'
@@ -424,8 +424,8 @@ export default function Onboarding() {
         } catch {
           // Non-fatal — user may already be a member, or join fails silently
         }
-        setActiveWorkspace({ mode: 'team', groupId: urlGroupId, groupName: null })
-        window.location.replace('/dashboard')
+        clearSessionWorkspace()
+        window.location.replace('/choose-workspace')
         return
       }
 
@@ -516,13 +516,14 @@ export default function Onboarding() {
   async function handleFinish() {
     setLoading(true)
     try { await saveProfile({ onboarding_complete: true }) } catch { /* non-fatal */ }
-    // Apply chosen mode to session so dashboard opens correctly
+    // If user created a team, show workspace selector so they can choose where to start
     if (needsGroup) {
-      setActiveWorkspace({ mode: 'team', groupId: createdGroup?.id || null, groupName: createdGroup?.name || null })
+      clearSessionWorkspace()
+      window.location.replace('/choose-workspace')
     } else {
       setActiveWorkspace({ mode: 'personal', groupId: null, groupName: null })
+      window.location.replace('/dashboard')
     }
-    window.location.replace('/dashboard')
   }
 
   function goBack() { setStep(s => Math.max(1, s - 1)) }

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../config/supabase'
 import { groupsApi } from '../services/api'
+import { clearSessionWorkspace } from '../context/WorkspaceContext'
 import { Users, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -53,8 +54,9 @@ export default function JoinGroup() {
       }
 
       localStorage.removeItem('pendingInvite')
+      clearSessionWorkspace()
       setStatus('joined')
-      setTimeout(() => navigate('/dashboard'), 1500)
+      setTimeout(() => navigate('/choose-workspace'), 1500)
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to join')
       setStatus('ready')
