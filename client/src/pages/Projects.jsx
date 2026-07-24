@@ -7,14 +7,11 @@ import {
   MoreVertical, Archive, Pencil, Loader2, Sparkles, ChevronLeft, GitBranch,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { UpgradeBanner } from '../components/shared/UpgradeGate'
 import {
   PageShell, PageHeader, PageLoader, EmptyState, Modal, ModalButton,
 } from '../components/ui'
 import { useWorkspace } from '../context/WorkspaceContext'
 import { getTemplatesForProfession, PROJECT_TEMPLATES } from '../config/projectTemplates'
-
-const FREE_PROJECT_LIMIT = 3
 
 // ── Confirm Modal ─────────────────────────────────────────────
 function ConfirmModal({ icon: Icon = Archive, iconBg = 'bg-amber-50', iconColor = 'text-amber-500', title, message, confirmLabel = 'Confirm', confirmClass = 'bg-amber-500 text-white hover:bg-amber-600 border-amber-500', onConfirm, onCancel }) {
@@ -320,7 +317,6 @@ export default function Projects() {
   const [modal,         setModal]         = useState(null)   // null | 'create' | project object
   const [templateStep,  setTemplateStep]  = useState(false)  // show template gallery
   const [selectedTpl,   setSelectedTpl]   = useState(null)   // chosen template
-  const [upgradeMsg,    setUpgradeMsg]    = useState(null)
   const [archiveTarget, setArchiveTarget] = useState(null)
 
   useEffect(() => { load() }, [activeGroupId]) // eslint-disable-line
@@ -385,10 +381,6 @@ export default function Projects() {
   }
 
   function openCreate() {
-    if (projects.length >= FREE_PROJECT_LIMIT) {
-      setUpgradeMsg(`You've reached ${FREE_PROJECT_LIMIT} projects. Upgrade to Group (free) to add more.`)
-      return
-    }
     setTemplateStep(true)
   }
 
@@ -430,11 +422,6 @@ export default function Projects() {
         }
       />
 
-      {upgradeMsg && (
-        <div className="mb-4">
-          <UpgradeBanner message={upgradeMsg} plan="group_free" onDismiss={() => setUpgradeMsg(null)} />
-        </div>
-      )}
 
       {loading ? (
         <PageLoader />
