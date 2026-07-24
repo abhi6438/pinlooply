@@ -1267,7 +1267,8 @@ export default function Lists() {
   async function loadTasks() {
     setLoading(true)
     try {
-      const params = { excludeTestCases: true }
+      // show_done=true: include tasks with status='done' so the DONE/PROD column is visible
+      const params = { excludeTestCases: true, show_done: true }
       if (activeGroupId) params.group_id = activeGroupId
       else params.group_id = 'personal'
       const res = await tasksApi.list(params)
