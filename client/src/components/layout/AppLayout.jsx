@@ -205,7 +205,7 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
         {!collapsed && (
           <button
             onClick={() => navigate('/choose-workspace')}
-            className="flex items-center gap-2 min-w-0 flex-1 group hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 min-w-0 flex-1 group rounded-lg px-1.5 py-1 hover:bg-[#312E81] border border-transparent hover:border-[#4338CA] transition-all"
             title="Switch workspace"
           >
             <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center flex-shrink-0">
@@ -213,7 +213,10 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-white font-bold text-sm truncate leading-tight">{displayName}</p>
-              <p className="text-purple-300 text-[10px] leading-tight">{workspaceBadge}</p>
+              <p className="text-purple-300 text-[10px] leading-tight group-hover:text-purple-200 transition-colors">
+                <span className="group-hover:hidden">{workspaceBadge}</span>
+                <span className="hidden group-hover:inline">Switch workspace</span>
+              </p>
             </div>
             <ChevronsUpDown className="w-3.5 h-3.5 text-purple-400 group-hover:text-white transition-colors flex-shrink-0" />
           </button>
