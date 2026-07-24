@@ -19,16 +19,18 @@ router.get('/:slug', async (req, res) => {
 
     const page = pages?.[0] || null
     if (!page) {
+      console.log('[public] no publish_pages row for slug:', slug)
       return res.status(404).json({ error: 'Page not found or unpublished' })
     }
 
     const projectId = page.project_id
+    console.log('[public] found page, projectId:', projectId)
     const now = new Date().toISOString()
     const in3days = new Date(Date.now() + 3 * 86400000).toISOString()
 
     // 2. Fetch all data in parallel — omit sensitive fields
     const [
-      { data: project },
+      { data: project, error: projErr },
       { data: tasks },
       { data: topics },
       { data: discussions },
@@ -37,7 +39,7 @@ router.get('/:slug', async (req, res) => {
         .from('projects')
         .select('id, name, description, color, updated_at')
         .eq('id', projectId)
-        .single(),
+        .maybeSingle(),
 
       supabaseAdmin
         .from('tasks')
@@ -62,7 +64,10 @@ router.get('/:slug', async (req, res) => {
         .limit(5),
     ])
 
-    if (!project) return res.status(404).json({ error: 'Project not found' })
+    if (!project) {
+      console.log('[public] project not found for id:', projectId, 'err:', projErr?.message)
+      return res.status(404).json({ error: 'Project not found', projectId })
+    }
 
     // 3. Compute health
     const allTasks      = (tasks || []).filter(t => t.type !== 'test_case')
