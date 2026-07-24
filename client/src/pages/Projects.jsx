@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { projectsApi, tasksApi } from '../services/api'
+import { projectsApi, tasksApi, publishApi } from '../services/api'
 import {
   Plus, FolderOpen, CheckSquare2, Tag, Clock,
   MoreVertical, Archive, Pencil, Loader2, Sparkles, ChevronLeft, GitBranch,
+  Share2, Globe, Copy, Check, X, ExternalLink,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -27,6 +28,126 @@ function ConfirmModal({ icon: Icon = Archive, iconBg = 'bg-amber-50', iconColor 
           <button onClick={onCancel} className="flex-1 btn btn-secondary">Cancel</button>
           <button onClick={onConfirm} className={`flex-1 btn border ${confirmClass}`}>{confirmLabel}</button>
         </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ── Share Modal ───────────────────────────────────────────────
+function ShareModal({ project, onClose, onPublish, onUnpublish }) {
+  const [loading,  setLoading]  = useState(true)
+  const [slug,     setSlug]     = useState(null)
+  const [copied,   setCopied]   = useState(false)
+  const [stopping, setStopping] = useState(false)
+
+  const publicUrl = slug ? `${window.location.origin}/p/${slug}` : null
+
+  useEffect(() => {
+    async function init() {
+      try {
+        const res = await publishApi.getStatus(project.id)
+        const existing = res.data?.data?.slug
+        if (existing) {
+          setSlug(existing)
+          setLoading(false)
+        } else {
+          // Not published yet — publish now
+          const pub = await publishApi.enable(project.id)
+          const newSlug = pub.data?.data?.slug
+          setSlug(newSlug)
+          if (newSlug) onPublish(project.id, newSlug)
+          setLoading(false)
+        }
+      } catch {
+        setLoading(false)
+      }
+    }
+    init()
+  }, [project.id])
+
+  async function handleCopy() {
+    if (!publicUrl) return
+    await navigator.clipboard.writeText(publicUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleStop() {
+    setStopping(true)
+    try {
+      await publishApi.disable(project.id)
+      onUnpublish(project.id)
+      onClose()
+    } catch { setStopping(false) }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-indigo-50">
+              <Globe className="w-4 h-4 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Share Status Page</h3>
+              <p className="text-xs text-gray-400 truncate max-w-[220px]">{project.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+            <span className="ml-2 text-sm text-gray-400">Generating link…</span>
+          </div>
+        ) : !slug ? (
+          <p className="text-sm text-red-500 text-center py-4">Failed to generate link. Try again.</p>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 overflow-hidden">
+                <p className="text-xs text-gray-600 truncate font-mono">{publicUrl}</p>
+              </div>
+              <button
+                onClick={handleCopy}
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all flex-shrink-0 ${
+                  copied ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                }`}
+              >
+                {copied ? <><Check className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+              </button>
+            </div>
+
+            <div className="flex gap-2 mb-5">
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Preview
+              </a>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-[11px] text-gray-400 mb-3">
+                Anyone with this link can view the public status page. No login required.
+              </p>
+              <button
+                onClick={handleStop}
+                disabled={stopping}
+                className="w-full text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg py-2 transition-all disabled:opacity-50"
+              >
+                {stopping ? 'Stopping…' : 'Stop sharing this project'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>,
     document.body
@@ -236,7 +357,7 @@ function ProjectModal({ project, template, onClose, onSave, onBack }) {
 }
 
 // ── Project Card ──────────────────────────────────────────────
-function ProjectCard({ project, onEdit, onArchive }) {
+function ProjectCard({ project, onEdit, onArchive, onShare, publishedSlug }) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const health = HEALTH[project.health] ?? HEALTH.good
@@ -261,7 +382,12 @@ function ProjectCard({ project, onEdit, onArchive }) {
               )}
             </div>
           </div>
-          <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
+          <div className="relative flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            {publishedSlug && (
+              <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                <Globe className="w-2.5 h-2.5" /> Live
+              </span>
+            )}
             <button
               onClick={() => setMenuOpen(o => !o)}
               className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-warm-400 hover:text-warm-600 hover:bg-warm-100 transition-opacity"
@@ -269,7 +395,14 @@ function ProjectCard({ project, onEdit, onArchive }) {
               <MoreVertical className="w-4 h-4" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-7 w-36 bg-white border border-warm-200 rounded-xl shadow-lg z-10 py-1">
+              <div className="absolute right-0 top-7 w-40 bg-white border border-warm-200 rounded-xl shadow-lg z-10 py-1">
+                <button
+                  onClick={() => { setMenuOpen(false); onShare(project) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-indigo-600 hover:bg-indigo-50"
+                >
+                  <Share2 className="w-3.5 h-3.5" /> Share Status Page
+                </button>
+                <div className="border-t border-warm-100 my-1" />
                 <button
                   onClick={() => { setMenuOpen(false); onEdit(project) }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-warm-700 hover:bg-warm-50"
@@ -317,7 +450,9 @@ export default function Projects() {
   const [modal,         setModal]         = useState(null)   // null | 'create' | project object
   const [templateStep,  setTemplateStep]  = useState(false)  // show template gallery
   const [selectedTpl,   setSelectedTpl]   = useState(null)   // chosen template
-  const [archiveTarget, setArchiveTarget] = useState(null)
+  const [archiveTarget,  setArchiveTarget]  = useState(null)
+  const [shareTarget,    setShareTarget]    = useState(null)   // project being shared
+  const [publishedSlugs, setPublishedSlugs] = useState({})    // { projectId: slug }
 
   useEffect(() => { load() }, [activeGroupId]) // eslint-disable-line
 
@@ -325,9 +460,21 @@ export default function Projects() {
     setLoading(true)
     try {
       const res = await projectsApi.list({ groupId: activeGroupId })
-      setProjects(res.data.data || [])
+      const list = res.data.data || []
+      setProjects(list)
+      // Load publish statuses in background (non-blocking)
+      loadPublishStatuses(list)
     } catch { toast.error('Failed to load projects') }
     finally { setLoading(false) }
+  }
+
+  async function loadPublishStatuses(list) {
+    const results = await Promise.allSettled(
+      list.map(p => publishApi.getStatus(p.id).then(r => ({ id: p.id, slug: r.data?.data?.slug || null })))
+    )
+    const map = {}
+    results.forEach(r => { if (r.status === 'fulfilled' && r.value.slug) map[r.value.id] = r.value.slug })
+    setPublishedSlugs(map)
   }
 
   async function handleSave(payload) {
@@ -349,14 +496,7 @@ export default function Projects() {
         const res = await projectsApi.create(createPayload)
         created = res.data?.data || res.data
         toast.success('Project created')
-        setUpgradeMsg(null)
       } catch (err) {
-        if (err.response?.status === 403 && err.response?.data?.upgrade) {
-          setUpgradeMsg(err.response.data.message)
-          setModal(null)
-          setSelectedTpl(null)
-          return
-        }
         throw err
       }
       // Create starter tasks if template has them
@@ -442,7 +582,14 @@ export default function Projects() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map(p => (
-            <ProjectCard key={p.id} project={p} onEdit={setModal} onArchive={handleArchive} />
+            <ProjectCard
+              key={p.id}
+              project={p}
+              onEdit={setModal}
+              onArchive={handleArchive}
+              onShare={setShareTarget}
+              publishedSlug={publishedSlugs[p.id]}
+            />
           ))}
         </div>
       )}
@@ -474,6 +621,15 @@ export default function Projects() {
           confirmLabel="Archive"
           onConfirm={doArchive}
           onCancel={() => setArchiveTarget(null)}
+        />
+      )}
+
+      {shareTarget && (
+        <ShareModal
+          project={shareTarget}
+          onClose={() => setShareTarget(null)}
+          onPublish={(id, slug) => setPublishedSlugs(prev => ({ ...prev, [id]: slug }))}
+          onUnpublish={(id) => setPublishedSlugs(prev => { const n = { ...prev }; delete n[id]; return n })}
         />
       )}
     </PageShell>

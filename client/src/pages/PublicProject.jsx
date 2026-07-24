@@ -51,6 +51,80 @@ function timeAgo(iso) {
   catch { return '' }
 }
 
+// ── Donut chart (SVG, no deps) ────────────────────────────────
+function DonutChart({ pct, done, total, overdue }) {
+  const r = 36
+  const cx = 48
+  const cy = 48
+  const circ = 2 * Math.PI * r
+  const fill = pct >= 80 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#6366f1'
+  const dash = (pct / 100) * circ
+
+  return (
+    <div className="relative w-24 h-24 flex-shrink-0">
+      <svg width="96" height="96" viewBox="0 0 96 96">
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth="9" />
+        {pct > 0 && (
+          <circle
+            cx={cx} cy={cy} r={r}
+            fill="none" stroke={fill} strokeWidth="9"
+            strokeDasharray={`${dash} ${circ - dash}`}
+            strokeDashoffset={circ * 0.25}
+            strokeLinecap="round"
+          />
+        )}
+        {overdue > 0 && (
+          <circle
+            cx={cx} cy={cy} r={r}
+            fill="none" stroke="#ef4444" strokeWidth="9" opacity="0.7"
+            strokeDasharray={`${(overdue / total) * circ} ${circ - (overdue / total) * circ}`}
+            strokeDashoffset={circ * 0.25 - (done / total) * circ}
+            strokeLinecap="round"
+          />
+        )}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-bold text-gray-900 leading-none">{pct}%</span>
+        <span className="text-[10px] text-gray-400 mt-0.5">done</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Priority bars ─────────────────────────────────────────────
+function PriorityBars({ items }) {
+  const total = items.length || 1
+  const bars = [
+    { label: 'High',   count: items.filter(t => t.priority === 'high').length,   color: '#ef4444', track: '#fee2e2' },
+    { label: 'Medium', count: items.filter(t => t.priority === 'medium').length, color: '#f59e0b', track: '#fef3c7' },
+    { label: 'Low',    count: items.filter(t => t.priority === 'low').length,    color: '#9ca3af', track: '#f3f4f6' },
+  ]
+  return (
+    <div className="space-y-2.5">
+      {bars.map(b => (
+        <div key={b.label} className="flex items-center gap-3">
+          <span className="text-xs text-gray-500 w-12 flex-shrink-0">{b.label}</span>
+          <div className="flex-1 h-2 rounded-full" style={{ background: b.track }}>
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.max((b.count / total) * 100, b.count > 0 ? 4 : 0)}%`, background: b.color }} />
+          </div>
+          <span className="text-xs font-semibold text-gray-700 w-4 text-right flex-shrink-0">{b.count}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Mini stat card ────────────────────────────────────────────
+function StatCard({ value, label, color = 'text-gray-900' }) {
+  return (
+    <div className="flex flex-col items-center bg-gray-50 rounded-xl px-4 py-3 min-w-[60px]">
+      <span className={`text-2xl font-bold leading-none ${color}`}>{value}</span>
+      <span className="text-[11px] text-gray-400 mt-1 text-center">{label}</span>
+    </div>
+  )
+}
+
 // ── Section wrapper ───────────────────────────────────────────
 function Section({ title, icon: Icon, children, empty }) {
   return (
@@ -188,17 +262,32 @@ export default function PublicProject() {
           </div>
         </div>
 
-        {/* Task Progress Bar */}
+        {/* Task Progress — donut + stats */}
         {taskProgress && taskProgress.total > 0 && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-gray-400" />
-                Progress
-              </h2>
-              <span className="text-sm font-bold text-gray-900">{taskProgress.pct}%</span>
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
+              <CheckCircle2 className="w-4 h-4 text-gray-400" />
+              Progress
+            </h2>
+            <div className="flex items-center gap-6">
+              <DonutChart
+                pct={taskProgress.pct}
+                done={taskProgress.done}
+                total={taskProgress.total}
+                overdue={taskProgress.overdue}
+              />
+              <div className="flex-1 grid grid-cols-2 gap-2">
+                <StatCard value={taskProgress.done}   label="Completed" color="text-emerald-600" />
+                <StatCard value={taskProgress.open}   label="Open"      color="text-indigo-600" />
+                <StatCard value={taskProgress.total}  label="Total" />
+                {taskProgress.overdue > 0
+                  ? <StatCard value={taskProgress.overdue} label="Overdue" color="text-red-600" />
+                  : <StatCard value="0" label="Overdue" color="text-gray-400" />
+                }
+              </div>
             </div>
-            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
+            {/* Progress bar underneath */}
+            <div className="mt-4 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-700"
                 style={{
@@ -207,14 +296,17 @@ export default function PublicProject() {
                 }}
               />
             </div>
-            <div className="flex gap-4 text-xs text-gray-500">
-              <span><strong className="text-gray-900">{taskProgress.done}</strong> completed</span>
-              <span><strong className="text-gray-900">{taskProgress.open}</strong> open</span>
-              {taskProgress.overdue > 0 && (
-                <span className="text-red-600"><strong>{taskProgress.overdue}</strong> overdue</span>
-              )}
-              <span className="ml-auto text-gray-400">{taskProgress.total} total</span>
-            </div>
+          </div>
+        )}
+
+        {/* Priority Breakdown */}
+        {openItems && openItems.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
+              <AlertTriangle className="w-4 h-4 text-gray-400" />
+              Open Tasks by Priority
+            </h2>
+            <PriorityBars items={openItems} />
           </div>
         )}
 
@@ -289,32 +381,18 @@ export default function PublicProject() {
         {/* Test Status */}
         {testStatus && (testStatus.total > 0) && (
           <Section title="Test Status" icon={FlaskConical}>
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{testStatus.passing}</p>
-                <p className="text-xs text-emerald-600 font-medium mt-0.5">Passing</p>
+            <div className="flex items-center gap-5">
+              <DonutChart
+                pct={Math.round((testStatus.passing / testStatus.total) * 100)}
+                done={testStatus.passing}
+                total={testStatus.total}
+                overdue={testStatus.pending}
+              />
+              <div className="flex gap-3 flex-wrap">
+                <StatCard value={testStatus.passing} label="Passing" color="text-emerald-600" />
+                <StatCard value={testStatus.pending} label="Pending" color="text-amber-600" />
+                <StatCard value={testStatus.total}   label="Total" />
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{testStatus.pending}</p>
-                <p className="text-xs text-amber-600 font-medium mt-0.5">Pending</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{testStatus.total}</p>
-                <p className="text-xs text-gray-400 font-medium mt-0.5">Total</p>
-              </div>
-              {testStatus.total > 0 && (
-                <div className="flex-1 ml-2">
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all"
-                      style={{ width: `${Math.round((testStatus.passing / testStatus.total) * 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {Math.round((testStatus.passing / testStatus.total) * 100)}% passing
-                  </p>
-                </div>
-              )}
             </div>
           </Section>
         )}
