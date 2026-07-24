@@ -33,14 +33,14 @@ async function fetchProjectData(projectId) {
       .eq('project_id', projectId)
       .eq('status', 'open')
       .order('updated_at', { ascending: false })
-      .limit(5),
+      .limit(20),
 
     supabaseAdmin
       .from('discussions')
       .select('id, ai_summary, created_at')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
-      .limit(5),
+      .limit(10),
   ])
 
   if (projectErr) console.error('[public] project query error:', JSON.stringify(projectErr))
@@ -69,7 +69,7 @@ async function fetchProjectData(projectId) {
     .filter(d => d.ai_summary)
     .map(d => ({ summary: d.ai_summary, created_at: d.created_at }))
 
-  const openItems = pendingTasks.slice(0, 15).map(t => ({
+  const openItems = pendingTasks.slice(0, 50).map(t => ({
     title:    t.title,
     priority: t.priority,
     type:     t.type,

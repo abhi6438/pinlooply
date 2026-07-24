@@ -232,7 +232,7 @@ export default function PublicProject() {
               <div className="min-w-0">
                 <h1 className="text-xl font-bold text-gray-900 truncate">{project.name}</h1>
                 {project.description && (
-                  <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{project.description}</p>
+                  <p className="text-sm text-gray-500 mt-0.5">{project.description}</p>
                 )}
               </div>
             </div>
@@ -370,7 +370,7 @@ export default function PublicProject() {
               {topics.map((t, i) => (
                 <div key={i} className="border-b border-gray-100 last:border-0 pb-3 last:pb-0">
                   <p className="text-sm font-medium text-gray-800">{t.title}</p>
-                  {t.summary && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{t.summary}</p>}
+                  {t.summary && <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{t.summary}</p>}
                   {t.updated_at && <p className="text-[11px] text-gray-400 mt-1">Updated {timeAgo(t.updated_at)}</p>}
                 </div>
               ))}
