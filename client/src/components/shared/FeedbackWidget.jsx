@@ -79,7 +79,7 @@ function FeedbackModal({ onClose }) {
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center sm:justify-end p-4 sm:pr-6">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
 
         {/* Header */}
@@ -210,20 +210,27 @@ function FeedbackModal({ onClose }) {
 
 // ── Floating trigger button ───────────────────────────────────
 export default function FeedbackWidget() {
-  const [open, setOpen] = useState(false)
+  const [open,    setOpen]    = useState(false)
+  const [tooltip, setTooltip] = useState(false)
 
   return (
     <>
-      {/* Floating tab — right edge, mid-screen */}
-      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50">
+      {/* FAB — bottom-left, clear of content and other FABs */}
+      <div className="fixed bottom-5 left-5 z-50 flex items-end gap-2">
+        {/* Tooltip label */}
+        {tooltip && (
+          <div className="mb-1 px-2.5 py-1 bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none">
+            Share feedback
+          </div>
+        )}
         <button
           onClick={() => setOpen(true)}
-          title="Give feedback"
-          className="flex flex-col items-center gap-1 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-semibold px-2 py-3 rounded-l-xl shadow-lg transition-all hover:shadow-xl hover:-translate-x-0.5"
-          style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'translateY(-50%) rotate(180deg)' }}
+          onMouseEnter={() => setTooltip(true)}
+          onMouseLeave={() => setTooltip(false)}
+          title="Share feedback"
+          className="w-11 h-11 rounded-full bg-primary-600 hover:bg-primary-700 active:scale-95 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
         >
-          <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" style={{ transform: 'rotate(180deg)' }} />
-          Feedback
+          <MessageSquare className="w-5 h-5" />
         </button>
       </div>
 
