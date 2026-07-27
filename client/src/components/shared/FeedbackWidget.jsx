@@ -50,10 +50,12 @@ function FeedbackModal({ onClose }) {
   const [category, setCategory] = useState('general')
   const [rating,   setRating]   = useState(0)
   const [message,  setMessage]  = useState('')
-  const [name,     setName]     = useState(user?.user_metadata?.name || user?.name || '')
-  const [email,    setEmail]    = useState(user?.email || '')
   const [sending,  setSending]  = useState(false)
   const [error,    setError]    = useState('')
+
+  // Name & email come silently from the logged-in account
+  const name  = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.name || ''
+  const email = user?.email || ''
 
   async function submit(e) {
     e.preventDefault()
@@ -160,32 +162,13 @@ function FeedbackModal({ onClose }) {
               />
             </div>
 
-            {/* Name + Email */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-medium text-warm-400 mb-1 block">
-                  Name <span className="text-warm-300">(optional)</span>
-                </label>
-                <input
-                  className="input text-sm w-full"
-                  placeholder="Your name"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-warm-400 mb-1 block">
-                  Email <span className="text-warm-300">(optional)</span>
-                </label>
-                <input
-                  type="email"
-                  className="input text-sm w-full"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
+            {/* Name/email taken from account silently — show who's submitting */}
+            {name && (
+              <p className="text-xs text-warm-400">
+                Submitting as <span className="font-medium text-warm-600">{name}</span>
+                {email && <span> · {email}</span>}
+              </p>
+            )}
 
             {error && <p className="text-xs text-red-500">{error}</p>}
 
