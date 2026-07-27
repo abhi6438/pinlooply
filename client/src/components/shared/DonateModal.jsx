@@ -238,6 +238,25 @@ export function DonateButton({ variant = 'default' }) {
     )
   }
 
+  if (variant === 'inline') {
+    return (
+      <>
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <div className="flex-1 h-px bg-gray-100" />
+          <button
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-1.5 text-xs text-pink-500 hover:text-pink-600 font-medium transition-colors"
+          >
+            <Heart className="w-3 h-3 fill-pink-400" />
+            Support this project
+          </button>
+          <div className="flex-1 h-px bg-gray-100" />
+        </div>
+        {open && <DonateModal onClose={() => setOpen(false)} />}
+      </>
+    )
+  }
+
   // default
   return (
     <>

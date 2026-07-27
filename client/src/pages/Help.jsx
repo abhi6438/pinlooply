@@ -7,6 +7,7 @@ import {
   ClipboardList, BarChart3, Bell, Globe, RefreshCw, UserCheck,
   BarChart2, FlaskConical, Play, Square, Pencil, Plus,
 } from 'lucide-react'
+import { DonateButton } from '../components/shared/DonateModal'
 
 // ── Guide content ─────────────────────────────────────────────
 const SECTIONS = [
@@ -572,8 +573,12 @@ export default function Help() {
 
           {/* Footer tip */}
           {!query && (
-            <div className="text-center py-8 text-warm-400 text-sm border-t border-warm-200 mt-6">
+            <div className="text-center py-8 text-warm-400 text-sm border-t border-warm-200 mt-6 space-y-4">
               <p>Still stuck? Use <kbd className="px-1.5 py-0.5 bg-warm-100 rounded border border-warm-200 text-xs">⌘K</kbd> to search anything in the app, or check the <strong className="text-warm-600">Automations</strong> and <strong className="text-warm-600">Workspace</strong> settings for more power features.</p>
+              <div className="flex flex-col items-center gap-1">
+                <p className="text-xs text-warm-400">Finding Pinlooply useful?</p>
+                <DonateButton variant="public" />
+              </div>
             </div>
           )}
         </div>

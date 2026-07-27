@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import { DonateButton } from '../components/shared/DonateModal'
 
 // ── Normalize field: string or array → array ──────────────────
 function toArr(val) {
@@ -239,6 +240,9 @@ function StandupPanel({ standup, projects, loading, copied, onCopy, onRegenerate
           Generated at {format(new Date(standup.meta.generatedAt), 'h:mm a')}
         </p>
       )}
+
+      {/* Support nudge */}
+      {standup && <DonateButton variant="inline" />}
     </div>
   )
 }

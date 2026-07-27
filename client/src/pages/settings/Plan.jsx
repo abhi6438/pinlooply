@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { Check, Zap, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../../components/ui'
+import { DonateButton } from '../../components/shared/DonateModal'
 
 function SettingsNav() {
   const { pathname } = useLocation()
@@ -221,6 +222,12 @@ export default function Plan() {
       <p className="mt-6 text-center text-xs text-warm-400">
         All plans include full access to every feature. Switch anytime.
       </p>
+
+      {/* Support */}
+      <div className="mt-8 flex flex-col items-center gap-2">
+        <p className="text-xs text-warm-400">Pinlooply is free forever. If it helps your team, consider supporting us:</p>
+        <DonateButton variant="public" />
+      </div>
     </PageShell>
   )
 }

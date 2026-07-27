@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
+import { DonateButton } from '../components/shared/DonateModal'
 
 // ── ISO week helpers ──────────────────────────────────────────
 function currentWeekStr() {
@@ -270,6 +271,9 @@ function SummaryPanel({ data, period, loading, copied, onCopy, onRegenerate }) {
           Generated {format(parseISO(data.generatedAt), 'h:mm a, MMM d')}
         </p>
       )}
+
+      {/* Support nudge */}
+      {data && <DonateButton variant="inline" />}
     </div>
   )
 }
