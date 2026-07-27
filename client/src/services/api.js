@@ -183,6 +183,18 @@ export const donorApi = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(r => r.json()),
+
+  razorpayCreateOrder: (amount, user_id) => fetch('/api/public/razorpay/create-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount, user_id }),
+  }).then(r => r.json()),
+
+  razorpayVerify: (body) => fetch('/api/public/razorpay/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(r => r.json()),
 }
 
 export const publishApi = {

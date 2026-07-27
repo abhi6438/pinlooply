@@ -23,9 +23,9 @@ const TABS = [
   { id: 'usage',    label: 'Usage Stats',     icon: BarChart3    },
   { id: 'plans',    label: 'Plan Management', icon: Crown        },
   { id: 'menus',    label: 'Menu Config',     icon: LayoutDashboard },
-  { id: 'donate',   label: 'Donation',        icon: Heart        },
+  { id: 'donate',   label: 'Support My Work',  icon: Heart        },
   { id: 'feedback', label: 'Feedback',        icon: Star         },
-  { id: 'donors',   label: 'Donors',          icon: HandCoins    },
+  { id: 'donors',   label: 'Supporters',       icon: HandCoins    },
 ]
 
 // ── All configurable module definitions ──────────────────────────
@@ -1367,7 +1367,7 @@ function DonorsTab() {
   )
 }
 
-// ── Tab 5: Donation Config ─────────────────────────────────────
+/// ── Tab 5: Support My Work Config ────────────────────────────────────
 function DonateConfigTab() {
   const [cfg,     setCfg]     = useState(null)
   const [loading, setLoading] = useState(true)
@@ -1377,7 +1377,7 @@ function DonateConfigTab() {
   useEffect(() => {
     adminApi.getDonateConfig()
       .then(res => setCfg(res.data.data))
-      .catch(() => toast.error('Failed to load donation config'))
+      .catch(() => toast.error('Failed to load support config'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -1386,7 +1386,7 @@ function DonateConfigTab() {
     try {
       await adminApi.saveDonateConfig(cfg)
       setSaved(true)
-      toast.success('Donation config saved')
+      toast.success('Support config saved')
       setTimeout(() => setSaved(false), 2500)
     } catch { toast.error('Failed to save') }
     finally { setSaving(false) }
@@ -1499,6 +1499,40 @@ function DonateConfigTab() {
             value={cfg.buymeacoffee?.url || ''}
             onChange={e => update('buymeacoffee', 'url', e.target.value)}
           />
+        </div>
+      </div>
+
+      {/* Razorpay */}
+      <div className="card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">💳</span>
+            <h3 className="text-sm font-semibold text-warm-900">Razorpay</h3>
+            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">India</span>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-xs text-warm-500">Enable</span>
+            <div
+              onClick={() => update('razorpay', 'enabled', !cfg.razorpay?.enabled)}
+              className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${cfg.razorpay?.enabled ? 'bg-primary-600' : 'bg-warm-200'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.razorpay?.enabled ? 'translate-x-4' : ''}`} />
+            </div>
+          </label>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-warm-500 mb-1 block">
+            Key ID <span className="text-warm-300">(public key — safe to store here)</span>
+          </label>
+          <input
+            className="input text-sm w-full font-mono"
+            placeholder="rzp_live_xxxxxxxxxxxx"
+            value={cfg.razorpay?.key_id || ''}
+            onChange={e => update('razorpay', 'key_id', e.target.value)}
+          />
+          <p className="text-[11px] text-warm-400 mt-1">
+            Keep your Key Secret only in <code className="bg-warm-100 px-1 rounded">server/.env</code> as <code className="bg-warm-100 px-1 rounded">RAZORPAY_KEY_SECRET</code> — never store it here.
+          </p>
         </div>
       </div>
 

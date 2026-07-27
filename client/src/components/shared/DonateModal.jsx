@@ -20,7 +20,19 @@ function fetchDonateConfig() {
 }
 
 function hasAnyMethod(cfg) {
-  return !!(cfg && (cfg.upi || cfg.paypal || cfg.buymeacoffee))
+  return !!(cfg && (cfg.upi || cfg.paypal || cfg.buymeacoffee || cfg.razorpay))
+}
+
+// Load Razorpay checkout.js on demand
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) { resolve(true); return }
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload  = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.body.appendChild(script)
+  })
 }
 
 // UPI deep-link QR
@@ -29,7 +41,161 @@ function upiQrUrl(id, name) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${data}`
 }
 
-// ── Donor details form (shown after payment click) ────────────
+// ── Razorpay tab ─────────────────────────────────────────────────
+const PRESETS = [99, 299, 499]
+
+function RazorpayTab({ cfg, onClose }) {
+  const { user }             = useAuth()
+  const [preset,  setPreset] = useState(99)
+  const [custom,  setCustom] = useState('')
+  const [paying,  setPaying] = useState(false)
+  const [success, setSuccess]= useState(false)
+  const [error,   setError]  = useState('')
+
+  const finalAmount = custom ? Number(custom) : preset
+
+  async function pay() {
+    const amt = finalAmount
+    if (!amt || isNaN(amt) || amt < 1) { setError('Please enter a valid amount'); return }
+    setError('')
+    setPaying(true)
+    try {
+      const loaded = await loadRazorpayScript()
+      if (!loaded) {
+        setError('Could not load payment gateway — try refreshing.')
+        setPaying(false)
+        return
+      }
+
+      const orderRes = await donorApi.razorpayCreateOrder(amt, user?.id)
+      if (!orderRes.success) {
+        setError(orderRes.error || 'Failed to create order')
+        setPaying(false)
+        return
+      }
+
+      const options = {
+        key:       orderRes.key_id,
+        amount:    orderRes.amount,
+        currency:  orderRes.currency || 'INR',
+        order_id:  orderRes.order_id,
+        name:      'Pinlooply',
+        description: 'Support my work',
+        prefill: {
+          name:  user?.user_metadata?.name || user?.name || '',
+          email: user?.email || '',
+        },
+        theme: { color: '#6366f1' },
+        handler: async (response) => {
+          try {
+            const verifyRes = await donorApi.razorpayVerify({
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+              name:    user?.user_metadata?.name || 'Supporter',
+              email:   user?.email || '',
+              amount:  amt,
+              user_id: user?.id || null,
+            })
+            if (verifyRes.success) setSuccess(true)
+            else setError('Payment received but verification failed. Please contact support.')
+          } catch {
+            setError('Verification error — please contact support.')
+          }
+          setPaying(false)
+        },
+        modal: { ondismiss: () => setPaying(false) },
+      }
+
+      const rzp = new window.Razorpay(options)
+      rzp.open()
+    } catch (err) {
+      setError(err.message || 'Something went wrong')
+      setPaying(false)
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="px-5 py-8 flex flex-col items-center gap-3 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center">
+          <CheckCheck className="w-7 h-7 text-emerald-600" />
+        </div>
+        <h3 className="text-base font-semibold text-gray-900">You're amazing! 🎉</h3>
+        <p className="text-sm text-gray-500 leading-relaxed">
+          Thank you for your support. We'll send you a personal thank-you soon!
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-2 px-6 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-4 pb-4 space-y-4">
+      {/* Amount presets */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 mb-2">Select amount</p>
+        <div className="grid grid-cols-3 gap-2">
+          {PRESETS.map(p => (
+            <button
+              key={p}
+              onClick={() => { setPreset(p); setCustom('') }}
+              className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                !custom && preset === p
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-400'
+              }`}
+            >
+              ₹{p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Custom amount */}
+      <div>
+        <label className="text-xs font-medium text-gray-500 mb-1 block">
+          Custom amount <span className="text-gray-300">(optional)</span>
+        </label>
+        <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-indigo-300">
+          <span className="pl-3 pr-1 text-gray-500 text-sm">₹</span>
+          <input
+            type="number"
+            className="flex-1 py-2 pr-3 text-sm outline-none"
+            placeholder="e.g. 150"
+            value={custom}
+            min="1"
+            onChange={e => setCustom(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      <button
+        onClick={pay}
+        disabled={paying}
+        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-3 rounded-xl transition-all disabled:opacity-60"
+      >
+        {paying && (
+          <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+        )}
+        {paying ? 'Opening checkout…' : `Pay ₹${finalAmount || '—'} with Razorpay`}
+      </button>
+
+      <p className="text-[11px] text-gray-400 text-center">
+        Secured by Razorpay · UPI, cards, net banking &amp; wallets accepted
+      </p>
+    </div>
+  )
+}
+
+// ── Donor details form (shown after UPI / PayPal / BMC click) ─────────
 function DonorThanksForm({ method, onClose, onSkip }) {
   const { user }              = useAuth()
   const [name,    setName]    = useState(user?.user_metadata?.name || user?.name || '')
@@ -46,7 +212,10 @@ function DonorThanksForm({ method, onClose, onSkip }) {
     setSending(true)
     setError('')
     try {
-      const res = await donorApi.notify({ name: name.trim(), email: email.trim(), method, amount: amount.trim(), message: message.trim(), user_id: user?.id || null })
+      const res = await donorApi.notify({
+        name: name.trim(), email: email.trim(), method,
+        amount: amount.trim(), message: message.trim(), user_id: user?.id || null,
+      })
       if (res.success) setDone(true)
       else setError(res.error || 'Something went wrong')
     } catch { setError('Failed to send. Try again.') }
@@ -71,7 +240,7 @@ function DonorThanksForm({ method, onClose, onSkip }) {
   return (
     <form onSubmit={submit} className="px-5 py-4 space-y-3">
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
-        🎉 Thank you for donating! Leave your details and we'll personally say thanks.
+        🎉 Thank you for supporting! Leave your details and we'll personally say thanks.
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -143,7 +312,7 @@ function DonorThanksForm({ method, onClose, onSkip }) {
   )
 }
 
-// ── Tab button ───────────────────────────────────────────────
+// ── Tab button ────────────────────────────────────────────────────────
 function Tab({ active, onClick, children }) {
   return (
     <button
@@ -159,19 +328,20 @@ function Tab({ active, onClick, children }) {
   )
 }
 
-// ── Main modal ───────────────────────────────────────────────
+// ── Main modal ────────────────────────────────────────────────────────
 export function DonateModal({ onClose }) {
-  const [tab,         setTab]         = useState(null)   // set after config loads
+  const [tab,         setTab]         = useState(null)
   const [copied,      setCopied]      = useState(false)
-  const [cfg,         setCfg]         = useState(null)   // fetched from server
-  const [donorStep,   setDonorStep]   = useState(false)  // show donor details form
+  const [cfg,         setCfg]         = useState(null)
+  const [donorStep,   setDonorStep]   = useState(false)
   const [donorMethod, setDonorMethod] = useState('upi')
 
   useEffect(() => {
     fetchDonateConfig().then(data => {
       setCfg(data)
-      if (data.upi)               setTab('upi')
-      else if (data.paypal)       setTab('paypal')
+      if (data.razorpay)      setTab('razorpay')
+      else if (data.upi)      setTab('upi')
+      else if (data.paypal)   setTab('paypal')
       else if (data.buymeacoffee) setTab('bmc')
     })
   }, [])
@@ -183,7 +353,6 @@ export function DonateModal({ onClose }) {
   }
 
   function handlePaymentClick(method) {
-    // After a short delay (letting the external tab open), show the donor form
     setDonorMethod(method)
     setTimeout(() => setDonorStep(true), 1200)
   }
@@ -206,7 +375,7 @@ export function DonateModal({ onClose }) {
               <Heart className="w-5 h-5 fill-white" />
             </div>
             <div>
-              <h2 className="text-base font-bold">Support Pinlooply</h2>
+              <h2 className="text-base font-bold">Support My Work</h2>
               <p className="text-pink-100 text-xs">Your support keeps this project alive ❤️</p>
             </div>
           </div>
@@ -222,11 +391,11 @@ export function DonateModal({ onClose }) {
         {/* No methods enabled */}
         {cfg !== null && !hasAny && (
           <div className="px-4 py-8 text-center text-sm text-gray-400">
-            Donation methods not configured yet.
+            Support methods not configured yet.
           </div>
         )}
 
-        {/* Donor details step — shown after clicking a payment link */}
+        {/* Donor details step — shown after clicking a manual payment link */}
         {hasAny && donorStep && (
           <DonorThanksForm
             method={donorMethod}
@@ -240,11 +409,17 @@ export function DonateModal({ onClose }) {
           <>
             <div className="px-4 pt-4">
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
-                {cfg.upi          && <Tab active={tab === 'upi'}    onClick={() => setTab('upi')}>🇮🇳 UPI</Tab>}
-                {cfg.paypal       && <Tab active={tab === 'paypal'} onClick={() => setTab('paypal')}>💳 PayPal</Tab>}
-                {cfg.buymeacoffee && <Tab active={tab === 'bmc'}    onClick={() => setTab('bmc')}>☕ Buy Me a Coffee</Tab>}
+                {cfg.razorpay     && <Tab active={tab === 'razorpay'} onClick={() => setTab('razorpay')}>💳 Razorpay</Tab>}
+                {cfg.upi          && <Tab active={tab === 'upi'}      onClick={() => setTab('upi')}>🇮🇳 UPI</Tab>}
+                {cfg.paypal       && <Tab active={tab === 'paypal'}   onClick={() => setTab('paypal')}>💳 PayPal</Tab>}
+                {cfg.buymeacoffee && <Tab active={tab === 'bmc'}      onClick={() => setTab('bmc')}>☕ Buy Me a Coffee</Tab>}
               </div>
             </div>
+
+            {/* Razorpay tab */}
+            {tab === 'razorpay' && cfg.razorpay && (
+              <RazorpayTab cfg={cfg} onClose={onClose} />
+            )}
 
             {/* UPI tab */}
             {tab === 'upi' && cfg.upi && (
@@ -272,13 +447,12 @@ export function DonateModal({ onClose }) {
                     {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
                   </button>
                 </div>
-                {/* After copying, prompt them to share details */}
                 {copied && (
                   <button
                     onClick={() => handlePaymentClick('upi')}
                     className="w-full text-xs text-pink-600 hover:text-pink-700 font-medium py-1 transition-colors"
                   >
-                    ✓ Done donating? Leave your details for a thank-you →
+                    ✓ Done? Leave your details for a thank-you →
                   </button>
                 )}
               </div>
@@ -291,7 +465,7 @@ export function DonateModal({ onClose }) {
                   <span className="text-3xl">💳</span>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-800 mb-1">Donate via PayPal</p>
+                  <p className="text-sm font-semibold text-gray-800 mb-1">Support via PayPal</p>
                   <p className="text-xs text-gray-500">Any amount is deeply appreciated</p>
                 </div>
                 <a
@@ -301,7 +475,7 @@ export function DonateModal({ onClose }) {
                   onClick={() => handlePaymentClick('paypal')}
                   className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-3 rounded-xl transition-all"
                 >
-                  Donate on PayPal <ExternalLink className="w-4 h-4" />
+                  Support on PayPal <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
             )}
@@ -342,16 +516,15 @@ export function DonateModal({ onClose }) {
   )
 }
 
-// ── Trigger button (inline use) ───────────────────────────────
+// ── Trigger button (inline use) ───────────────────────────────────────
 export function DonateButton({ variant = 'default' }) {
   const [open,    setOpen]    = useState(false)
-  const [visible, setVisible] = useState(false) // hide until config confirms a method is on
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
     fetchDonateConfig().then(cfg => setVisible(hasAnyMethod(cfg)))
   }, [])
 
-  // Don't render anything if no donation method is configured
   if (!visible) return null
 
   if (variant === 'sidebar') {
@@ -360,7 +533,7 @@ export function DonateButton({ variant = 'default' }) {
         <button
           onClick={() => setOpen(true)}
           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-pink-300 hover:bg-[#312E81] hover:text-pink-200 transition-colors"
-          title="Support Pinlooply"
+          title="Support My Work"
         >
           <Heart className="w-3.5 h-3.5 flex-shrink-0 fill-pink-400" />
           <span>Support</span>
@@ -376,7 +549,7 @@ export function DonateButton({ variant = 'default' }) {
         <button
           onClick={() => setOpen(true)}
           className="w-8 h-8 flex items-center justify-center rounded-lg text-pink-300 hover:bg-[#312E81] hover:text-pink-200 transition-colors mx-auto"
-          title="Support Pinlooply"
+          title="Support My Work"
         >
           <Heart className="w-4 h-4 fill-pink-400" />
         </button>
@@ -392,7 +565,7 @@ export function DonateButton({ variant = 'default' }) {
           onClick={() => setOpen(true)}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-semibold hover:opacity-90 transition-all shadow-sm"
         >
-          <Heart className="w-4 h-4 fill-white" /> Support the developer
+          <Heart className="w-4 h-4 fill-white" /> Support my work
         </button>
         {open && <DonateModal onClose={() => setOpen(false)} />}
       </>

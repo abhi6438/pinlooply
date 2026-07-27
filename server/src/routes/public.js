@@ -1,5 +1,16 @@
-import { Router } from 'express'
+import { Router }     from 'express'
+import crypto          from 'crypto'
+import Razorpay        from 'razorpay'
 import { supabaseAdmin } from '../config/supabase.js'
+
+function getRazorpay() {
+  const key_id     = process.env.RAZORPAY_KEY_ID
+  const key_secret = process.env.RAZORPAY_KEY_SECRET
+  if (!key_id || !key_secret || key_id.startsWith('rzp_test_XXXX')) {
+    throw new Error('Razorpay keys not configured — update RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in server/.env')
+  }
+  return new Razorpay({ key_id, key_secret })
+}
 
 // ── Helper: send in-app notification to a user ────────────────
 async function notifyUser(userId, { type, title, body, relatedFeedbackId }) {
@@ -211,10 +222,95 @@ router.get('/donate-config', async (req, res) => {
     if (cfg.upi?.enabled)          result.upi          = { id: cfg.upi.id,   name: cfg.upi.name }
     if (cfg.paypal?.enabled)       result.paypal       = { url: cfg.paypal.url }
     if (cfg.buymeacoffee?.enabled) result.buymeacoffee = { url: cfg.buymeacoffee.url }
+    if (cfg.razorpay?.enabled)     result.razorpay     = { key_id: cfg.razorpay.key_id }
 
     res.json({ success: true, data: result })
   } catch (err) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+// ── POST /api/public/razorpay/create-order ───────────────────────────
+router.post('/razorpay/create-order', async (req, res) => {
+  try {
+    const { amount, currency = 'INR' } = req.body
+    const amountNum = Number(amount)
+    if (!amountNum || isNaN(amountNum) || amountNum < 1) {
+      return res.status(400).json({ error: 'Invalid amount' })
+    }
+
+    const rzp   = getRazorpay()
+    const order = await rzp.orders.create({
+      amount:  Math.round(amountNum * 100),  // paise
+      currency,
+      receipt: `rcpt_${Date.now()}`,
+    })
+
+    res.json({
+      success:  true,
+      order_id: order.id,
+      amount:   order.amount,
+      currency: order.currency,
+      key_id:   process.env.RAZORPAY_KEY_ID,
+    })
+  } catch (err) {
+    console.error('[razorpay] create-order error:', err.message)
+    res.status(500).json({ error: err.message || 'Failed to create order' })
+  }
+})
+
+// ── POST /api/public/razorpay/verify ─────────────────────────────────
+router.post('/razorpay/verify', async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      name, email, amount, message, user_id,
+    } = req.body
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: 'Missing payment details' })
+    }
+
+    // Verify HMAC-SHA256 signature
+    const payload     = `${razorpay_order_id}|${razorpay_payment_id}`
+    const expectedSig = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(payload)
+      .digest('hex')
+
+    if (expectedSig !== razorpay_signature) {
+      console.warn('[razorpay] signature mismatch for order', razorpay_order_id)
+      return res.status(400).json({ error: 'Payment verification failed' })
+    }
+
+    // Save to donor_details
+    const { error: dbErr } = await supabaseAdmin.from('donor_details').insert({
+      user_id:              user_id || null,
+      name:                 name?.trim()    || 'Supporter',
+      email:                email?.trim()   || null,
+      method:               'razorpay',
+      amount:               amount ? String(amount) : null,
+      message:              message?.trim() || null,
+      razorpay_order_id,
+      razorpay_payment_id,
+    })
+    if (dbErr) console.error('[razorpay] db insert error:', dbErr.message)
+
+    // In-app notification to the supporter
+    if (user_id) {
+      await notifyUser(user_id, {
+        type:  'system_message',
+        title: '💖 Thank you for your support!',
+        body:  `Payment of ₹${amount} received. We truly appreciate it — a personal thank-you is on its way!`,
+      })
+    }
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[razorpay] verify error:', err.message)
+    res.status(500).json({ error: err.message || 'Verification failed' })
   }
 })
 
