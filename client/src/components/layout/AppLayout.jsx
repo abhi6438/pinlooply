@@ -342,7 +342,7 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
 
 // ── Mobile bottom nav ─────────────────────────────────────────
 function BottomNav({ mode }) {
-  const { vocabulary, enabledModules } = useWorkspace()
+  const { vocabulary, effectiveModules } = useWorkspace()
   // Show 5 most-used items on mobile
   const mobileItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
@@ -351,9 +351,9 @@ function BottomNav({ mode }) {
     { to: '/log',       icon: Send,            label: 'Log' },
     { to: '/my-tasks',  icon: UserCheck,       label: 'Mine' },
   ].filter(item => {
-    // basic module check for projects/tasks
-    if (item.to === '/projects' && enabledModules && !enabledModules.includes('projects')) return false
-    if (item.to === '/lists' && enabledModules && !enabledModules.includes('tasks')) return false
+    // use effectiveModules (merged: global ∩ group ∩ user) so group/admin restrictions apply
+    if (item.to === '/projects' && effectiveModules && !effectiveModules.includes('projects')) return false
+    if (item.to === '/lists' && effectiveModules && !effectiveModules.includes('tasks')) return false
     return true
   }).slice(0, 5)
 
@@ -379,8 +379,9 @@ function BottomNav({ mode }) {
 
 // ── Mobile drawer ─────────────────────────────────────────────
 function MobileDrawer({ open, onClose, user, userProfile, bellProps, onLogout }) {
-  const { vocabulary, enabledModules, workspaceName } = useWorkspace()
-  const navGroups = getNavGroups(userProfile?.mode, vocabulary, enabledModules)
+  const { vocabulary, effectiveModules, workspaceName, activeMode } = useWorkspace()
+  const effectiveMode = activeMode ?? userProfile?.mode ?? 'personal'
+  const navGroups = getNavGroups(effectiveMode, vocabulary, effectiveModules)
   const displayName = workspaceName || 'Pinlooply'
 
   useEffect(() => { if (open) onClose() }, []) // eslint-disable-line

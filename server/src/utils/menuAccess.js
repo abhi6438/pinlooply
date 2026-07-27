@@ -12,21 +12,36 @@ const ALL_MODULE_KEYS = ['projects', 'tasks', 'timeline', 'topics', 'standup', '
  */
 export async function getEffectiveMenuKeys(userId, groupId = null) {
   try {
-    // Fetch all menus + relevant disabled rules in parallel
+    // Determine which group(s) rules to check.
+    // If a specific groupId is given, use only that group.
+    // Otherwise, fetch ALL groups the user belongs to and apply any of their restrictions —
+    // this ensures group-level disables work even when the user hasn't explicitly "activated"
+    // team mode in sessionStorage (fresh tab, new browser, etc.).
+    let groupIds = []
+    if (groupId) {
+      groupIds = [groupId]
+    } else {
+      const { data: memberships } = await supabaseAdmin
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', userId)
+      groupIds = (memberships || []).map(m => m.group_id)
+    }
+
+    // Fetch menus + relevant disabled rules in parallel
     const queries = [
       supabaseAdmin.from('menus').select('key, always_on').order('sort_order'),
       supabaseAdmin.from('menu_access').select('menu_key').eq('level', 'global').is('target_id', null).eq('enabled', false),
       supabaseAdmin.from('menu_access').select('menu_key').eq('level', 'user').eq('target_id', userId).eq('enabled', false),
     ]
 
-    if (groupId) {
+    if (groupIds.length > 0) {
       queries.push(
-        supabaseAdmin.from('menu_access').select('menu_key').eq('level', 'group').eq('target_id', groupId).eq('enabled', false)
+        supabaseAdmin.from('menu_access').select('menu_key').eq('level', 'group').in('target_id', groupIds).eq('enabled', false)
       )
     }
 
-    const results = await Promise.all(queries)
-    const [menusRes, ...ruleResults] = results
+    const [menusRes, ...ruleResults] = await Promise.all(queries)
 
     if (menusRes.error) throw new Error(menusRes.error.message)
 
