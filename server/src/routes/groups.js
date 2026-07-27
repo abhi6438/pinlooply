@@ -90,7 +90,7 @@ router.get('/:groupId', requireAuth, async (req, res) => {
 
     const { data: grp } = await supabaseAdmin
       .from('groups')
-      .select('id, name, invite_code, owner_id, created_at')
+      .select('id, name, invite_code, owner_id, created_at, enabled_modules')
       .eq('id', groupId)
       .single()
 
@@ -324,13 +324,42 @@ router.get('/', requireAuth, async (req, res) => {
     const userId = req.user.id
     const { data } = await supabaseAdmin
       .from('group_members')
-      .select('role, groups(id, name, invite_code, owner_id, created_at)')
+      .select('role, groups(id, name, invite_code, owner_id, created_at, enabled_modules)')
       .eq('user_id', userId)
 
     const groups = (data || []).map(m => ({ ...m.groups, role: m.role })).filter(Boolean)
     res.json({ success: true, data: groups })
   } catch (err) {
     console.error('List groups error:', err)
+    res.status(500).json({ error: err.message || 'Internal server error' })
+  }
+})
+
+// ── PATCH /api/groups/:groupId/modules — set group module access ─────
+// Only the group owner can update which modules their team sees.
+// Pass modules: null to reset to "all allowed by admin" (inherit global).
+router.patch('/:groupId/modules', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { groupId } = req.params
+    const { modules } = req.body // array of module keys or null
+
+    const member = await getMember(groupId, userId)
+    if (!member || member.role !== 'owner')
+      return res.status(403).json({ error: 'Only the group owner can configure modules' })
+
+    if (modules !== null && !Array.isArray(modules))
+      return res.status(400).json({ error: 'modules must be an array or null' })
+
+    const { error } = await supabaseAdmin
+      .from('groups')
+      .update({ enabled_modules: modules })
+      .eq('id', groupId)
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true, data: { modules } })
+  } catch (err) {
+    console.error('Update group modules error:', err)
     res.status(500).json({ error: err.message || 'Internal server error' })
   }
 })

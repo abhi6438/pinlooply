@@ -556,4 +556,42 @@ router.put('/donate-config', async (req, res) => {
   }
 })
 
+// ── GET /api/admin/module-config ─────────────────────────────
+// Returns global allowed modules (what admin has enabled platform-wide)
+router.get('/module-config', async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('site_config')
+      .select('value')
+      .eq('key', 'global_modules')
+      .maybeSingle()
+
+    if (error) return res.status(500).json({ error: error.message })
+
+    // Default: all modules enabled
+    const defaultModules = ['projects', 'tasks', 'timeline', 'topics', 'standup', 'summary', 'testcases']
+    res.json({ success: true, data: data?.value || defaultModules })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── PUT /api/admin/module-config ─────────────────────────────
+// Save which modules are globally available
+router.put('/module-config', async (req, res) => {
+  try {
+    const { modules } = req.body
+    if (!Array.isArray(modules)) return res.status(400).json({ error: 'modules must be an array' })
+
+    const { error } = await supabaseAdmin
+      .from('site_config')
+      .upsert({ key: 'global_modules', value: modules, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true, data: modules })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 export default router

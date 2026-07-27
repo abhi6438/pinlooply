@@ -49,6 +49,7 @@ export const groupsApi = {
   getGroupMembers: (groupId) => api.get(`/api/groups/${groupId}`),
   updateRole: (groupId, memberId, role) => api.patch(`/api/groups/${groupId}/members/${memberId}`, { role }),
   removeMember: (groupId, memberId) => api.delete(`/api/groups/${groupId}/members/${memberId}`),
+  saveModules: (groupId, modules) => api.patch(`/api/groups/${groupId}/modules`, { modules }),
 }
 
 export const projectsApi = {
@@ -155,6 +156,8 @@ export const adminApi = {
   getFeedbackReplies: (id)          => api.get(`/api/admin/feedback/${id}/replies`),
   replyFeedback:     (id, text)     => api.post(`/api/admin/feedback/${id}/reply`, { replyText: text }),
   replyDonor:        (id, text)     => api.post(`/api/admin/donors/${id}/reply`,   { replyText: text }),
+  getModuleConfig:   ()             => api.get('/api/admin/module-config'),
+  saveModuleConfig:  (modules)      => api.put('/api/admin/module-config', { modules }),
 }
 
 export const feedbackApi = {

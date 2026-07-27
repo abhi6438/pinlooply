@@ -190,13 +190,13 @@ function SideNavLink({ to, icon: Icon, label, collapsed }) {
 // ── Sidebar ───────────────────────────────────────────────────
 function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
   const { sidebarOpen, toggleSidebar } = useUIStore()
-  const { vocabulary, enabledModules, workspaceName, activeMode, activeGroupName } = useWorkspace()
+  const { vocabulary, effectiveModules, workspaceName, activeMode, activeGroupName } = useWorkspace()
   const navigate = useNavigate()
   const collapsed = !sidebarOpen
 
   // Active mode: use session choice, fall back to DB mode
   const effectiveMode = activeMode ?? userProfile?.mode ?? 'personal'
-  const navGroups = getNavGroups(effectiveMode, vocabulary, enabledModules)
+  const navGroups = getNavGroups(effectiveMode, vocabulary, effectiveModules)
 
   // Display name: group name when in team mode, else workspace name
   const displayName = (effectiveMode === 'team' && activeGroupName)

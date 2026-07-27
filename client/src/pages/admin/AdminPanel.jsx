@@ -8,7 +8,7 @@ import {
   Save, CheckCheck, Search, ChevronDown, AlertCircle,
   Cpu, Crown, RefreshCw, TrendingUp, FolderOpen,
   MessageSquare, CheckSquare2, GitBranch, Heart,
-  Star, HandCoins, Mail, Send, X,
+  Star, HandCoins, Mail, Send, X, LayoutDashboard,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
@@ -18,14 +18,134 @@ const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || ''
 
 // ── Tab navigation ─────────────────────────────────────────────
 const TABS = [
-  { id: 'ai',       label: 'AI Config',       icon: Cpu        },
-  { id: 'users',    label: 'User Stats',      icon: Users      },
-  { id: 'usage',    label: 'Usage Stats',     icon: BarChart3  },
-  { id: 'plans',    label: 'Plan Management', icon: Crown      },
-  { id: 'donate',   label: 'Donation',        icon: Heart      },
-  { id: 'feedback', label: 'Feedback',        icon: Star       },
-  { id: 'donors',   label: 'Donors',          icon: HandCoins  },
+  { id: 'ai',       label: 'AI Config',       icon: Cpu          },
+  { id: 'users',    label: 'User Stats',      icon: Users        },
+  { id: 'usage',    label: 'Usage Stats',     icon: BarChart3    },
+  { id: 'plans',    label: 'Plan Management', icon: Crown        },
+  { id: 'menus',    label: 'Menu Config',     icon: LayoutDashboard },
+  { id: 'donate',   label: 'Donation',        icon: Heart        },
+  { id: 'feedback', label: 'Feedback',        icon: Star         },
+  { id: 'donors',   label: 'Donors',          icon: HandCoins    },
 ]
+
+// ── All configurable module definitions ──────────────────────────
+const MODULE_DEFS = [
+  { key: 'projects',  icon: '📁', label: 'Projects',      desc: 'Project boards and tracking' },
+  { key: 'tasks',     icon: '✅', label: 'Tasks / Lists',  desc: 'Task lists and assignments' },
+  { key: 'timeline',  icon: '📅', label: 'Timeline',      desc: 'Gantt / calendar view' },
+  { key: 'topics',    icon: '🏷️', label: 'Topics',        desc: 'Decisions and discussion topics' },
+  { key: 'standup',   icon: '📋', label: 'Standup',       desc: 'Daily standup generator' },
+  { key: 'summary',   icon: '📊', label: 'Weekly Summary', desc: 'Auto weekly report' },
+  { key: 'testcases', icon: '🧪', label: 'Test Cases',    desc: 'QA test case management' },
+]
+
+const ALWAYS_ON = [
+  { icon: '🏠', label: 'Dashboard' },
+  { icon: '💬', label: 'Log Discussion' },
+  { icon: '✔️', label: 'My Tasks' },
+  { icon: '⏱️', label: 'Time Reports' },
+  { icon: '⚙️', label: 'Settings' },
+  { icon: '❓', label: 'Help' },
+  { icon: '👥', label: 'Team (in team mode)' },
+  { icon: '📈', label: 'Manager (in team mode)' },
+]
+
+// ── Tab: Menu Config (admin-level global module toggles) ──────────
+function MenuConfigTab() {
+  const [modules, setModules] = useState(null)  // array of enabled keys
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+
+  useEffect(() => {
+    adminApi.getModuleConfig()
+      .then(res => setModules(res.data.data || MODULE_DEFS.map(m => m.key)))
+      .catch(() => toast.error('Failed to load module config'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  function toggle(key) {
+    setModules(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    )
+  }
+
+  async function save() {
+    setSaving(true)
+    try {
+      await adminApi.saveModuleConfig(modules)
+      setSaved(true)
+      toast.success('Menu configuration saved')
+      setTimeout(() => setSaved(false), 2500)
+    } catch { toast.error('Failed to save') }
+    finally { setSaving(false) }
+  }
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+
+  return (
+    <div className="max-w-xl space-y-6">
+      {/* Info banner */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700 leading-relaxed">
+        <strong>Admin-level control.</strong> Modules disabled here are hidden for <em>all</em> users platform-wide, regardless of their personal settings. Team owners can further restrict enabled modules for their group.
+      </div>
+
+      {/* Always-on section */}
+      <div>
+        <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wide mb-3">Always visible (can't be turned off)</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {ALWAYS_ON.map(m => (
+            <div key={m.label} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-warm-100 bg-warm-50">
+              <span className="text-sm">{m.icon}</span>
+              <span className="text-xs text-warm-600 font-medium">{m.label}</span>
+              <span className="ml-auto text-[10px] text-emerald-500 font-semibold">Always on</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Configurable modules */}
+      <div>
+        <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wide mb-3">Configurable modules</h3>
+        <div className="space-y-2">
+          {MODULE_DEFS.map(m => {
+            const enabled = modules.includes(m.key)
+            return (
+              <div
+                key={m.key}
+                onClick={() => toggle(m.key)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${
+                  enabled
+                    ? 'border-primary-200 bg-primary-50 hover:bg-primary-100'
+                    : 'border-warm-200 bg-white hover:bg-warm-50 opacity-60'
+                }`}
+              >
+                <span className="text-lg">{m.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-warm-900">{m.label}</p>
+                  <p className="text-xs text-warm-500">{m.desc}</p>
+                </div>
+                {/* Toggle */}
+                <div className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${enabled ? 'bg-primary-600' : 'bg-warm-200'}`}>
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : ''}`} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <button
+        onClick={save}
+        disabled={saving}
+        className="btn-primary flex items-center gap-2 px-6 disabled:opacity-60"
+      >
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCheck className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+        {saved ? 'Saved!' : saving ? 'Saving…' : 'Save module config'}
+      </button>
+    </div>
+  )
+}
 
 // ── Stat card ─────────────────────────────────────────────────
 function StatCard({ label, value, sub, iconBg, iconColor, icon: Icon }) {
@@ -1465,6 +1585,7 @@ export default function AdminPanel() {
         {tab === 'users'    && <UserStatsTab stats={stats} />}
         {tab === 'usage'    && <UsageStatsTab stats={stats} />}
         {tab === 'plans'    && <PlanManagementTab />}
+        {tab === 'menus'    && <MenuConfigTab />}
         {tab === 'donate'   && <DonateConfigTab />}
         {tab === 'feedback' && <FeedbackTab />}
         {tab === 'donors'   && <DonorsTab />}

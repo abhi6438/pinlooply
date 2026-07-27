@@ -1,8 +1,18 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useAuth } from './AuthContext'
-import { workspaceApi } from '../services/api'
+import { workspaceApi, adminApi, groupsApi } from '../services/api'
 import { resolveVocabulary, DEFAULT_VOCABULARY, DEFAULT_MODULES, getProfession } from '../config/professions'
 import { DEFAULT_STATUS_PIPELINES } from '../config/statuses'
+
+// All configurable module keys (admin/group can restrict these)
+export const ALL_MODULE_KEYS = ['projects', 'tasks', 'timeline', 'topics', 'standup', 'summary', 'testcases']
+
+// Merge: effective = globalAllowed ∩ groupAllowed ∩ userEnabled
+function mergeModules(globalModules, groupModules, userModules) {
+  const global = globalModules || ALL_MODULE_KEYS
+  const group  = groupModules  || global  // null = inherits global
+  return userModules.filter(m => global.includes(m) && group.includes(m))
+}
 
 const WorkspaceContext = createContext(null)
 
@@ -29,7 +39,9 @@ export function WorkspaceProvider({ children }) {
 
   const [profession,      setProfession]      = useState('general')
   const [vocabulary,      setVocabulary]      = useState(DEFAULT_VOCABULARY)
-  const [enabledModules,  setEnabledModules]  = useState(DEFAULT_MODULES)
+  const [enabledModules,  setEnabledModules]  = useState(DEFAULT_MODULES)  // user's own pref
+  const [globalModules,   setGlobalModules]   = useState(ALL_MODULE_KEYS)  // admin-level
+  const [groupModules,    setGroupModules]    = useState(null)              // team-level (null = inherit)
   const [customStatuses,  setCustomStatuses]  = useState(null)
   const [workspaceName,   setWorkspaceName]   = useState(null)
   const [accentColor,     setAccentColor]     = useState(null)
@@ -71,17 +83,24 @@ export function WorkspaceProvider({ children }) {
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return }
     try {
-      const res = await workspaceApi.get()
-      const d   = res.data.data || {}
+      // Fetch workspace + global module config in parallel
+      const [wsRes, modRes] = await Promise.allSettled([
+        workspaceApi.get(),
+        adminApi.getModuleConfig(),
+      ])
 
-      const prof    = d.profession     || 'general'
-      const raw     = d.vocabulary     || {}
+      const d       = wsRes.status === 'fulfilled' ? (wsRes.value.data.data || {}) : {}
+      const global  = modRes.status === 'fulfilled' ? (modRes.value.data.data || ALL_MODULE_KEYS) : ALL_MODULE_KEYS
+
+      const prof    = d.profession      || 'general'
+      const raw     = d.vocabulary      || {}
       const modules = d.enabled_modules || getProfession(prof)?.modules || DEFAULT_MODULES
 
       setProfession(prof)
       setRawVocab(raw)
       setVocabulary(resolveVocabulary(prof, raw))
       setEnabledModules(modules)
+      setGlobalModules(global)
       setCustomStatuses(d.custom_statuses || null)
       setWorkspaceName(d.workspace_name   || null)
       setAccentColor(d.accent_color       || null)
@@ -94,6 +113,17 @@ export function WorkspaceProvider({ children }) {
   }, [user])
 
   useEffect(() => { load() }, [load])
+
+  // ── Load group-level modules when active group changes ────────
+  useEffect(() => {
+    if (!activeGroupId) { setGroupModules(null); return }
+    groupsApi.get(activeGroupId)
+      .then(res => {
+        const grp = res.data.data
+        setGroupModules(grp?.enabled_modules || null)
+      })
+      .catch(() => setGroupModules(null))
+  }, [activeGroupId])
 
   // ── Save full workspace settings ─────────────────────────────
   async function saveWorkspace({ profession: p, vocabulary: v, enabled_modules: m, custom_statuses: cs, workspace_name: wn, accent_color: ac }) {
@@ -136,9 +166,24 @@ export function WorkspaceProvider({ children }) {
     await workspaceApi.save({ profession: p, vocabulary: {}, enabled_modules: mods })
   }
 
+  // ── Effective modules: intersection of all three levels ──────
+  const effectiveModules = mergeModules(globalModules, groupModules, enabledModules)
+
   // ── Convenience: is a module enabled? ────────────────────────
   function isModuleEnabled(moduleKey) {
-    return enabledModules.includes(moduleKey)
+    return effectiveModules.includes(moduleKey)
+  }
+
+  // ── Save group-level modules ──────────────────────────────────
+  async function saveGroupModules(groupId, modules) {
+    await groupsApi.saveModules(groupId, modules)
+    setGroupModules(modules)
+  }
+
+  // ── Save global modules (admin only) ──────────────────────────
+  async function saveGlobalModules(modules) {
+    await adminApi.saveModuleConfig(modules)
+    setGlobalModules(modules)
   }
 
   // ── Resolve status pipeline ───────────────────────────────────
@@ -159,13 +204,18 @@ export function WorkspaceProvider({ children }) {
       profession,
       vocabulary,
       rawVocab,
-      enabledModules,
+      enabledModules,       // user's own preference
+      effectiveModules,     // merged: global ∩ group ∩ user — use this for nav
+      globalModules,        // admin-level allowed modules
+      groupModules,         // group-level allowed modules (null = inherit)
       customStatuses,
       workspaceName,
       accentColor,
       loading,
       saveWorkspace,
       saveProfession,
+      saveGroupModules,
+      saveGlobalModules,
       isModuleEnabled,
       getEffectiveStatuses,
       reload: load,
