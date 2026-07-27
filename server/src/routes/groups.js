@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { supabaseAdmin } from '../config/supabase.js'
 import { checkMemberLimit } from '../middleware/planCheck.js'
+import { getMenuConfigForGroup, saveMenuAccess } from '../utils/menuAccess.js'
 
 const router = Router()
 
@@ -332,6 +333,43 @@ router.get('/', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('List groups error:', err)
     res.status(500).json({ error: err.message || 'Internal server error' })
+  }
+})
+
+// ── GET /api/groups/:groupId/menus — DB-driven group menu config ──────
+// Returns configurable menus with disabled_global + disabled_group flags (owner/admin only).
+router.get('/:groupId/menus', requireAuth, async (req, res) => {
+  try {
+    const { groupId } = req.params
+    const member = await getMember(groupId, req.user.id)
+    if (!member || !['owner', 'admin'].includes(member.role)) {
+      return res.status(403).json({ error: 'Owner or admin access required' })
+    }
+    const data = await getMenuConfigForGroup(groupId)
+    res.json({ success: true, data })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── PUT /api/groups/:groupId/menus — save group disabled keys ─────────
+// Body: { disabled_keys: ['standup', 'testcases'] }
+router.put('/:groupId/menus', requireAuth, async (req, res) => {
+  try {
+    const { groupId } = req.params
+    const { disabled_keys = [] } = req.body
+
+    const member = await getMember(groupId, req.user.id)
+    if (!member || member.role !== 'owner') {
+      return res.status(403).json({ error: 'Only the group owner can configure menus' })
+    }
+    if (!Array.isArray(disabled_keys)) {
+      return res.status(400).json({ error: 'disabled_keys must be an array' })
+    }
+    await saveMenuAccess('group', groupId, disabled_keys, req.user.id)
+    res.json({ success: true, data: { disabled_keys } })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
   }
 })
 

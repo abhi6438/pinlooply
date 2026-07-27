@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { requireAdmin } from '../middleware/adminAuth.js'
 import { supabaseAdmin } from '../config/supabase.js'
+import { getMenuConfigForAdmin, saveMenuAccess } from '../utils/menuAccess.js'
 // ── Helper: send in-app notification ─────────────────────────
 async function notifyUser(userId, { type, title, body, relatedFeedbackId }) {
   if (!userId) return
@@ -551,6 +552,32 @@ router.put('/donate-config', async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message })
     res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── GET /api/admin/menus — DB-driven menu config ─────────────
+// Returns all menus with always_on flag and global disabled status.
+router.get('/menus', async (req, res) => {
+  try {
+    const data = await getMenuConfigForAdmin()
+    res.json({ success: true, data })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── PUT /api/admin/menus — save global disabled keys ─────────
+// Body: { disabled_keys: ['timeline', 'testcases'] }
+router.put('/menus', async (req, res) => {
+  try {
+    const { disabled_keys = [] } = req.body
+    if (!Array.isArray(disabled_keys)) {
+      return res.status(400).json({ error: 'disabled_keys must be an array' })
+    }
+    await saveMenuAccess('global', null, disabled_keys, req.user.id)
+    res.json({ success: true, data: { disabled_keys } })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

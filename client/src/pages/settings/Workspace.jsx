@@ -4,9 +4,9 @@ import { useWorkspace } from '../../context/WorkspaceContext'
 import { PROFESSIONS, DEFAULT_VOCABULARY, getProfession } from '../../config/professions'
 import { StatusPipelineEditor, CustomFieldsEditor } from '../../components/ui'
 import { Loader2, Save, CheckCheck, LayoutDashboard, FolderOpen, ListChecks,
-         CalendarDays, Tag, ClipboardList, BarChart3, FlaskConical, Wand2, GitBranch, SlidersHorizontal, Palette } from 'lucide-react'
+         CalendarDays, Tag, ClipboardList, BarChart3, FlaskConical, Wand2, GitBranch, SlidersHorizontal, Palette, Lock } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { customFieldsApi } from '../../services/api'
+import { customFieldsApi, workspaceApi } from '../../services/api'
 
 const MODULE_LIST = [
   { key: 'projects',  icon: FolderOpen,    defaultLabel: 'Projects'   },
@@ -56,11 +56,10 @@ function SettingsNav() {
 }
 
 export default function WorkspaceSettings() {
-  const { profession, rawVocab, enabledModules, customStatuses, workspaceName, accentColor, saveWorkspace, getEffectiveStatuses } = useWorkspace()
+  const { profession, rawVocab, enabledModules, customStatuses, workspaceName, accentColor, saveWorkspace, getEffectiveStatuses, activeGroupId } = useWorkspace()
 
   const [localProfession,     setLocalProfession]     = useState(profession)
   const [localVocab,          setLocalVocab]          = useState({})
-  const [localModules,        setLocalModules]        = useState([])
   const [localStatuses,       setLocalStatuses]       = useState([])
   const [localWorkspaceName,  setLocalWorkspaceName]  = useState('')
   const [saving,              setSaving]              = useState(false)
@@ -69,15 +68,40 @@ export default function WorkspaceSettings() {
   const [customFields,        setCustomFields]        = useState([])
   const [fieldsLoading,       setFieldsLoading]       = useState(true)
 
+  // DB-driven menu config (personal level with lock info)
+  const [menuConfig,     setMenuConfig]     = useState(null)   // [{key, label, icon, disabled_global, disabled_group, disabled_user}]
+  const [menuLoading,    setMenuLoading]    = useState(true)
+  const [menuSaving,     setMenuSaving]     = useState(false)
+
   // Sync from context on mount / context change
   useEffect(() => {
     setLocalProfession(profession)
     setLocalVocab(rawVocab || {})
-    setLocalModules(enabledModules || [])
     setLocalStatuses(getEffectiveStatuses(null))
     setLocalWorkspaceName(workspaceName || '')
     setLocalAccentColor(accentColor || '')
-  }, [profession, rawVocab, enabledModules, customStatuses, workspaceName, accentColor])
+  }, [profession, rawVocab, customStatuses, workspaceName, accentColor])
+
+  // Load DB menu config (with lock status per level)
+  useEffect(() => {
+    setMenuLoading(true)
+    workspaceApi.getMenus(activeGroupId || null)
+      .then(res => setMenuConfig(res.data.data || []))
+      .catch(() => {
+        // Fall back to old enabled_modules if migration not run
+        setMenuConfig(
+          MODULE_LIST.map(m => ({
+            key:             m.key,
+            label:           m.defaultLabel,
+            icon:            null,
+            disabled_global: false,
+            disabled_group:  false,
+            disabled_user:   !(enabledModules || []).includes(m.key),
+          }))
+        )
+      })
+      .finally(() => setMenuLoading(false))
+  }, [activeGroupId]) // eslint-disable-line
 
   // Load custom fields on mount
   useEffect(() => {
@@ -93,7 +117,6 @@ export default function WorkspaceSettings() {
     const prof = getProfession(p)
     if (prof) {
       setLocalVocab({})
-      setLocalModules(prof.modules || [])
       setLocalStatuses(prof.defaultStatuses || getEffectiveStatuses(null))
     }
   }
@@ -102,10 +125,12 @@ export default function WorkspaceSettings() {
     setLocalVocab(v => ({ ...v, [key]: value }))
   }
 
-  function toggleModule(key) {
-    setLocalModules(m =>
-      m.includes(key) ? m.filter(x => x !== key) : [...m, key]
-    )
+  function toggleMenu(key) {
+    setMenuConfig(prev => prev.map(m =>
+      m.key === key && !m.disabled_global && !m.disabled_group
+        ? { ...m, disabled_user: !m.disabled_user }
+        : m
+    ))
   }
 
   // Placeholder for a vocab field = profession default
@@ -114,17 +139,34 @@ export default function WorkspaceSettings() {
     return prof?.vocabulary?.[key] || DEFAULT_VOCABULARY[key] || key
   }
 
+  async function saveMenuConfig() {
+    if (!menuConfig) return
+    setMenuSaving(true)
+    try {
+      const disabledKeys = menuConfig
+        .filter(m => m.disabled_user && !m.disabled_global && !m.disabled_group)
+        .map(m => m.key)
+      await workspaceApi.saveMenus(disabledKeys)
+    } catch {
+      // non-fatal, will be retried on next save
+    } finally {
+      setMenuSaving(false)
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
-      await saveWorkspace({
-        profession:      localProfession,
-        vocabulary:      localVocab,
-        enabled_modules: localModules,
-        custom_statuses: localStatuses,
-        workspace_name:  localWorkspaceName || null,
-        accent_color:    localAccentColor   || null,
-      })
+      await Promise.all([
+        saveWorkspace({
+          profession:      localProfession,
+          vocabulary:      localVocab,
+          custom_statuses: localStatuses,
+          workspace_name:  localWorkspaceName || null,
+          accent_color:    localAccentColor   || null,
+        }),
+        saveMenuConfig(),
+      ])
       setSaved(true)
       toast.success('Workspace settings saved!')
       setTimeout(() => setSaved(false), 2500)
@@ -222,41 +264,63 @@ export default function WorkspaceSettings() {
       {/* ── Modules ─────────────────────────────────────── */}
       <div className="card p-5">
         <h2 className="section-title mb-1">Visible Modules</h2>
-        <p className="text-xs text-warm-500 mb-4">Hide sections you don't need — they disappear from the sidebar.</p>
-        <div className="space-y-2">
-          {/* Dashboard always on */}
-          <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-warm-50 border border-warm-100 opacity-50">
-            <div className="flex items-center gap-3">
-              <LayoutDashboard className="w-4 h-4 text-warm-400" />
-              <span className="text-sm text-warm-700 font-medium">Dashboard</span>
-            </div>
-            <span className="text-xs text-warm-400">Always on</span>
+        <p className="text-xs text-warm-500 mb-4">
+          Personalise your sidebar. Modules locked by admin or your team can't be changed here.
+        </p>
+        {menuLoading ? (
+          <div className="flex items-center gap-2 text-xs text-warm-400 py-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
           </div>
-          {MODULE_LIST.map(({ key, icon: Icon, defaultLabel }) => {
-            const isOn   = localModules.includes(key)
-            const vocLabel = localVocab[key] || vocabPlaceholder(key) || defaultLabel
-            return (
-              <div
-                key={key}
-                onClick={() => toggleModule(key)}
-                className={`flex items-center justify-between py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all ${
-                  isOn ? 'border-primary-200 bg-primary-50' : 'border-warm-200 bg-white hover:border-warm-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isOn ? 'text-primary-500' : 'text-warm-400'}`} />
-                  <span className={`text-sm font-medium ${isOn ? 'text-primary-800' : 'text-warm-500'}`}>
-                    {vocLabel}
-                  </span>
-                </div>
-                {/* Toggle */}
-                <div className={`w-9 h-5 rounded-full transition-all flex items-center px-0.5 ${isOn ? 'bg-primary-500' : 'bg-warm-300'}`}>
-                  <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${isOn ? 'translate-x-4' : 'translate-x-0'}`} />
-                </div>
+        ) : (
+          <div className="space-y-2">
+            {/* Dashboard always on */}
+            <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-warm-50 border border-warm-100 opacity-50">
+              <div className="flex items-center gap-3">
+                <LayoutDashboard className="w-4 h-4 text-warm-400" />
+                <span className="text-sm text-warm-700 font-medium">Dashboard</span>
               </div>
-            )
-          })}
-        </div>
+              <span className="text-xs text-warm-400">Always on</span>
+            </div>
+            {(menuConfig || []).map(m => {
+              const locked    = m.disabled_global || m.disabled_group
+              const isOn      = !m.disabled_user && !locked
+              const vocLabel  = localVocab[m.key] || vocabPlaceholder(m.key) || m.label
+              const lockReason = m.disabled_global ? 'Admin locked'
+                               : m.disabled_group  ? 'Team locked'
+                               : null
+              return (
+                <div
+                  key={m.key}
+                  onClick={() => !locked && toggleMenu(m.key)}
+                  className={`flex items-center justify-between py-2.5 px-3 rounded-xl border-2 transition-all ${
+                    locked
+                      ? 'border-warm-100 bg-warm-50 opacity-50 cursor-not-allowed'
+                      : isOn
+                        ? 'border-primary-200 bg-primary-50 cursor-pointer'
+                        : 'border-warm-200 bg-white hover:border-warm-300 cursor-pointer'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-base w-5 text-center">{m.icon || '•'}</span>
+                    <span className={`text-sm font-medium ${isOn && !locked ? 'text-primary-800' : 'text-warm-500'}`}>
+                      {vocLabel}
+                    </span>
+                    {lockReason && (
+                      <span className="flex items-center gap-1 text-[10px] text-warm-400">
+                        <Lock className="w-2.5 h-2.5" />{lockReason}
+                      </span>
+                    )}
+                  </div>
+                  {locked ? null : (
+                    <div className={`w-9 h-5 rounded-full transition-all flex items-center px-0.5 ${isOn ? 'bg-primary-500' : 'bg-warm-300'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${isOn ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── Status Pipeline ──────────────────────────────── */}

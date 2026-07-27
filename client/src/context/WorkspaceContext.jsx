@@ -83,7 +83,7 @@ export function WorkspaceProvider({ children }) {
   const load = useCallback(async (groupId = null) => {
     if (!user) { setLoading(false); return }
     try {
-      // Single request — workspace + global_modules + group_modules all in one
+      // Single request — workspace + global_modules + group_modules + effective_menus
       const res = await workspaceApi.get(groupId)
       const d   = res.data.data || {}
 
@@ -95,14 +95,20 @@ export function WorkspaceProvider({ children }) {
       setRawVocab(raw)
       setVocabulary(resolveVocabulary(prof, raw))
       setEnabledModules(modules)
-      // global_modules comes directly from the workspace response (server fetched it)
       setGlobalModules(d.global_modules || ALL_MODULE_KEYS)
-      // group_modules: null means no restriction at group level
       setGroupModules(d.group_modules ?? null)
       setCustomStatuses(d.custom_statuses || null)
       setWorkspaceName(d.workspace_name   || null)
       setAccentColor(d.accent_color       || null)
       applyAccentColor(d.accent_color     || null)
+
+      // New: DB-driven effective menus — use if available (migration 021 run)
+      // effective_menus contains ALL enabled menu keys (including always-on)
+      if (d.effective_menus) {
+        // Extract just the configurable module keys for nav filtering
+        const dbModules = d.effective_menus.filter(k => ALL_MODULE_KEYS.includes(k))
+        setEnabledModules(dbModules)
+      }
     } catch {
       // Non-fatal — use defaults
     } finally {

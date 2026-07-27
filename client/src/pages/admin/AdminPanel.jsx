@@ -52,30 +52,39 @@ const ALWAYS_ON = [
 
 // ── Tab: Menu Config (admin-level global module toggles) ──────────
 function MenuConfigTab() {
-  const [modules, setModules] = useState(null)  // array of enabled keys
+  const [menus,   setMenus]   = useState(null)  // array from DB
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
 
   useEffect(() => {
-    adminApi.getModuleConfig()
-      .then(res => setModules(res.data.data || MODULE_DEFS.map(m => m.key)))
-      .catch(() => toast.error('Failed to load module config'))
+    adminApi.getMenus()
+      .then(res => setMenus(res.data.data || []))
+      .catch(() => {
+        // Fall back to old API if migration not run yet
+        adminApi.getModuleConfig()
+          .then(res => {
+            const enabled = res.data.data || MODULE_DEFS.map(m => m.key)
+            setMenus(MODULE_DEFS.map(m => ({
+              ...m, always_on: false, disabled: !enabled.includes(m.key),
+            })))
+          })
+          .catch(() => toast.error('Failed to load menu config'))
+      })
       .finally(() => setLoading(false))
   }, [])
 
   function toggle(key) {
-    setModules(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    )
+    setMenus(prev => prev.map(m => m.key === key ? { ...m, disabled: !m.disabled } : m))
   }
 
   async function save() {
     setSaving(true)
     try {
-      await adminApi.saveModuleConfig(modules)
+      const disabledKeys = menus.filter(m => !m.always_on && m.disabled).map(m => m.key)
+      await adminApi.saveMenus(disabledKeys)
       setSaved(true)
-      toast.success('Menu configuration saved')
+      toast.success('Menu configuration saved for all users')
       setTimeout(() => setSaved(false), 2500)
     } catch { toast.error('Failed to save') }
     finally { setSaving(false) }
@@ -83,33 +92,38 @@ function MenuConfigTab() {
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
 
+  const alwaysOnMenus  = menus.filter(m => m.always_on)
+  const configMenus    = menus.filter(m => !m.always_on)
+
   return (
     <div className="max-w-xl space-y-6">
       {/* Info banner */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700 leading-relaxed">
-        <strong>Admin-level control.</strong> Modules disabled here are hidden for <em>all</em> users platform-wide, regardless of their personal settings. Team owners can further restrict enabled modules for their group.
+        <strong>Platform-wide control.</strong> Items disabled here are hidden for <em>all</em> users regardless of their personal settings. Team owners can further restrict their group's access within what you enable.
       </div>
 
       {/* Always-on section */}
-      <div>
-        <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wide mb-3">Always visible (can't be turned off)</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {ALWAYS_ON.map(m => (
-            <div key={m.label} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-warm-100 bg-warm-50">
-              <span className="text-sm">{m.icon}</span>
-              <span className="text-xs text-warm-600 font-medium">{m.label}</span>
-              <span className="ml-auto text-[10px] text-emerald-500 font-semibold">Always on</span>
-            </div>
-          ))}
+      {alwaysOnMenus.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wide mb-3">Always visible — can't be turned off</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {alwaysOnMenus.map(m => (
+              <div key={m.key} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-warm-100 bg-warm-50">
+                <span className="text-sm">{m.icon}</span>
+                <span className="text-xs text-warm-600 font-medium">{m.label}</span>
+                <span className="ml-auto text-[10px] text-emerald-500 font-semibold">Always on</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Configurable modules */}
       <div>
         <h3 className="text-xs font-semibold text-warm-500 uppercase tracking-wide mb-3">Configurable modules</h3>
         <div className="space-y-2">
-          {MODULE_DEFS.map(m => {
-            const enabled = modules.includes(m.key)
+          {configMenus.map(m => {
+            const enabled = !m.disabled
             return (
               <div
                 key={m.key}
@@ -123,9 +137,8 @@ function MenuConfigTab() {
                 <span className="text-lg">{m.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-warm-900">{m.label}</p>
-                  <p className="text-xs text-warm-500">{m.desc}</p>
+                  <p className="text-xs text-warm-500">{m.desc || m.description}</p>
                 </div>
-                {/* Toggle */}
                 <div className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${enabled ? 'bg-primary-600' : 'bg-warm-200'}`}>
                   <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : ''}`} />
                 </div>
@@ -141,7 +154,7 @@ function MenuConfigTab() {
         className="btn-primary flex items-center gap-2 px-6 disabled:opacity-60"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCheck className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-        {saved ? 'Saved!' : saving ? 'Saving…' : 'Save module config'}
+        {saved ? 'Saved!' : saving ? 'Saving…' : 'Save menu config'}
       </button>
     </div>
   )

@@ -50,6 +50,9 @@ export const groupsApi = {
   updateRole: (groupId, memberId, role) => api.patch(`/api/groups/${groupId}/members/${memberId}`, { role }),
   removeMember: (groupId, memberId) => api.delete(`/api/groups/${groupId}/members/${memberId}`),
   saveModules: (groupId, modules) => api.patch(`/api/groups/${groupId}/modules`, { modules }),
+  // New DB-driven menu access
+  getMenus: (groupId) => api.get(`/api/groups/${groupId}/menus`),
+  saveMenus: (groupId, disabledKeys) => api.put(`/api/groups/${groupId}/menus`, { disabled_keys: disabledKeys }),
 }
 
 export const projectsApi = {
@@ -137,8 +140,11 @@ export const planApi = {
 }
 
 export const workspaceApi = {
-  get:   (groupId) => api.get('/api/workspace', { params: groupId ? { group_id: groupId } : {} }),
-  save:  (payload) => api.patch('/api/workspace', payload),
+  get:      (groupId) => api.get('/api/workspace', { params: groupId ? { group_id: groupId } : {} }),
+  save:     (payload) => api.patch('/api/workspace', payload),
+  // DB-driven personal menu access
+  getMenus:  (groupId) => api.get('/api/workspace/menus', { params: groupId ? { group_id: groupId } : {} }),
+  saveMenus: (disabledKeys) => api.put('/api/workspace/menus', { disabled_keys: disabledKeys }),
 }
 
 export const adminApi = {
@@ -158,6 +164,9 @@ export const adminApi = {
   replyDonor:        (id, text)     => api.post(`/api/admin/donors/${id}/reply`,   { replyText: text }),
   getModuleConfig:   ()             => api.get('/api/admin/module-config'),
   saveModuleConfig:  (modules)      => api.put('/api/admin/module-config', { modules }),
+  // New DB-driven menu access
+  getMenus:          ()             => api.get('/api/admin/menus'),
+  saveMenus:         (disabledKeys) => api.put('/api/admin/menus', { disabled_keys: disabledKeys }),
 }
 
 export const feedbackApi = {

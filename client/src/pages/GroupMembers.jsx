@@ -23,31 +23,37 @@ const MODULE_DEFS = [
 ]
 
 // ── Group menu config panel (owner only) ─────────────────────
-function GroupMenuConfig({ groupId, initialModules }) {
-  const { globalModules, saveGroupModules } = useWorkspace()
-  // globalModules = what admin allows; we can only toggle within that
-  const allowed = globalModules || MODULE_DEFS.map(m => m.key)
-
-  const [modules, setModules] = useState(initialModules || allowed)
+function GroupMenuConfig({ groupId }) {
+  const [menus,   setMenus]   = useState(null)
+  const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
 
-  // Reset when group changes
   useEffect(() => {
-    setModules(initialModules || allowed)
-  }, [groupId]) // eslint-disable-line
+    if (!groupId) return
+    setLoading(true)
+    groupsApi.getMenus(groupId)
+      .then(res => setMenus(res.data.data || []))
+      .catch(() => {
+        // Fall back to old static list if migration not run yet
+        setMenus(MODULE_DEFS.map(m => ({ ...m, disabled_global: false, disabled_group: false })))
+      })
+      .finally(() => setLoading(false))
+  }, [groupId])
 
   function toggle(key) {
-    if (!allowed.includes(key)) return // can't enable what admin disabled
-    setModules(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    )
+    setMenus(prev => prev.map(m =>
+      m.key === key && !m.disabled_global
+        ? { ...m, disabled_group: !m.disabled_group }
+        : m
+    ))
   }
 
   async function save() {
     setSaving(true)
     try {
-      await saveGroupModules(groupId, modules)
+      const disabledKeys = menus.filter(m => m.disabled_group && !m.disabled_global).map(m => m.key)
+      await groupsApi.saveMenus(groupId, disabledKeys)
       setSaved(true)
       toast.success('Team menu config saved')
       setTimeout(() => setSaved(false), 2500)
@@ -55,22 +61,28 @@ function GroupMenuConfig({ groupId, initialModules }) {
     finally { setSaving(false) }
   }
 
+  if (loading) return (
+    <div className="mt-6 bg-white border border-warm-100 rounded-2xl p-6 flex items-center gap-2 text-xs text-warm-400">
+      <Loader2 className="w-4 h-4 animate-spin" /> Loading menu config…
+    </div>
+  )
+
   return (
     <div className="mt-6 bg-white border border-warm-100 rounded-2xl overflow-hidden">
       <div className="px-5 py-3.5 border-b border-warm-100">
         <p className="text-xs font-semibold text-warm-400 uppercase tracking-wide">Team Menu Access</p>
-        <p className="text-xs text-warm-400 mt-0.5">Choose which modules your team members can access. Admin-disabled modules are greyed out.</p>
+        <p className="text-xs text-warm-400 mt-0.5">Choose which modules your team can access. Items locked by admin can't be enabled here.</p>
       </div>
       <div className="p-4 grid grid-cols-2 gap-2">
-        {MODULE_DEFS.map(m => {
-          const adminAllows = allowed.includes(m.key)
-          const teamEnabled = modules.includes(m.key)
+        {(menus || []).map(m => {
+          const locked      = m.disabled_global
+          const teamEnabled = !m.disabled_group && !locked
           return (
             <div
               key={m.key}
-              onClick={() => adminAllows && toggle(m.key)}
+              onClick={() => !locked && toggle(m.key)}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${
-                !adminAllows
+                locked
                   ? 'border-warm-100 bg-warm-50 opacity-40 cursor-not-allowed'
                   : teamEnabled
                     ? 'border-primary-200 bg-primary-50 cursor-pointer hover:bg-primary-100'
@@ -79,8 +91,8 @@ function GroupMenuConfig({ groupId, initialModules }) {
             >
               <span className="text-base">{m.icon}</span>
               <span className="text-xs font-medium text-warm-900 flex-1">{m.label}</span>
-              {!adminAllows ? (
-                <span className="text-[10px] text-warm-400">Disabled by admin</span>
+              {locked ? (
+                <span className="text-[10px] text-warm-400">Admin locked</span>
               ) : (
                 <div className={`relative w-8 h-4 rounded-full flex-shrink-0 transition-colors ${teamEnabled ? 'bg-primary-600' : 'bg-warm-200'}`}>
                   <span className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${teamEnabled ? 'translate-x-4' : ''}`} />
@@ -637,10 +649,7 @@ export default function GroupMembers() {
 
       {/* Owner-only: team menu access configuration */}
       {myRole === 'owner' && active && (
-        <GroupMenuConfig
-          groupId={active.id}
-          initialModules={active.enabled_modules}
-        />
+        <GroupMenuConfig groupId={active.id} />
       )}
 
       {showCreate && <CreateGroupModal onClose={() => setShowCreate(false)} onCreate={handleCreateGroup} />}
