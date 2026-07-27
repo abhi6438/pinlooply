@@ -7,6 +7,7 @@ import {
   BookOpen, Tag, FlaskConical, ListTodo,
 } from 'lucide-react'
 import { formatDistanceToNow, parseISO, format } from 'date-fns'
+import { DonateButton } from '../components/shared/DonateModal'
 
 // ── Config ────────────────────────────────────────────────────
 const HEALTH = {
@@ -390,7 +391,8 @@ export default function PublicCollection() {
         ))}
 
         {/* Footer */}
-        <div className="text-center py-6">
+        <div className="flex flex-col items-center gap-4 py-8">
+          <DonateButton variant="public" />
           <a href="https://pinlooply.app" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 transition-colors">
             <div className="w-4 h-4 bg-indigo-600 rounded flex items-center justify-center">

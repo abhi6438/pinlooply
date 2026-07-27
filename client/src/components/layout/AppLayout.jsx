@@ -7,6 +7,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { supabase } from '../../config/supabase'
 import { notificationsApi } from '../../services/api'
 import SearchModal from '../ui/SearchModal'
+import { DonateButton } from '../shared/DonateModal'
 import {
   LayoutDashboard, FolderOpen, ListChecks,
   CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
@@ -290,6 +291,14 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
         {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
           <SideNavLink to="/admin" icon={Shield} label="Admin" collapsed={collapsed} />
         )}
+
+        {/* Donate button */}
+        <div className="mb-1">
+          {collapsed
+            ? <DonateButton variant="sidebar-collapsed" />
+            : <DonateButton variant="sidebar" />
+          }
+        </div>
 
         {collapsed ? (
           <div className="flex flex-col items-center gap-2 pt-1">

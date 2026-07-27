@@ -7,6 +7,7 @@ import {
   BookOpen, Tag,
 } from 'lucide-react'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
+import { DonateButton } from '../components/shared/DonateModal'
 
 // ── Health config ─────────────────────────────────────────────
 const HEALTH = {
@@ -398,24 +399,27 @@ export default function PublicProject() {
         )}
 
         {/* Footer */}
-        <div className="text-center py-6">
-          <a
-            href="https://pinlooply.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 transition-colors"
-          >
-            <div className="w-4 h-4 bg-indigo-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-[9px]">P</span>
-            </div>
-            Powered by Pinlooply
-            <ExternalLink className="w-3 h-3" />
-          </a>
-          {data.meta?.fetchedAt && (
-            <p className="text-[11px] text-gray-300 mt-1">
-              Fetched {format(parseISO(data.meta.fetchedAt), 'MMM d, yyyy h:mm a')}
-            </p>
-          )}
+        <div className="flex flex-col items-center gap-4 py-6">
+          <DonateButton variant="public" />
+          <div className="flex flex-col items-center gap-1">
+            <a
+              href="https://pinlooply.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 transition-colors"
+            >
+              <div className="w-4 h-4 bg-indigo-600 rounded flex items-center justify-center">
+                <span className="text-white font-bold text-[9px]">P</span>
+              </div>
+              Powered by Pinlooply
+              <ExternalLink className="w-3 h-3" />
+            </a>
+            {data.meta?.fetchedAt && (
+              <p className="text-[11px] text-gray-300">
+                Fetched {format(parseISO(data.meta.fetchedAt), 'MMM d, yyyy h:mm a')}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
