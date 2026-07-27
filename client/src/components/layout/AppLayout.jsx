@@ -19,6 +19,32 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+// ── Nav skeleton — shown while workspace restrictions load ────
+function SidebarNavSkeleton({ collapsed }) {
+  const lines = [80, 65, 90, 55, 75, 60, 70]
+  return (
+    <div className="space-y-1 px-1 py-2 animate-pulse">
+      {lines.map((w, i) => (
+        <div key={i} className={`h-7 rounded-lg bg-[#312E81]/60 ${collapsed ? 'w-8' : ''}`}
+          style={collapsed ? {} : { width: `${w}%` }} />
+      ))}
+    </div>
+  )
+}
+
+function BottomNavSkeleton() {
+  return (
+    <div className="flex animate-pulse">
+      {[1,2,3,4,5].map(i => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1 py-2.5">
+          <div className="w-5 h-5 rounded-md bg-warm-200" />
+          <div className="w-8 h-2 rounded bg-warm-200" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Nav groups — grouped by purpose ───────────────────────────
 function getNavGroups(mode, vocabulary = {}, enabledModules = null) {
   const allow = (key) => key === null || enabledModules === null || enabledModules.includes(key)
@@ -191,7 +217,7 @@ function SideNavLink({ to, icon: Icon, label, collapsed }) {
 // ── Sidebar ───────────────────────────────────────────────────
 function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
   const { sidebarOpen, toggleSidebar } = useUIStore()
-  const { vocabulary, effectiveModules, workspaceName, activeMode, activeGroupName } = useWorkspace()
+  const { vocabulary, effectiveModules, workspaceName, activeMode, activeGroupName, loading } = useWorkspace()
   const navigate = useNavigate()
   const collapsed = !sidebarOpen
 
@@ -265,7 +291,7 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
 
       {/* Grouped nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
-        {navGroups.map((group, gi) => {
+        {loading ? <SidebarNavSkeleton collapsed={collapsed} /> : navGroups.map((group, gi) => {
           if (!group.items.length) return null
           const isUtility = group.label === null
           return (
@@ -342,7 +368,7 @@ function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
 
 // ── Mobile bottom nav ─────────────────────────────────────────
 function BottomNav({ mode }) {
-  const { vocabulary, effectiveModules } = useWorkspace()
+  const { vocabulary, effectiveModules, loading } = useWorkspace()
   // Show 5 most-used items on mobile
   const mobileItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
@@ -359,7 +385,7 @@ function BottomNav({ mode }) {
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-warm-200 z-40">
-      <div className="flex">
+      {loading ? <BottomNavSkeleton /> : <div className="flex">
         {mobileItems.map(({ to, icon: Icon, label }) => (
           <NavLink key={to} to={to}
             className={({ isActive }) =>
@@ -372,14 +398,14 @@ function BottomNav({ mode }) {
             <span>{label}</span>
           </NavLink>
         ))}
-      </div>
+      </div>}
     </nav>
   )
 }
 
 // ── Mobile drawer ─────────────────────────────────────────────
 function MobileDrawer({ open, onClose, user, userProfile, bellProps, onLogout }) {
-  const { vocabulary, effectiveModules, workspaceName, activeMode } = useWorkspace()
+  const { vocabulary, effectiveModules, workspaceName, activeMode, loading } = useWorkspace()
   const effectiveMode = activeMode ?? userProfile?.mode ?? 'personal'
   const navGroups = getNavGroups(effectiveMode, vocabulary, effectiveModules)
   const displayName = workspaceName || 'Pinlooply'
@@ -404,7 +430,7 @@ function MobileDrawer({ open, onClose, user, userProfile, bellProps, onLogout })
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-          {navGroups.map((group, gi) => {
+          {loading ? <SidebarNavSkeleton collapsed={false} /> : navGroups.map((group, gi) => {
             if (!group.items.length) return null
             return (
               <div key={gi}>

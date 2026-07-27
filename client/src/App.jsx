@@ -212,7 +212,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <WorkspaceProvider>
-          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+          <Toaster position="top-right" toastOptions={{ duration: 4000 }} containerStyle={{ zIndex: 99999 }} />
           <AppRoutes />
         </WorkspaceProvider>
       </AuthProvider>
