@@ -56,7 +56,7 @@ function SettingsNav() {
 }
 
 export default function WorkspaceSettings() {
-  const { profession, rawVocab, enabledModules, customStatuses, workspaceName, accentColor, saveWorkspace, getEffectiveStatuses, activeGroupId } = useWorkspace()
+  const { profession, rawVocab, enabledModules, customStatuses, workspaceName, accentColor, saveWorkspace, getEffectiveStatuses, activeGroupId, reload } = useWorkspace()
 
   const [localProfession,     setLocalProfession]     = useState(profession)
   const [localVocab,          setLocalVocab]          = useState({})
@@ -167,6 +167,8 @@ export default function WorkspaceSettings() {
         }),
         saveMenuConfig(),
       ])
+      // Reload effective menus from server so nav reflects personal toggles + group restrictions
+      reload(activeGroupId || null).catch(() => {})
       setSaved(true)
       toast.success('Workspace settings saved!')
       setTimeout(() => setSaved(false), 2500)

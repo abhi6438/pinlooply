@@ -7,7 +7,8 @@ import { DEFAULT_STATUS_PIPELINES } from '../config/statuses'
 // All configurable module keys (admin/group can restrict these)
 export const ALL_MODULE_KEYS = ['projects', 'tasks', 'timeline', 'topics', 'standup', 'summary', 'testcases']
 
-// Merge: effective = globalAllowed ∩ groupAllowed ∩ userEnabled
+// Fallback merge: used only when server has NOT returned effective_menus
+// (i.e. migration 021 not yet run — old system only)
 function mergeModules(globalModules, groupModules, userModules) {
   const global = globalModules || ALL_MODULE_KEYS
   const group  = groupModules  || global  // null = inherits global
@@ -39,16 +40,22 @@ export function WorkspaceProvider({ children }) {
 
   const [profession,      setProfession]      = useState('general')
   const [vocabulary,      setVocabulary]      = useState(DEFAULT_VOCABULARY)
-  const [enabledModules,  setEnabledModules]  = useState(DEFAULT_MODULES)  // user's own pref
-  const [globalModules,   setGlobalModules]   = useState(ALL_MODULE_KEYS)  // admin-level
-  const [groupModules,    setGroupModules]    = useState(null)              // team-level (null = inherit)
+  const [enabledModules,  setEnabledModules]  = useState(DEFAULT_MODULES)  // user's raw DB pref
+  const [globalModules,   setGlobalModules]   = useState(ALL_MODULE_KEYS)  // admin-level (old system)
+  const [groupModules,    setGroupModules]    = useState(null)              // team-level (old system)
   const [customStatuses,  setCustomStatuses]  = useState(null)
   const [workspaceName,   setWorkspaceName]   = useState(null)
   const [accentColor,     setAccentColor]     = useState(null)
   const [loading,         setLoading]         = useState(true)
-  const [rawVocab,        setRawVocab]        = useState({}) // user overrides (not merged)
+  const [rawVocab,        setRawVocab]        = useState({})
 
-  // ── Session workspace (personal vs team) — persists for browser session ──
+  // ── DB-driven effective menus (migration 021+) ────────────────
+  // When non-null, this is the authoritative list from the server.
+  // It already incorporates global + group + user restrictions.
+  // When null, fall back to old mergeModules logic.
+  const [serverEffectiveMenus, setServerEffectiveMenus] = useState(null)
+
+  // ── Session workspace (personal vs team) ─────────────────────
   const [activeWorkspace, setActiveWorkspaceState] = useState(() => readSessionWorkspace())
 
   function setActiveWorkspace(ws) {
@@ -56,15 +63,13 @@ export function WorkspaceProvider({ children }) {
     setActiveWorkspaceState(ws)
   }
 
-  // activeMode: the mode in effect right now (may differ from DB mode)
-  const activeMode    = activeWorkspace?.mode    ?? null // null = not chosen yet
-  const activeGroupId = activeWorkspace?.groupId ?? null
+  const activeMode      = activeWorkspace?.mode    ?? null
+  const activeGroupId   = activeWorkspace?.groupId ?? null
   const activeGroupName = activeWorkspace?.groupName ?? null
 
   // ── Apply accent color CSS variables ─────────────────────────
   function applyAccentColor(hex) {
     if (!hex) {
-      // Reset to default purple
       document.documentElement.style.removeProperty('--color-primary-500')
       document.documentElement.style.removeProperty('--color-primary-600')
       document.documentElement.style.removeProperty('--color-primary-700')
@@ -72,18 +77,15 @@ export function WorkspaceProvider({ children }) {
       document.documentElement.style.removeProperty('--color-primary-50')
       return
     }
-    // Apply hex as base; derive lighter/darker shades via CSS filter tricks
     document.documentElement.style.setProperty('--color-primary-500', hex)
     document.documentElement.style.setProperty('--color-primary-600', hex)
     document.documentElement.style.setProperty('--color-primary-700', hex)
-    // For lighter shades we use the hex with opacity via the CSS variable
     document.documentElement.style.setProperty('--accent-hex', hex)
   }
 
   const load = useCallback(async (groupId = null) => {
     if (!user) { setLoading(false); return }
     try {
-      // Single request — workspace + global_modules + group_modules + effective_menus
       const res = await workspaceApi.get(groupId)
       const d   = res.data.data || {}
 
@@ -102,24 +104,22 @@ export function WorkspaceProvider({ children }) {
       setAccentColor(d.accent_color       || null)
       applyAccentColor(d.accent_color     || null)
 
-      // New: DB-driven effective menus — use if available (migration 021 run)
-      // effective_menus contains ALL enabled menu keys (including always-on)
-      if (d.effective_menus) {
-        // Extract just the configurable module keys for nav filtering
-        const dbModules = d.effective_menus.filter(k => ALL_MODULE_KEYS.includes(k))
-        setEnabledModules(dbModules)
-      }
+      // Store effective_menus directly — this is the authoritative list from the server.
+      // It includes global + group + user restrictions already applied.
+      // null = migration 021 not run yet; fall back to old mergeModules logic.
+      setServerEffectiveMenus(Array.isArray(d.effective_menus) ? d.effective_menus : null)
     } catch {
-      // Non-fatal — use defaults
+      // Non-fatal — keep defaults
     } finally {
       setLoading(false)
     }
   }, [user])
 
-  // Load workspace (includes global_modules + group_modules from server)
   useEffect(() => { load(activeGroupId) }, [load, activeGroupId])
 
   // ── Save full workspace settings ─────────────────────────────
+  // NOTE: we do NOT touch serverEffectiveMenus here — group/global restrictions
+  // must persist even after the user saves their profile/vocabulary/colors.
   async function saveWorkspace({ profession: p, vocabulary: v, enabled_modules: m, custom_statuses: cs, workspace_name: wn, accent_color: ac }) {
     const payload = {}
     if (p  !== undefined) payload.profession       = p
@@ -144,6 +144,8 @@ export function WorkspaceProvider({ children }) {
     setWorkspaceName(d.workspace_name   || null)
     setAccentColor(d.accent_color       || null)
     applyAccentColor(d.accent_color     || null)
+    // ← intentionally NOT calling setServerEffectiveMenus here —
+    //   restrictions from the DB stay in force until next full load()
 
     return d
   }
@@ -157,31 +159,33 @@ export function WorkspaceProvider({ children }) {
     setVocabulary(newVoc)
     setRawVocab({})
     setEnabledModules(mods)
+    // ← intentionally NOT touching serverEffectiveMenus
     await workspaceApi.save({ profession: p, vocabulary: {}, enabled_modules: mods })
   }
 
-  // ── Effective modules: intersection of all three levels ──────
-  const effectiveModules = mergeModules(globalModules, groupModules, enabledModules)
+  // ── Effective modules — THE authoritative list for the sidebar ──
+  // Priority: server-computed (migration 021+) > old merge logic
+  const effectiveModules = serverEffectiveMenus
+    ? serverEffectiveMenus.filter(k => ALL_MODULE_KEYS.includes(k))
+    : mergeModules(globalModules, groupModules, enabledModules)
 
-  // ── Convenience: is a module enabled? ────────────────────────
   function isModuleEnabled(moduleKey) {
     return effectiveModules.includes(moduleKey)
   }
 
-  // ── Save group-level modules ──────────────────────────────────
+  // ── Save group-level modules (old system, kept for compat) ───
   async function saveGroupModules(groupId, modules) {
     await groupsApi.saveModules(groupId, modules)
     setGroupModules(modules)
   }
 
-  // ── Save global modules (admin only) ──────────────────────────
+  // ── Save global modules (old system, kept for compat) ────────
   async function saveGlobalModules(modules) {
     await adminApi.saveModuleConfig(modules)
     setGlobalModules(modules)
   }
 
   // ── Resolve status pipeline ───────────────────────────────────
-  // Priority: projectStatuses → workspace customStatuses → profession defaults → general defaults
   function getEffectiveStatuses(projectStatuses) {
     if (projectStatuses && Array.isArray(projectStatuses) && projectStatuses.length > 0) {
       return projectStatuses
@@ -198,10 +202,10 @@ export function WorkspaceProvider({ children }) {
       profession,
       vocabulary,
       rawVocab,
-      enabledModules,       // user's own preference
-      effectiveModules,     // merged: global ∩ group ∩ user — use this for nav
-      globalModules,        // admin-level allowed modules
-      groupModules,         // group-level allowed modules (null = inherit)
+      enabledModules,           // user's raw DB pref (use for settings UI)
+      effectiveModules,         // authoritative for nav — use this everywhere
+      globalModules,
+      groupModules,
       customStatuses,
       workspaceName,
       accentColor,
@@ -213,7 +217,6 @@ export function WorkspaceProvider({ children }) {
       isModuleEnabled,
       getEffectiveStatuses,
       reload: load,
-      // Session workspace
       activeMode,
       activeGroupId,
       activeGroupName,
@@ -230,7 +233,6 @@ export function useWorkspace() {
   return ctx
 }
 
-// ── Convenience hook — just the vocabulary ────────────────────
 export function useVocabulary() {
   return useWorkspace().vocabulary
 }

@@ -21,10 +21,11 @@ export async function getEffectiveMenuKeys(userId, groupId = null) {
     if (groupId) {
       groupIds = [groupId]
     } else {
-      const { data: memberships } = await supabaseAdmin
+      const { data: memberships, error: memErr } = await supabaseAdmin
         .from('group_members')
         .select('group_id')
         .eq('user_id', userId)
+      if (memErr) console.error('[menuAccess] group_members query error:', memErr.message)
       groupIds = (memberships || []).map(m => m.group_id)
     }
 
@@ -41,21 +42,31 @@ export async function getEffectiveMenuKeys(userId, groupId = null) {
       )
     }
 
-    const [menusRes, ...ruleResults] = await Promise.all(queries)
+    const [menusRes, globalRes, userRes, groupRes] = await Promise.all(queries)
 
-    if (menusRes.error) throw new Error(menusRes.error.message)
+    if (menusRes.error) throw new Error(`menus table: ${menusRes.error.message}`)
+    if (globalRes.error) console.error('[menuAccess] global rules query error:', globalRes.error.message)
+    if (userRes.error)   console.error('[menuAccess] user rules query error:',   userRes.error.message)
+    if (groupRes?.error) console.error('[menuAccess] group rules query error:',  groupRes.error.message)
 
     // Collect all disabled keys across every level
-    const disabledKeys = new Set(
-      ruleResults.flatMap(r => (r.data || []).map(row => row.menu_key))
-    )
+    const disabledKeys = new Set([
+      ...(globalRes.data || []).map(r => r.menu_key),
+      ...(userRes.data   || []).map(r => r.menu_key),
+      ...(groupRes?.data || []).map(r => r.menu_key),
+    ])
+
+    console.log(`[menuAccess] userId=${userId} groupIds=[${groupIds}] disabledKeys=[${[...disabledKeys]}]`)
 
     // Return: always_on menus always included; configurable menus only if not disabled
-    return (menusRes.data || [])
+    const result = (menusRes.data || [])
       .filter(m => m.always_on || !disabledKeys.has(m.key))
       .map(m => m.key)
+
+    console.log(`[menuAccess] effective_menus=[${result}]`)
+    return result
   } catch (err) {
-    console.warn('[menuAccess] getEffectiveMenuKeys fallback:', err.message)
+    console.error('[menuAccess] getEffectiveMenuKeys error:', err.message)
     return null  // caller falls back to old logic
   }
 }

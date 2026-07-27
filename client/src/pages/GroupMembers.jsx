@@ -24,6 +24,7 @@ const MODULE_DEFS = [
 
 // ── Group menu config panel (owner only) ─────────────────────
 function GroupMenuConfig({ groupId }) {
+  const { reload, activeGroupId } = useWorkspace()
   const [menus,   setMenus]   = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
@@ -54,6 +55,8 @@ function GroupMenuConfig({ groupId }) {
     try {
       const disabledKeys = menus.filter(m => m.disabled_group && !m.disabled_global).map(m => m.key)
       await groupsApi.saveMenus(groupId, disabledKeys)
+      // Reload effective menus so the owner's own sidebar reflects the new restrictions
+      reload(activeGroupId || groupId).catch(() => {})
       setSaved(true)
       toast.success('Team menu config saved')
       setTimeout(() => setSaved(false), 2500)
