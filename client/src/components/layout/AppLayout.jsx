@@ -547,18 +547,20 @@ function QuickCreateFAB() {
   if (!loading && actions.length === 0) return null
 
   return (
-    <div ref={ref} className="flex flex-col-reverse items-center gap-2">
-      {/* Action items — expand above the button */}
-      {open && (
-        <div className="flex flex-col-reverse gap-2 mb-1">
+    <div ref={ref} className="relative">
+      {/* Action popup — absolutely positioned ABOVE the button, never affects container layout */}
+      {open && actions.length > 0 && (
+        <div
+          className="absolute bottom-full right-0 mb-2 flex flex-col gap-2"
+          style={{ minWidth: 200 }}
+        >
           {actions.map((a) => (
             <button
               key={a.label}
               onClick={() => { navigate(a.to); setOpen(false) }}
-              className="flex items-center gap-3 pl-3 pr-5 py-2.5 rounded-2xl border shadow-md bg-white hover:shadow-lg transition-all text-left animate-fade-in"
-              style={{ minWidth: 190 }}
+              className="flex items-center gap-3 pl-3 pr-4 py-2.5 rounded-2xl border shadow-md bg-white hover:shadow-lg transition-all text-left"
             >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${a.bg} border`}>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border ${a.bg}`}>
                 <a.icon className={`w-4 h-4 ${a.color}`} />
               </div>
               <div>
@@ -570,7 +572,7 @@ function QuickCreateFAB() {
         </div>
       )}
 
-      {/* FAB toggle */}
+      {/* FAB toggle button */}
       <button
         onClick={() => setOpen(o => !o)}
         className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 ${

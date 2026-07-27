@@ -1,11 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 
-const STORAGE_KEY = 'pinlooply_fab_pos_v2'  // v2 — clears any old out-of-bounds saved positions
-const EDGE        = 12   // min px from viewport edge
-const EST_W       = 56   // estimated button width
-const EST_H       = 180  // estimated total stack height (handle + 2 buttons + gaps)
+const STORAGE_KEY = 'pinlooply_fab_pos_v3'
+const EDGE = 16  // min px from any viewport edge
 
-// Six-dot grip icon
 function GripDots() {
   return (
     <div className="flex gap-[3px] justify-center">
@@ -16,25 +13,12 @@ function GripDots() {
   )
 }
 
-// Clamp x,y so the container (w×h) stays fully inside the viewport
-function clamp(x, y, w = EST_W, h = EST_H) {
+// Clamp a position so the container (w×h) stays fully inside the viewport
+function clampToViewport(x, y, w, h) {
   return {
     x: Math.max(EDGE, Math.min(window.innerWidth  - w - EDGE, x)),
     y: Math.max(EDGE, Math.min(window.innerHeight - h - EDGE, y)),
   }
-}
-
-function loadSaved() {
-  try {
-    const s = JSON.parse(localStorage.getItem(STORAGE_KEY))
-    if (s && typeof s.x === 'number' && typeof s.y === 'number') return s
-  } catch {}
-  return null
-}
-
-function defaultPos() {
-  // bottom-right, safely in bounds
-  return clamp(window.innerWidth - 80, window.innerHeight - 200)
 }
 
 export default function DraggableFABStack({ children }) {
@@ -44,78 +28,95 @@ export default function DraggableFABStack({ children }) {
   const startPtr     = useRef({ x: 0, y: 0 })
   const startPos     = useRef({ x: 0, y: 0 })
 
-  const [pos,      setPos]      = useState(null)   // null until mounted
-  const [stacksUp, setStacksUp] = useState(false)  // flip stack above handle?
+  const [pos, setPos] = useState(null)   // null = not yet mounted
 
-  // Measure actual container and re-clamp pos
-  function reclamp(rawPos) {
+  // Get actual container dimensions (falls back to safe estimates)
+  function getSize() {
     const el = containerRef.current
-    const w  = el ? el.offsetWidth  : EST_W
-    const h  = el ? el.offsetHeight : EST_H
-    const p  = clamp(rawPos.x, rawPos.y, w, h)
-    // Stack upward when the FAB is in the bottom 55% of the screen
-    setStacksUp(p.y > window.innerHeight * 0.45)
+    return {
+      w: el ? el.offsetWidth  : 60,
+      h: el ? el.offsetHeight : 130,
+    }
+  }
+
+  // Clamp using actual container size and commit to state
+  function snapToViewport(rawX, rawY) {
+    const { w, h } = getSize()
+    const p = clampToViewport(rawX, rawY, w, h)
+    setPos(p)
     return p
   }
 
-  // Init: load saved pos (clamped) or use default
+  // ── Init ──────────────────────────────────────────────────────
   useEffect(() => {
-    const raw = loadSaved() || defaultPos()
-    // First render — element isn't sized yet, use estimate
-    const p = clamp(raw.x, raw.y)
+    // Load saved position or default to bottom-right
+    let raw = null
+    try {
+      const s = JSON.parse(localStorage.getItem(STORAGE_KEY))
+      if (s && typeof s.x === 'number' && typeof s.y === 'number') raw = s
+    } catch {}
+
+    // Default: bottom-right, 80px from right, 100px from bottom
+    if (!raw) {
+      raw = {
+        x: window.innerWidth  - 80,
+        y: window.innerHeight - 200,
+      }
+    }
+
+    // First clamp with estimated size so container appears on screen immediately
+    const p = clampToViewport(raw.x, raw.y, 60, 130)
     setPos(p)
-    setStacksUp(p.y > window.innerHeight * 0.45)
   }, [])
 
-  // After first paint, measure real size and re-clamp
+  // After first paint: re-clamp with actual measured dimensions
   useEffect(() => {
     if (!pos) return
-    const p = reclamp(pos)
+    const { w, h } = getSize()
+    const p = clampToViewport(pos.x, pos.y, w, h)
     if (p.x !== pos.x || p.y !== pos.y) setPos(p)
-  }, [pos === null]) // run once after pos is first set — eslint-disable-line
+  }, [!!pos]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-clamp on window resize
+  // Re-clamp when viewport resizes (orientation change, window resize)
   useEffect(() => {
-    function onResize() {
+    const handler = () => {
       setPos(prev => {
         if (!prev) return prev
-        return reclamp(prev)
+        const { w, h } = getSize()
+        return clampToViewport(prev.x, prev.y, w, h)
       })
     }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
   }, [])
 
-  // ── Drag handlers ─────────────────────────────────────────────
+  // ── Drag ─────────────────────────────────────────────────────
   function onPointerDown(e) {
     e.preventDefault()
     handleRef.current.setPointerCapture(e.pointerId)
-    dragging.current  = true
-    startPtr.current  = { x: e.clientX, y: e.clientY }
+    dragging.current = true
+    startPtr.current = { x: e.clientX, y: e.clientY }
     const rect = containerRef.current.getBoundingClientRect()
-    startPos.current  = { x: rect.left, y: rect.top }
+    startPos.current = { x: rect.left, y: rect.top }
   }
 
   function onPointerMove(e) {
     if (!dragging.current) return
-    const dx = e.clientX - startPtr.current.x
-    const dy = e.clientY - startPtr.current.y
-    const el = containerRef.current
-    const w  = el ? el.offsetWidth  : EST_W
-    const h  = el ? el.offsetHeight : EST_H
-    const p  = clamp(startPos.current.x + dx, startPos.current.y + dy, w, h)
-    // Direct DOM update for smooth drag — no React re-render during move
-    el.style.left = p.x + 'px'
-    el.style.top  = p.y + 'px'
+    const rawX = startPos.current.x + (e.clientX - startPtr.current.x)
+    const rawY = startPos.current.y + (e.clientY - startPtr.current.y)
+    const { w, h } = getSize()
+    const p = clampToViewport(rawX, rawY, w, h)
+    // Update DOM directly for 60fps drag — no React re-render mid-drag
+    containerRef.current.style.left = p.x + 'px'
+    containerRef.current.style.top  = p.y + 'px'
   }
 
   function onPointerUp() {
     if (!dragging.current) return
     dragging.current = false
     const rect = containerRef.current.getBoundingClientRect()
-    const p = reclamp({ x: rect.left, y: rect.top })
+    const p = snapToViewport(rect.left, rect.top)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p))
-    setPos(p)
   }
 
   if (!pos) return null
@@ -124,9 +125,9 @@ export default function DraggableFABStack({ children }) {
     <div
       ref={containerRef}
       style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9100 }}
-      className={`flex items-center gap-2 ${stacksUp ? 'flex-col-reverse' : 'flex-col'}`}
+      className="flex flex-col items-center gap-2"
     >
-      {/* Drag handle */}
+      {/* Drag handle — grab to reposition */}
       <div
         ref={handleRef}
         onPointerDown={onPointerDown}
@@ -140,7 +141,7 @@ export default function DraggableFABStack({ children }) {
         <GripDots />
       </div>
 
-      {/* FAB buttons — appear above or below handle based on screen position */}
+      {/* Children (FeedbackWidget, QuickCreateFAB, etc.) */}
       {children}
     </div>
   )
