@@ -4,6 +4,25 @@ import { Heart, X, Copy, Check, ExternalLink, CheckCheck, Send } from 'lucide-re
 import { donorApi } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
+// ── Module-level config cache — fetched once, shared by all buttons ───
+let _configCache   = null   // null = not fetched, {} = fetched (may be empty)
+let _configPromise = null
+
+function fetchDonateConfig() {
+  if (_configCache !== null) return Promise.resolve(_configCache)
+  if (!_configPromise) {
+    _configPromise = fetch('/api/public/donate-config')
+      .then(r => r.json())
+      .then(res => { _configCache = res.data || {}; return _configCache })
+      .catch(() => { _configCache = {}; return {} })
+  }
+  return _configPromise
+}
+
+function hasAnyMethod(cfg) {
+  return !!(cfg && (cfg.upi || cfg.paypal || cfg.buymeacoffee))
+}
+
 // UPI deep-link QR
 function upiQrUrl(id, name) {
   const data = encodeURIComponent(`upi://pay?pa=${id}&pn=${encodeURIComponent(name)}&cu=INR`)
@@ -149,17 +168,12 @@ export function DonateModal({ onClose }) {
   const [donorMethod, setDonorMethod] = useState('upi')
 
   useEffect(() => {
-    fetch('/api/public/donate-config')
-      .then(r => r.json())
-      .then(res => {
-        const data = res.data || {}
-        setCfg(data)
-        // Default to first enabled tab
-        if (data.upi)               setTab('upi')
-        else if (data.paypal)       setTab('paypal')
-        else if (data.buymeacoffee) setTab('bmc')
-      })
-      .catch(() => setCfg({}))
+    fetchDonateConfig().then(data => {
+      setCfg(data)
+      if (data.upi)               setTab('upi')
+      else if (data.paypal)       setTab('paypal')
+      else if (data.buymeacoffee) setTab('bmc')
+    })
   }, [])
 
   function copyUpi() {
@@ -174,7 +188,7 @@ export function DonateModal({ onClose }) {
     setTimeout(() => setDonorStep(true), 1200)
   }
 
-  const hasAny = cfg && (cfg.upi || cfg.paypal || cfg.buymeacoffee)
+  const hasAny = hasAnyMethod(cfg)
 
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
@@ -330,7 +344,15 @@ export function DonateModal({ onClose }) {
 
 // ── Trigger button (inline use) ───────────────────────────────
 export function DonateButton({ variant = 'default' }) {
-  const [open, setOpen] = useState(false)
+  const [open,    setOpen]    = useState(false)
+  const [visible, setVisible] = useState(false) // hide until config confirms a method is on
+
+  useEffect(() => {
+    fetchDonateConfig().then(cfg => setVisible(hasAnyMethod(cfg)))
+  }, [])
+
+  // Don't render anything if no donation method is configured
+  if (!visible) return null
 
   if (variant === 'sidebar') {
     return (
