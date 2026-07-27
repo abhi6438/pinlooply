@@ -69,7 +69,13 @@ function RazorpayTab({ cfg, onClose }) {
 
       const orderRes = await donorApi.razorpayCreateOrder(amt, user?.id)
       if (!orderRes.success) {
-        setError(orderRes.error || 'Failed to create order')
+        // Hide technical config errors from end users
+        const msg = orderRes.error || ''
+        setError(
+          msg.toLowerCase().includes('not configured') || msg.toLowerCase().includes('key')
+            ? 'Payment gateway is temporarily unavailable. Please try UPI or contact us directly.'
+            : 'Could not initiate payment. Please try again.'
+        )
         setPaying(false)
         return
       }
@@ -109,8 +115,8 @@ function RazorpayTab({ cfg, onClose }) {
 
       const rzp = new window.Razorpay(options)
       rzp.open()
-    } catch (err) {
-      setError(err.message || 'Something went wrong')
+    } catch {
+      setError('Something went wrong. Please try again.')
       setPaying(false)
     }
   }
