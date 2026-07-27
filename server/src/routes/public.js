@@ -292,4 +292,21 @@ router.get('/:slug', async (req, res) => {
   }
 })
 
+// ── GET /api/public/module-config — global module config (no auth needed) ──
+// Any logged-in OR anonymous user can call this so nav filters correctly.
+router.get('/module-config', async (req, res) => {
+  try {
+    const { data } = await supabaseAdmin
+      .from('site_config')
+      .select('value')
+      .eq('key', 'global_modules')
+      .maybeSingle()
+
+    const ALL = ['projects', 'tasks', 'timeline', 'topics', 'standup', 'summary', 'testcases']
+    res.json({ success: true, data: data?.value || ALL })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 export default router
