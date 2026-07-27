@@ -358,4 +358,42 @@ router.patch('/users/:userId/plan', async (req, res) => {
   }
 })
 
+// ── GET /api/admin/donate-config ─────────────────────────────
+router.get('/donate-config', async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('site_config')
+      .select('value')
+      .eq('key', 'donate')
+      .maybeSingle()
+
+    if (error) return res.status(500).json({ error: error.message })
+
+    const defaults = {
+      upi:          { enabled: true,  id: '',   name: '' },
+      paypal:       { enabled: false, url: '' },
+      buymeacoffee: { enabled: false, url: '' },
+    }
+    res.json({ success: true, data: data?.value || defaults })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── PUT /api/admin/donate-config ─────────────────────────────
+router.put('/donate-config', async (req, res) => {
+  try {
+    const config = req.body // { upi: {...}, paypal: {...}, buymeacoffee: {...} }
+
+    const { error } = await supabaseAdmin
+      .from('site_config')
+      .upsert({ key: 'donate', value: config, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 export default router

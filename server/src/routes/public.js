@@ -98,6 +98,28 @@ async function fetchProjectData(projectId) {
   }
 }
 
+// ── GET /api/public/donate-config — donate settings (no auth) ────────
+router.get('/donate-config', async (req, res) => {
+  try {
+    const { data } = await supabaseAdmin
+      .from('site_config')
+      .select('value')
+      .eq('key', 'donate')
+      .maybeSingle()
+
+    // Only return enabled methods
+    const cfg = data?.value || {}
+    const result = {}
+    if (cfg.upi?.enabled)          result.upi          = { id: cfg.upi.id,   name: cfg.upi.name }
+    if (cfg.paypal?.enabled)       result.paypal       = { url: cfg.paypal.url }
+    if (cfg.buymeacoffee?.enabled) result.buymeacoffee = { url: cfg.buymeacoffee.url }
+
+    res.json({ success: true, data: result })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── GET /api/public/collection/:slug — multi-project collection ───────
 router.get('/collection/:slug', async (req, res) => {
   try {

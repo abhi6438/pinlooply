@@ -6,7 +6,7 @@ import {
   Settings, Users, BarChart3, Shield, Loader2,
   Save, CheckCheck, Search, ChevronDown, AlertCircle,
   Cpu, Crown, RefreshCw, TrendingUp, FolderOpen,
-  MessageSquare, CheckSquare2, GitBranch,
+  MessageSquare, CheckSquare2, GitBranch, Heart,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
@@ -16,10 +16,11 @@ const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || ''
 
 // ── Tab navigation ─────────────────────────────────────────────
 const TABS = [
-  { id: 'ai',    label: 'AI Config',       icon: Cpu      },
-  { id: 'users', label: 'User Stats',      icon: Users    },
-  { id: 'usage', label: 'Usage Stats',     icon: BarChart3},
-  { id: 'plans', label: 'Plan Management', icon: Crown    },
+  { id: 'ai',     label: 'AI Config',       icon: Cpu      },
+  { id: 'users',  label: 'User Stats',      icon: Users    },
+  { id: 'usage',  label: 'Usage Stats',     icon: BarChart3},
+  { id: 'plans',  label: 'Plan Management', icon: Crown    },
+  { id: 'donate', label: 'Donation',        icon: Heart    },
 ]
 
 // ── Stat card ─────────────────────────────────────────────────
@@ -822,6 +823,159 @@ function PlanManagementTab() {
   )
 }
 
+// ── Tab 5: Donation Config ─────────────────────────────────────
+function DonateConfigTab() {
+  const [cfg,     setCfg]     = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+
+  useEffect(() => {
+    adminApi.getDonateConfig()
+      .then(res => setCfg(res.data.data))
+      .catch(() => toast.error('Failed to load donation config'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    try {
+      await adminApi.saveDonateConfig(cfg)
+      setSaved(true)
+      toast.success('Donation config saved')
+      setTimeout(() => setSaved(false), 2500)
+    } catch { toast.error('Failed to save') }
+    finally { setSaving(false) }
+  }
+
+  function update(method, field, value) {
+    setCfg(prev => ({ ...prev, [method]: { ...prev[method], [field]: value } }))
+  }
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+  if (!cfg)    return <p className="text-center text-warm-400 py-20">Could not load config</p>
+
+  return (
+    <div className="max-w-xl space-y-5">
+
+      {/* UPI */}
+      <div className="card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🇮🇳</span>
+            <h3 className="text-sm font-semibold text-warm-900">UPI</h3>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-xs text-warm-500">Enable</span>
+            <div
+              onClick={() => update('upi', 'enabled', !cfg.upi?.enabled)}
+              className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${cfg.upi?.enabled ? 'bg-primary-600' : 'bg-warm-200'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.upi?.enabled ? 'translate-x-4' : ''}`} />
+            </div>
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-warm-500 mb-1 block">UPI ID</label>
+            <input
+              className="input text-sm w-full"
+              placeholder="name@bank"
+              value={cfg.upi?.id || ''}
+              onChange={e => update('upi', 'id', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-warm-500 mb-1 block">Display Name</label>
+            <input
+              className="input text-sm w-full"
+              placeholder="Your Name"
+              value={cfg.upi?.name || ''}
+              onChange={e => update('upi', 'name', e.target.value)}
+            />
+          </div>
+        </div>
+        {cfg.upi?.id && (
+          <p className="text-xs text-warm-400">
+            QR will link to: <span className="font-mono">upi://pay?pa={cfg.upi.id}&pn={cfg.upi.name}&cu=INR</span>
+          </p>
+        )}
+      </div>
+
+      {/* PayPal */}
+      <div className="card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">💳</span>
+            <h3 className="text-sm font-semibold text-warm-900">PayPal</h3>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-xs text-warm-500">Enable</span>
+            <div
+              onClick={() => update('paypal', 'enabled', !cfg.paypal?.enabled)}
+              className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${cfg.paypal?.enabled ? 'bg-primary-600' : 'bg-warm-200'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.paypal?.enabled ? 'translate-x-4' : ''}`} />
+            </div>
+          </label>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-warm-500 mb-1 block">PayPal.me URL</label>
+          <input
+            className="input text-sm w-full"
+            placeholder="https://paypal.me/YourUsername"
+            value={cfg.paypal?.url || ''}
+            onChange={e => update('paypal', 'url', e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Buy Me a Coffee */}
+      <div className="card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">☕</span>
+            <h3 className="text-sm font-semibold text-warm-900">Buy Me a Coffee</h3>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-xs text-warm-500">Enable</span>
+            <div
+              onClick={() => update('buymeacoffee', 'enabled', !cfg.buymeacoffee?.enabled)}
+              className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${cfg.buymeacoffee?.enabled ? 'bg-primary-600' : 'bg-warm-200'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.buymeacoffee?.enabled ? 'translate-x-4' : ''}`} />
+            </div>
+          </label>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-warm-500 mb-1 block">Buy Me a Coffee URL</label>
+          <input
+            className="input text-sm w-full"
+            placeholder="https://www.buymeacoffee.com/YourUsername"
+            value={cfg.buymeacoffee?.url || ''}
+            onChange={e => update('buymeacoffee', 'url', e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Save */}
+      <button
+        onClick={save}
+        disabled={saving}
+        className="btn-primary flex items-center gap-2 px-5"
+      >
+        {saving
+          ? <Loader2 className="w-4 h-4 animate-spin" />
+          : saved
+            ? <CheckCheck className="w-4 h-4" />
+            : <Save className="w-4 h-4" />
+        }
+        {saved ? 'Saved!' : 'Save Changes'}
+      </button>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────
 export default function AdminPanel() {
   const { user } = useAuth()
@@ -896,10 +1050,11 @@ export default function AdminPanel() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === 'ai'    && <AIConfigTab />}
-        {tab === 'users' && <UserStatsTab stats={stats} />}
-        {tab === 'usage' && <UsageStatsTab stats={stats} />}
-        {tab === 'plans' && <PlanManagementTab />}
+        {tab === 'ai'     && <AIConfigTab />}
+        {tab === 'users'  && <UserStatsTab stats={stats} />}
+        {tab === 'usage'  && <UsageStatsTab stats={stats} />}
+        {tab === 'plans'  && <PlanManagementTab />}
+        {tab === 'donate' && <DonateConfigTab />}
       </div>
     </div>
   )

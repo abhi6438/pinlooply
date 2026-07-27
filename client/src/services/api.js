@@ -147,6 +147,8 @@ export const adminApi = {
   getDetailedUsage:  ()             => api.get('/api/admin/usage-detail'),
   getUsers:          (search = '')  => api.get(`/api/admin/users${search ? `?search=${encodeURIComponent(search)}` : ''}`),
   updateUserPlan:    (userId, body) => api.patch(`/api/admin/users/${userId}/plan`, body),
+  getDonateConfig:   ()             => api.get('/api/admin/donate-config'),
+  saveDonateConfig:  (config)       => api.put('/api/admin/donate-config', config),
 }
 
 export const publishApi = {
