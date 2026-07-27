@@ -149,6 +149,28 @@ export const adminApi = {
   updateUserPlan:    (userId, body) => api.patch(`/api/admin/users/${userId}/plan`, body),
   getDonateConfig:   ()             => api.get('/api/admin/donate-config'),
   saveDonateConfig:  (config)       => api.put('/api/admin/donate-config', config),
+  getFeedback:       (params = {})  => api.get('/api/admin/feedback',  { params }),
+  getDonors:         (params = {})  => api.get('/api/admin/donors',    { params }),
+  markThanked:       (id)           => api.patch(`/api/admin/donors/${id}/thanked`),
+  getFeedbackReplies: (id)          => api.get(`/api/admin/feedback/${id}/replies`),
+  replyFeedback:     (id, text)     => api.post(`/api/admin/feedback/${id}/reply`, { replyText: text }),
+  replyDonor:        (id, text)     => api.post(`/api/admin/donors/${id}/reply`,   { replyText: text }),
+}
+
+export const feedbackApi = {
+  submit: (body) => fetch('/api/public/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(r => r.json()),
+}
+
+export const donorApi = {
+  notify: (body) => fetch('/api/public/donor-notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(r => r.json()),
 }
 
 export const publishApi = {

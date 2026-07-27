@@ -8,6 +8,7 @@ import { supabase } from '../../config/supabase'
 import { notificationsApi } from '../../services/api'
 import SearchModal from '../ui/SearchModal'
 import { DonateButton } from '../shared/DonateModal'
+import FeedbackWidget from '../shared/FeedbackWidget'
 import {
   LayoutDashboard, FolderOpen, ListChecks,
   CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
@@ -109,7 +110,13 @@ function NotificationBell({ notifications, unreadCount, onMarkRead, onMarkAllRea
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const typeIcon = { task_assigned: '📋', task_completed: '✅', task_overdue: '⚠️' }
+  const typeIcon = {
+    task_assigned:  '📋',
+    task_completed: '✅',
+    task_overdue:   '⚠️',
+    system_message: '💬',
+    feedback_reply: '💬',
+  }
 
   return (
     <div className="relative" ref={ref}>
@@ -620,6 +627,7 @@ export default function AppLayout({ children }) {
   return (
     <div className="flex h-screen bg-warm-50 overflow-hidden">
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <FeedbackWidget />
       <Sidebar
         user={user}
         userProfile={userProfile}

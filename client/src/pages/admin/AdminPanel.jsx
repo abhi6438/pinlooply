@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { adminApi } from '../../services/api'
@@ -7,6 +8,7 @@ import {
   Save, CheckCheck, Search, ChevronDown, AlertCircle,
   Cpu, Crown, RefreshCw, TrendingUp, FolderOpen,
   MessageSquare, CheckSquare2, GitBranch, Heart,
+  Star, HandCoins, Mail, Send, X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
@@ -16,11 +18,13 @@ const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || ''
 
 // ── Tab navigation ─────────────────────────────────────────────
 const TABS = [
-  { id: 'ai',     label: 'AI Config',       icon: Cpu      },
-  { id: 'users',  label: 'User Stats',      icon: Users    },
-  { id: 'usage',  label: 'Usage Stats',     icon: BarChart3},
-  { id: 'plans',  label: 'Plan Management', icon: Crown    },
-  { id: 'donate', label: 'Donation',        icon: Heart    },
+  { id: 'ai',       label: 'AI Config',       icon: Cpu        },
+  { id: 'users',    label: 'User Stats',      icon: Users      },
+  { id: 'usage',    label: 'Usage Stats',     icon: BarChart3  },
+  { id: 'plans',    label: 'Plan Management', icon: Crown      },
+  { id: 'donate',   label: 'Donation',        icon: Heart      },
+  { id: 'feedback', label: 'Feedback',        icon: Star       },
+  { id: 'donors',   label: 'Donors',          icon: HandCoins  },
 ]
 
 // ── Stat card ─────────────────────────────────────────────────
@@ -823,6 +827,413 @@ function PlanManagementTab() {
   )
 }
 
+// ── Inline reply thread for a feedback card ───────────────────
+function FeedbackThread({ feedbackId, onReplySent }) {
+  const [replies,  setReplies]  = useState(null)   // null = not loaded yet
+  const [open,     setOpen]     = useState(false)
+  const [text,     setText]     = useState('')
+  const [sending,  setSending]  = useState(false)
+  const [error,    setError]    = useState('')
+
+  async function load() {
+    if (replies !== null) return // already loaded
+    try {
+      const res = await adminApi.getFeedbackReplies(feedbackId)
+      setReplies(res.data.data || [])
+    } catch { setReplies([]) }
+  }
+
+  function toggle() {
+    if (!open) load()
+    setOpen(o => !o)
+  }
+
+  async function sendReply() {
+    if (!text.trim()) return
+    setSending(true)
+    setError('')
+    try {
+      await adminApi.replyFeedback(feedbackId, text.trim())
+      const newReply = { id: Date.now(), sender: 'admin', message: text.trim(), created_at: new Date().toISOString() }
+      setReplies(prev => [...(prev || []), newReply])
+      setText('')
+      toast.success('Reply sent & user notified!')
+      onReplySent?.()
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Failed to send reply')
+    } finally { setSending(false) }
+  }
+
+  const SENDER_STYLE = {
+    system: { bg: 'bg-blue-50 border-blue-100',  label: 'System',  labelClass: 'text-blue-500' },
+    admin:  { bg: 'bg-primary-50 border-primary-100', label: 'You', labelClass: 'text-primary-600' },
+    user:   { bg: 'bg-warm-50 border-warm-100',   label: 'User',   labelClass: 'text-warm-600' },
+  }
+
+  return (
+    <div className="mt-2 border-t border-warm-100 pt-2">
+      <button
+        onClick={toggle}
+        className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors"
+      >
+        <MessageSquare className="w-3 h-3" />
+        {open ? 'Hide thread' : 'View / Reply'}
+        {replies !== null && replies.length > 0 && (
+          <span className="bg-primary-100 text-primary-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+            {replies.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-2">
+          {/* Thread messages */}
+          {replies === null ? (
+            <div className="flex justify-center py-3">
+              <Loader2 className="w-4 h-4 text-primary-400 animate-spin" />
+            </div>
+          ) : replies.length === 0 ? (
+            <p className="text-xs text-warm-400 italic">No messages yet.</p>
+          ) : (
+            replies.map(r => {
+              const s = SENDER_STYLE[r.sender] || SENDER_STYLE.system
+              return (
+                <div key={r.id} className={`rounded-xl border px-3 py-2.5 ${s.bg}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-[11px] font-semibold uppercase tracking-wide ${s.labelClass}`}>{s.label}</span>
+                    <span className="text-[10px] text-warm-400">
+                      {r.created_at ? format(new Date(r.created_at), 'MMM d · h:mm a') : ''}
+                    </span>
+                  </div>
+                  <p className="text-xs text-warm-800 leading-relaxed">{r.message}</p>
+                </div>
+              )
+            })
+          )}
+
+          {/* Reply input */}
+          <div className="flex gap-2 pt-1">
+            <textarea
+              rows={2}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply() }}
+              placeholder="Write a reply… (⌘Enter to send)"
+              className="input flex-1 resize-none text-xs leading-relaxed"
+            />
+            <button
+              onClick={sendReply}
+              disabled={sending || !text.trim()}
+              className="self-end flex items-center gap-1 btn-primary px-3 py-2 text-xs disabled:opacity-50"
+            >
+              {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Tab: Feedback ─────────────────────────────────────────────
+const CATEGORY_COLORS = {
+  bug:     'bg-red-100 text-red-700',
+  feature: 'bg-purple-100 text-purple-700',
+  general: 'bg-blue-100 text-blue-700',
+}
+const CATEGORY_LABELS = { bug: '🐛 Bug', feature: '✨ Feature', general: '💬 General' }
+
+function FeedbackTab() {
+  const [items,    setItems]    = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [filter,   setFilter]   = useState('all')
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await adminApi.getFeedback({ limit: 100 })
+      setItems(res.data.data || [])
+    } catch { toast.error('Failed to load feedback') }
+    finally { setLoading(false) }
+  }
+
+  const filtered = filter === 'all' ? items : items.filter(f => f.category === filter)
+  const counts   = { all: items.length, bug: 0, feature: 0, general: 0 }
+  for (const f of items) if (counts[f.category] !== undefined) counts[f.category]++
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+
+  return (
+    <div className="space-y-4">
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {['all', 'bug', 'feature', 'general'].map(cat => (
+          <button
+            key={cat}
+            onClick={() => setFilter(cat)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+              filter === cat
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-white text-warm-500 border-warm-200 hover:border-warm-300'
+            }`}
+          >
+            {cat === 'all' ? `All (${counts.all})` : `${CATEGORY_LABELS[cat]} (${counts[cat]})`}
+          </button>
+        ))}
+        <button onClick={load} className="ml-auto p-1.5 rounded-lg hover:bg-warm-100 text-warm-400">
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="card p-10 text-center text-warm-400 text-sm">No feedback yet</div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(f => (
+            <div key={f.id} className="card p-4 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[f.category] || 'bg-warm-100 text-warm-500'}`}>
+                    {CATEGORY_LABELS[f.category] || f.category}
+                  </span>
+                  {f.rating && (
+                    <span className="flex items-center gap-0.5 text-xs text-amber-500 font-semibold">
+                      {'★'.repeat(f.rating)}{'☆'.repeat(5 - f.rating)}
+                      <span className="text-warm-400 font-normal ml-1">{f.rating}/5</span>
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-warm-400 flex-shrink-0">
+                  {f.created_at ? format(parseISO(f.created_at), 'MMM d, yyyy · h:mm a') : ''}
+                </span>
+              </div>
+              <p className="text-sm text-warm-800 leading-relaxed">{f.message}</p>
+              {(f.name || f.email) && (
+                <p className="text-xs text-warm-400">
+                  From: {[f.name, f.email].filter(Boolean).join(' · ')}
+                  {!f.user_id && <span className="ml-1 text-warm-300">(anonymous — no in-app notification)</span>}
+                </p>
+              )}
+              <FeedbackThread feedbackId={f.id} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Tab: Donors ───────────────────────────────────────────────
+const METHOD_COLORS = {
+  upi:          'bg-green-100 text-green-700',
+  paypal:       'bg-blue-100 text-blue-700',
+  buymeacoffee: 'bg-amber-100 text-amber-700',
+}
+const METHOD_LABELS = { upi: '🇮🇳 UPI', paypal: '💳 PayPal', buymeacoffee: '☕ BMC' }
+
+function DonorReplyForm({ donor, onSent }) {
+  const [text,    setText]    = useState(`Hi ${donor.name.split(' ')[0]},\n\nThank you so much for your generous support! `)
+  const [sending, setSending] = useState(false)
+  const [done,    setDone]    = useState(false)
+
+  async function send() {
+    if (!text.trim()) return
+    setSending(true)
+    try {
+      await adminApi.replyDonor(donor.id, text.trim())
+      setDone(true)
+      toast.success(`Thank-you message sent to ${donor.name}!`)
+      onSent?.()
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Failed to send')
+    } finally { setSending(false) }
+  }
+
+  if (done) return (
+    <div className="mt-2 pt-2 border-t border-warm-100 flex items-center gap-2 text-xs text-emerald-600">
+      <CheckCheck className="w-3.5 h-3.5" /> Thank-you message sent and donor marked as thanked.
+    </div>
+  )
+
+  return (
+    <div className="mt-2 pt-2 border-t border-warm-100 space-y-2">
+      <p className="text-[11px] font-semibold text-warm-500 uppercase tracking-wide">Send thank-you</p>
+      <div className="flex gap-2">
+        <textarea
+          rows={3}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }}
+          className="input flex-1 resize-none text-xs leading-relaxed"
+          placeholder="Write your thank-you message…"
+        />
+        <button
+          onClick={send}
+          disabled={sending || !text.trim()}
+          className="self-end flex items-center gap-1 btn-primary px-3 py-2 text-xs disabled:opacity-50"
+        >
+          {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+      <p className="text-[10px] text-warm-400">⌘Enter to send · Delivers as in-app notification if user was logged in</p>
+    </div>
+  )
+}
+
+function DonorsTab() {
+  const [donors,   setDonors]   = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [filter,   setFilter]   = useState('all') // 'all' | 'pending' | 'thanked'
+  const [marking,  setMarking]  = useState(null)
+  const [expanded, setExpanded] = useState(null)  // donor id with reply form open
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await adminApi.getDonors({ limit: 100 })
+      setDonors(res.data.data || [])
+    } catch { toast.error('Failed to load donors') }
+    finally { setLoading(false) }
+  }
+
+  async function markThanked(id) {
+    setMarking(id)
+    try {
+      await adminApi.markThanked(id)
+      setDonors(prev => prev.map(d => d.id === id ? { ...d, thanked: true } : d))
+      toast.success('Marked as thanked!')
+    } catch { toast.error('Failed') }
+    finally { setMarking(null) }
+  }
+
+  const filtered = filter === 'all' ? donors
+    : filter === 'pending' ? donors.filter(d => !d.thanked)
+    : donors.filter(d => d.thanked)
+
+  const pendingCount = donors.filter(d => !d.thanked).length
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+
+  return (
+    <div className="space-y-4">
+      {/* Header + filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {[
+          { key: 'all',     label: `All (${donors.length})` },
+          { key: 'pending', label: `Needs Thanks (${pendingCount})` },
+          { key: 'thanked', label: `Thanked (${donors.length - pendingCount})` },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+              filter === key
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-white text-warm-500 border-warm-200 hover:border-warm-300'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <button onClick={load} className="ml-auto p-1.5 rounded-lg hover:bg-warm-100 text-warm-400">
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+
+      {pendingCount > 0 && filter !== 'thanked' && (
+        <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <Mail className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 leading-relaxed">
+            <strong>{pendingCount} donor{pendingCount > 1 ? 's' : ''}</strong> waiting for a thank-you. Reach out to them and mark as thanked.
+          </p>
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div className="card p-10 text-center text-warm-400 text-sm">No donors yet</div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(d => (
+            <div key={d.id} className={`card p-4 space-y-2 ${d.thanked ? 'opacity-60' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${METHOD_COLORS[d.method] || 'bg-warm-100 text-warm-500'}`}>
+                    {METHOD_LABELS[d.method] || d.method}
+                  </span>
+                  {d.amount && (
+                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      {d.amount}
+                    </span>
+                  )}
+                  {d.thanked && (
+                    <span className="text-xs text-emerald-600 flex items-center gap-1">
+                      <CheckCheck className="w-3 h-3" /> Thanked
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-warm-400 flex-shrink-0">
+                  {d.created_at ? format(parseISO(d.created_at), 'MMM d, yyyy') : ''}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-warm-900">{d.name}</p>
+                  <a href={`mailto:${d.email}`} className="text-xs text-primary-600 hover:underline">{d.email}</a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setExpanded(expanded === d.id ? null : d.id)}
+                    className="flex items-center gap-1.5 text-xs bg-primary-50 text-primary-700 border border-primary-200 px-3 py-1.5 rounded-lg hover:bg-primary-100 transition-colors font-medium"
+                  >
+                    <Send className="w-3 h-3" /> {d.thanked ? 'Reply Again' : 'Send Thanks'}
+                  </button>
+                  {!d.thanked && (
+                    <button
+                      onClick={() => markThanked(d.id)}
+                      disabled={marking === d.id}
+                      className="flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors font-medium disabled:opacity-50"
+                    >
+                      {marking === d.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <CheckCheck className="w-3 h-3" />
+                      }
+                      Mark Only
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {d.message && (
+                <p className="text-xs text-warm-500 italic bg-warm-50 rounded-lg px-3 py-2 leading-relaxed">
+                  "{d.message}"
+                </p>
+              )}
+              {!d.user_id && (
+                <p className="text-[10px] text-warm-300">Anonymous donor — no in-app notification available</p>
+              )}
+              {expanded === d.id && (
+                <DonorReplyForm
+                  donor={d}
+                  onSent={() => {
+                    setExpanded(null)
+                    setDonors(prev => prev.map(x => x.id === d.id ? { ...x, thanked: true } : x))
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Tab 5: Donation Config ─────────────────────────────────────
 function DonateConfigTab() {
   const [cfg,     setCfg]     = useState(null)
@@ -1050,11 +1461,13 @@ export default function AdminPanel() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === 'ai'     && <AIConfigTab />}
-        {tab === 'users'  && <UserStatsTab stats={stats} />}
-        {tab === 'usage'  && <UsageStatsTab stats={stats} />}
-        {tab === 'plans'  && <PlanManagementTab />}
-        {tab === 'donate' && <DonateConfigTab />}
+        {tab === 'ai'       && <AIConfigTab />}
+        {tab === 'users'    && <UserStatsTab stats={stats} />}
+        {tab === 'usage'    && <UsageStatsTab stats={stats} />}
+        {tab === 'plans'    && <PlanManagementTab />}
+        {tab === 'donate'   && <DonateConfigTab />}
+        {tab === 'feedback' && <FeedbackTab />}
+        {tab === 'donors'   && <DonorsTab />}
       </div>
     </div>
   )

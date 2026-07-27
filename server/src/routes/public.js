@@ -1,6 +1,22 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../config/supabase.js'
 
+// ── Helper: send in-app notification to a user ────────────────
+async function notifyUser(userId, { type, title, body, relatedFeedbackId }) {
+  if (!userId) return
+  try {
+    await supabaseAdmin.from('notifications').insert({
+      user_id:             userId,
+      type,
+      title,
+      body:                body || null,
+      related_feedback_id: relatedFeedbackId || null,
+    })
+  } catch (e) {
+    console.error('[notify] failed:', e.message)
+  }
+}
+
 const router = Router()
 
 // ── Shared helper: fetch and compute project status data ──────────────
@@ -97,6 +113,88 @@ async function fetchProjectData(projectId) {
     },
   }
 }
+
+// ── POST /api/public/feedback — submit user feedback ─────────────────
+router.post('/feedback', async (req, res) => {
+  try {
+    const { name, email, category = 'general', rating, message, user_id } = req.body
+    if (!message?.trim()) return res.status(400).json({ error: 'Message is required' })
+
+    // 1. Save feedback
+    const { data: fb, error } = await supabaseAdmin
+      .from('feedback')
+      .insert({
+        user_id: user_id || null,
+        name:    name?.trim()  || null,
+        email:   email?.trim() || null,
+        category,
+        rating:  rating ? Number(rating) : null,
+        message: message.trim(),
+      })
+      .select('id')
+      .single()
+
+    if (error) return res.status(500).json({ error: error.message })
+
+    // 2. Auto-generated system acknowledgment reply
+    const ackMsg = 'Thanks for reaching out! Our team has received your message and will review it shortly. We\'ll reply here in your notifications.'
+    await supabaseAdmin.from('feedback_replies').insert({
+      feedback_id: fb.id,
+      sender:      'system',
+      message:     ackMsg,
+    })
+
+    // 3. Send in-app notification to the user (if logged in)
+    if (user_id) {
+      await notifyUser(user_id, {
+        type:              'system_message',
+        title:             '✅ Feedback received!',
+        body:              ackMsg,
+        relatedFeedbackId: fb.id,
+      })
+    }
+
+    res.json({ success: true, feedbackId: fb.id })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── POST /api/public/donor-notify — donor submits their details ───────
+router.post('/donor-notify', async (req, res) => {
+  try {
+    const { name, email, method = 'upi', amount, message, user_id } = req.body
+    if (!name?.trim() || !email?.trim()) {
+      return res.status(400).json({ error: 'Name and email are required' })
+    }
+
+    const { error } = await supabaseAdmin
+      .from('donor_details')
+      .insert({
+        user_id: user_id || null,
+        name:    name.trim(),
+        email:   email.trim(),
+        method,
+        amount:  amount?.trim() || null,
+        message: message?.trim() || null,
+      })
+
+    if (error) return res.status(500).json({ error: error.message })
+
+    // Send in-app notification to the user (if logged in)
+    if (user_id) {
+      await notifyUser(user_id, {
+        type:  'system_message',
+        title: '💖 Thank you for your donation!',
+        body:  'We\'ve received your details and will personally send you a thank-you message soon.',
+      })
+    }
+
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // ── GET /api/public/donate-config — donate settings (no auth) ────────
 router.get('/donate-config', async (req, res) => {

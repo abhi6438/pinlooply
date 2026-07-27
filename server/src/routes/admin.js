@@ -2,6 +2,21 @@ import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { requireAdmin } from '../middleware/adminAuth.js'
 import { supabaseAdmin } from '../config/supabase.js'
+// ── Helper: send in-app notification ─────────────────────────
+async function notifyUser(userId, { type, title, body, relatedFeedbackId }) {
+  if (!userId) return
+  try {
+    await supabaseAdmin.from('notifications').insert({
+      user_id:             userId,
+      type,
+      title,
+      body:                body || null,
+      related_feedback_id: relatedFeedbackId || null,
+    })
+  } catch (e) {
+    console.error('[admin notify] failed:', e.message)
+  }
+}
 
 const router = Router()
 
@@ -353,6 +368,151 @@ router.patch('/users/:userId/plan', async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message })
     res.json({ success: true, data })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── GET /api/admin/feedback ──────────────────────────────────
+router.get('/feedback', async (req, res) => {
+  try {
+    const { category, limit = 50, offset = 0 } = req.query
+    let query = supabaseAdmin
+      .from('feedback')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(Number(offset), Number(offset) + Number(limit) - 1)
+
+    if (category) query = query.eq('category', category)
+
+    const { data, error } = await query
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true, data: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── GET /api/admin/donors ────────────────────────────────────
+router.get('/donors', async (req, res) => {
+  try {
+    const { thanked, limit = 50, offset = 0 } = req.query
+    let query = supabaseAdmin
+      .from('donor_details')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(Number(offset), Number(offset) + Number(limit) - 1)
+
+    if (thanked !== undefined) query = query.eq('thanked', thanked === 'true')
+
+    const { data, error } = await query
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true, data: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── PATCH /api/admin/donors/:id/thanked ──────────────────────
+router.patch('/donors/:id/thanked', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { error } = await supabaseAdmin
+      .from('donor_details')
+      .update({ thanked: true })
+      .eq('id', id)
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── GET /api/admin/feedback/:id/replies ──────────────────────
+router.get('/feedback/:id/replies', async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('feedback_replies')
+      .select('*')
+      .eq('feedback_id', req.params.id)
+      .order('created_at', { ascending: true })
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true, data: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── POST /api/admin/feedback/:id/reply ───────────────────────
+router.post('/feedback/:id/reply', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { replyText } = req.body
+    if (!replyText?.trim()) return res.status(400).json({ error: 'Reply text required' })
+
+    // Get original feedback to find user_id
+    const { data: fb, error } = await supabaseAdmin
+      .from('feedback')
+      .select('id, user_id, name')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error || !fb) return res.status(404).json({ error: 'Feedback not found' })
+
+    // 1. Store reply in feedback_replies thread
+    const { data: reply, error: replyErr } = await supabaseAdmin
+      .from('feedback_replies')
+      .insert({ feedback_id: id, sender: 'admin', message: replyText.trim() })
+      .select('id, created_at')
+      .single()
+
+    if (replyErr) return res.status(500).json({ error: replyErr.message })
+
+    // 2. Send in-app notification to user (if they were logged in when they submitted)
+    if (fb.user_id) {
+      await notifyUser(fb.user_id, {
+        type:              'feedback_reply',
+        title:             '💬 New reply from the team',
+        body:              replyText.trim().slice(0, 120),
+        relatedFeedbackId: id,
+      })
+    }
+
+    res.json({ success: true, data: reply })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── POST /api/admin/donors/:id/reply ─────────────────────────
+router.post('/donors/:id/reply', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { replyText } = req.body
+    if (!replyText?.trim()) return res.status(400).json({ error: 'Reply text required' })
+
+    const { data: donor, error } = await supabaseAdmin
+      .from('donor_details')
+      .select('id, user_id, name')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error || !donor) return res.status(404).json({ error: 'Donor not found' })
+
+    // 1. Mark as thanked
+    await supabaseAdmin.from('donor_details').update({ thanked: true }).eq('id', id)
+
+    // 2. Send in-app notification to user (if logged in)
+    if (donor.user_id) {
+      await notifyUser(donor.user_id, {
+        type:  'feedback_reply',
+        title: '💖 A personal message from us',
+        body:  replyText.trim().slice(0, 120),
+      })
+    }
+
+    res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

@@ -1,11 +1,127 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Heart, X, Copy, Check, ExternalLink } from 'lucide-react'
+import { Heart, X, Copy, Check, ExternalLink, CheckCheck, Send } from 'lucide-react'
+import { donorApi } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 
 // UPI deep-link QR
 function upiQrUrl(id, name) {
   const data = encodeURIComponent(`upi://pay?pa=${id}&pn=${encodeURIComponent(name)}&cu=INR`)
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${data}`
+}
+
+// ── Donor details form (shown after payment click) ────────────
+function DonorThanksForm({ method, onClose, onSkip }) {
+  const { user }              = useAuth()
+  const [name,    setName]    = useState(user?.user_metadata?.name || user?.name || '')
+  const [email,   setEmail]   = useState(user?.email || '')
+  const [amount,  setAmount]  = useState('')
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [done,    setDone]    = useState(false)
+  const [error,   setError]   = useState('')
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!name.trim() || !email.trim()) { setError('Name and email are required'); return }
+    setSending(true)
+    setError('')
+    try {
+      const res = await donorApi.notify({ name: name.trim(), email: email.trim(), method, amount: amount.trim(), message: message.trim(), user_id: user?.id || null })
+      if (res.success) setDone(true)
+      else setError(res.error || 'Something went wrong')
+    } catch { setError('Failed to send. Try again.') }
+    finally { setSending(false) }
+  }
+
+  if (done) {
+    return (
+      <div className="px-5 py-8 flex flex-col items-center gap-3 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center">
+          <CheckCheck className="w-7 h-7 text-emerald-600" />
+        </div>
+        <h3 className="text-base font-semibold text-gray-900">You're amazing! 🎉</h3>
+        <p className="text-sm text-gray-500 leading-relaxed">We'll send you a personal thank-you note. It truly means the world.</p>
+        <button onClick={onClose} className="mt-2 px-6 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors">
+          Close
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={submit} className="px-5 py-4 space-y-3">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
+        🎉 Thank you for donating! Leave your details and we'll personally say thanks.
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">Name <span className="text-red-400">*</span></label>
+          <input
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+            placeholder="Your name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">Email <span className="text-red-400">*</span></label>
+          <input
+            type="email"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+            placeholder="your@email.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-gray-500 mb-1 block">Amount <span className="text-gray-300">(optional)</span></label>
+        <input
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+          placeholder="e.g. ₹100 or $5"
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-gray-500 mb-1 block">Note for us <span className="text-gray-300">(optional)</span></label>
+        <textarea
+          rows={2}
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-pink-300"
+          placeholder="Any message you'd like to share…"
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+        />
+      </div>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={sending}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+        >
+          {sending
+            ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            : <Send className="w-3.5 h-3.5" />
+          }
+          {sending ? 'Sending…' : 'Send'}
+        </button>
+        <button
+          type="button"
+          onClick={onSkip}
+          className="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600 border border-gray-200 rounded-xl transition-colors"
+        >
+          Skip
+        </button>
+      </div>
+    </form>
+  )
 }
 
 // ── Tab button ───────────────────────────────────────────────
@@ -26,9 +142,11 @@ function Tab({ active, onClick, children }) {
 
 // ── Main modal ───────────────────────────────────────────────
 export function DonateModal({ onClose }) {
-  const [tab,    setTab]    = useState(null)   // set after config loads
-  const [copied, setCopied] = useState(false)
-  const [cfg,    setCfg]    = useState(null)   // fetched from server
+  const [tab,         setTab]         = useState(null)   // set after config loads
+  const [copied,      setCopied]      = useState(false)
+  const [cfg,         setCfg]         = useState(null)   // fetched from server
+  const [donorStep,   setDonorStep]   = useState(false)  // show donor details form
+  const [donorMethod, setDonorMethod] = useState('upi')
 
   useEffect(() => {
     fetch('/api/public/donate-config')
@@ -37,20 +155,23 @@ export function DonateModal({ onClose }) {
         const data = res.data || {}
         setCfg(data)
         // Default to first enabled tab
-        if (data.upi)          setTab('upi')
-        else if (data.paypal)  setTab('paypal')
+        if (data.upi)               setTab('upi')
+        else if (data.paypal)       setTab('paypal')
         else if (data.buymeacoffee) setTab('bmc')
       })
-      .catch(() => {
-        // Silently fall back to showing nothing
-        setCfg({})
-      })
+      .catch(() => setCfg({}))
   }, [])
 
   function copyUpi() {
     navigator.clipboard.writeText(cfg?.upi?.id || '')
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function handlePaymentClick(method) {
+    // After a short delay (letting the external tab open), show the donor form
+    setDonorMethod(method)
+    setTimeout(() => setDonorStep(true), 1200)
   }
 
   const hasAny = cfg && (cfg.upi || cfg.paypal || cfg.buymeacoffee)
@@ -91,8 +212,17 @@ export function DonateModal({ onClose }) {
           </div>
         )}
 
-        {/* Tabs */}
-        {hasAny && (
+        {/* Donor details step — shown after clicking a payment link */}
+        {hasAny && donorStep && (
+          <DonorThanksForm
+            method={donorMethod}
+            onClose={onClose}
+            onSkip={() => setDonorStep(false)}
+          />
+        )}
+
+        {/* Payment tabs — hidden once donor step is active */}
+        {hasAny && !donorStep && (
           <>
             <div className="px-4 pt-4">
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
@@ -104,7 +234,7 @@ export function DonateModal({ onClose }) {
 
             {/* UPI tab */}
             {tab === 'upi' && cfg.upi && (
-              <div className="px-4 pb-6 flex flex-col items-center gap-3">
+              <div className="px-4 pb-4 flex flex-col items-center gap-3">
                 <div className="bg-gray-50 rounded-2xl p-3 border border-gray-200">
                   <img
                     src={upiQrUrl(cfg.upi.id, cfg.upi.name)}
@@ -128,12 +258,21 @@ export function DonateModal({ onClose }) {
                     {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
                   </button>
                 </div>
+                {/* After copying, prompt them to share details */}
+                {copied && (
+                  <button
+                    onClick={() => handlePaymentClick('upi')}
+                    className="w-full text-xs text-pink-600 hover:text-pink-700 font-medium py-1 transition-colors"
+                  >
+                    ✓ Done donating? Leave your details for a thank-you →
+                  </button>
+                )}
               </div>
             )}
 
             {/* PayPal tab */}
             {tab === 'paypal' && cfg.paypal && (
-              <div className="px-4 pb-6 flex flex-col items-center gap-4">
+              <div className="px-4 pb-4 flex flex-col items-center gap-4">
                 <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
                   <span className="text-3xl">💳</span>
                 </div>
@@ -145,6 +284,7 @@ export function DonateModal({ onClose }) {
                   href={cfg.paypal.url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => handlePaymentClick('paypal')}
                   className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-3 rounded-xl transition-all"
                 >
                   Donate on PayPal <ExternalLink className="w-4 h-4" />
@@ -154,7 +294,7 @@ export function DonateModal({ onClose }) {
 
             {/* Buy Me a Coffee tab */}
             {tab === 'bmc' && cfg.buymeacoffee && (
-              <div className="px-4 pb-6 flex flex-col items-center gap-4">
+              <div className="px-4 pb-4 flex flex-col items-center gap-4">
                 <div className="w-16 h-16 bg-yellow-50 rounded-2xl flex items-center justify-center">
                   <span className="text-4xl">☕</span>
                 </div>
@@ -166,22 +306,21 @@ export function DonateModal({ onClose }) {
                   href={cfg.buymeacoffee.url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => handlePaymentClick('buymeacoffee')}
                   className="w-full flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 text-sm font-semibold px-5 py-3 rounded-xl transition-all"
                 >
                   ☕ Buy Me a Coffee <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
             )}
-          </>
-        )}
 
-        {/* Footer note */}
-        {hasAny && (
-          <div className="px-4 pb-4 text-center">
-            <p className="text-[11px] text-gray-400">
-              100% goes to the developer. Thank you for your support 🙏
-            </p>
-          </div>
+            {/* Footer note */}
+            <div className="px-4 pb-4 text-center">
+              <p className="text-[11px] text-gray-400">
+                100% goes to the developer. Thank you for your support 🙏
+              </p>
+            </div>
+          </>
         )}
       </div>
     </div>,
