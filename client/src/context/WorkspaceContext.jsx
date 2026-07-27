@@ -85,6 +85,7 @@ export function WorkspaceProvider({ children }) {
 
   const load = useCallback(async (groupId = null) => {
     if (!user) { setLoading(false); return }
+    setLoading(true)  // always show skeleton while fetching — prevents flash of all-modules
     try {
       const res = await workspaceApi.get(groupId)
       const d   = res.data.data || {}

@@ -516,6 +516,7 @@ function MobileHeader({ user, bellProps, onMenuOpen }) {
 
 // ── Quick-Create FAB ──────────────────────────────────────────
 function QuickCreateFAB() {
+  const { effectiveModules, loading } = useWorkspace()
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const ref = useRef()
@@ -528,11 +529,22 @@ function QuickCreateFAB() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const actions = [
-    { icon: Send,      label: 'Log Discussion', desc: 'Paste notes or chat',  color: 'text-violet-600', bg: 'bg-violet-50 border-violet-200', to: '/log'      },
-    { icon: FolderOpen, label: 'New Project',   desc: 'Start a new project', color: 'text-blue-600',   bg: 'bg-blue-50 border-blue-200',     to: '/projects' },
-    { icon: ListChecks, label: 'Add Task',      desc: 'Add to task board',   color: 'text-green-600',  bg: 'bg-green-50 border-green-200',   to: '/lists'    },
+  // Close popup if workspace reloads (e.g. group switch) — avoids stale items
+  useEffect(() => { if (loading) setOpen(false) }, [loading])
+
+  const ALL_ACTIONS = [
+    { icon: Send,       label: 'Log Discussion', desc: 'Paste notes or chat',  color: 'text-violet-600', bg: 'bg-violet-50 border-violet-200', to: '/log',      moduleKey: null       },
+    { icon: FolderOpen, label: 'New Project',    desc: 'Start a new project',  color: 'text-blue-600',   bg: 'bg-blue-50 border-blue-200',     to: '/projects', moduleKey: 'projects' },
+    { icon: ListChecks, label: 'Add Task',       desc: 'Add to task board',    color: 'text-green-600',  bg: 'bg-green-50 border-green-200',   to: '/lists',    moduleKey: 'tasks'    },
   ]
+
+  // Only show actions for modules that are enabled (or have no module restriction)
+  const actions = loading
+    ? []
+    : ALL_ACTIONS.filter(a => a.moduleKey === null || effectiveModules.includes(a.moduleKey))
+
+  // Don't render the button at all if no actions are available (fully restricted)
+  if (!loading && actions.length === 0) return null
 
   return (
     <div ref={ref} className="flex flex-col-reverse items-center gap-2">
