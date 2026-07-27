@@ -80,18 +80,12 @@ export function WorkspaceProvider({ children }) {
     document.documentElement.style.setProperty('--accent-hex', hex)
   }
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (groupId = null) => {
     if (!user) { setLoading(false); return }
     try {
-      // Fetch workspace + global module config in parallel
-      // Use the PUBLIC endpoint for module config — no admin auth needed
-      const [wsRes, modRes] = await Promise.allSettled([
-        workspaceApi.get(),
-        fetch('/api/public/module-config').then(r => r.json()),
-      ])
-
-      const d       = wsRes.status === 'fulfilled' ? (wsRes.value.data.data || {}) : {}
-      const global  = modRes.status === 'fulfilled' ? (modRes.value.data || ALL_MODULE_KEYS) : ALL_MODULE_KEYS
+      // Single request — workspace + global_modules + group_modules all in one
+      const res = await workspaceApi.get(groupId)
+      const d   = res.data.data || {}
 
       const prof    = d.profession      || 'general'
       const raw     = d.vocabulary      || {}
@@ -101,7 +95,10 @@ export function WorkspaceProvider({ children }) {
       setRawVocab(raw)
       setVocabulary(resolveVocabulary(prof, raw))
       setEnabledModules(modules)
-      setGlobalModules(global)
+      // global_modules comes directly from the workspace response (server fetched it)
+      setGlobalModules(d.global_modules || ALL_MODULE_KEYS)
+      // group_modules: null means no restriction at group level
+      setGroupModules(d.group_modules ?? null)
       setCustomStatuses(d.custom_statuses || null)
       setWorkspaceName(d.workspace_name   || null)
       setAccentColor(d.accent_color       || null)
@@ -113,33 +110,8 @@ export function WorkspaceProvider({ children }) {
     }
   }, [user])
 
-  useEffect(() => { load() }, [load])
-
-  // ── Load group-level modules when active group changes ────────
-  useEffect(() => {
-    if (!activeGroupId) { setGroupModules(null); return }
-    groupsApi.get(activeGroupId)
-      .then(res => {
-        const grp = res.data.data
-        // enabled_modules: array = restricted, null = all allowed by admin
-        setGroupModules(grp?.enabled_modules ?? null)
-      })
-      .catch(() => setGroupModules(null))
-  }, [activeGroupId])
-
-  // ── When user has a group but no active session workspace, auto-load ──
-  // This handles: user is in team mode but cleared session / first visit
-  useEffect(() => {
-    if (activeGroupId || !user) return  // already handled above
-    groupsApi.list()
-      .then(res => {
-        const groups = res.data.data || []
-        if (groups.length > 0 && groups[0].enabled_modules) {
-          setGroupModules(groups[0].enabled_modules)
-        }
-      })
-      .catch(() => {})
-  }, [user, activeGroupId])
+  // Load workspace (includes global_modules + group_modules from server)
+  useEffect(() => { load(activeGroupId) }, [load, activeGroupId])
 
   // ── Save full workspace settings ─────────────────────────────
   async function saveWorkspace({ profession: p, vocabulary: v, enabled_modules: m, custom_statuses: cs, workspace_name: wn, accent_color: ac }) {

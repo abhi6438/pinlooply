@@ -137,7 +137,7 @@ export const planApi = {
 }
 
 export const workspaceApi = {
-  get:   ()       => api.get('/api/workspace'),
+  get:   (groupId) => api.get('/api/workspace', { params: groupId ? { group_id: groupId } : {} }),
   save:  (payload) => api.patch('/api/workspace', payload),
 }
 
