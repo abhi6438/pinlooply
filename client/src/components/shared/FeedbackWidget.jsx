@@ -215,11 +215,10 @@ export default function FeedbackWidget() {
 
   return (
     <>
-      {/* FAB — bottom-left, clear of content and other FABs */}
-      <div className="fixed bottom-5 left-5 z-50 flex items-end gap-2">
-        {/* Tooltip label */}
+      {/* FAB — bottom-right, clear of sidebar */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-1.5">
         {tooltip && (
-          <div className="mb-1 px-2.5 py-1 bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none">
+          <div className="px-2.5 py-1 bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none">
             Share feedback
           </div>
         )}
