@@ -9,6 +9,7 @@ import { notificationsApi } from '../../services/api'
 import SearchModal from '../ui/SearchModal'
 import { DonateButton } from '../shared/DonateModal'
 import FeedbackWidget from '../shared/FeedbackWidget'
+import DraggableFABStack from '../shared/DraggableFABStack'
 import {
   LayoutDashboard, FolderOpen, ListChecks,
   CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
@@ -507,15 +508,15 @@ function QuickCreateFAB() {
   ]
 
   return (
-    <div ref={ref} className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-end gap-2 md:bottom-8 md:right-8">
-      {/* Action items */}
+    <div ref={ref} className="flex flex-col-reverse items-center gap-2">
+      {/* Action items — expand above the button */}
       {open && (
-        <div className="flex flex-col-reverse gap-2 mb-2">
+        <div className="flex flex-col-reverse gap-2 mb-1">
           {actions.map((a) => (
             <button
               key={a.label}
               onClick={() => { navigate(a.to); setOpen(false) }}
-              className={`flex items-center gap-3 pl-3 pr-5 py-2.5 rounded-2xl border shadow-md bg-white hover:shadow-lg transition-all text-left group animate-fade-in`}
+              className="flex items-center gap-3 pl-3 pr-5 py-2.5 rounded-2xl border shadow-md bg-white hover:shadow-lg transition-all text-left animate-fade-in"
               style={{ minWidth: 190 }}
             >
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${a.bg} border`}>
@@ -627,7 +628,6 @@ export default function AppLayout({ children }) {
   return (
     <div className="flex h-screen bg-warm-50 overflow-hidden">
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <FeedbackWidget />
       <Sidebar
         user={user}
         userProfile={userProfile}
@@ -650,7 +650,10 @@ export default function AppLayout({ children }) {
         </main>
       </div>
       <BottomNav mode={userProfile?.mode} />
-      <QuickCreateFAB />
+      <DraggableFABStack>
+        <FeedbackWidget inline />
+        <QuickCreateFAB />
+      </DraggableFABStack>
     </div>
   )
 }

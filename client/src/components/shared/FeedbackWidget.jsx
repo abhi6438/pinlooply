@@ -208,31 +208,36 @@ function FeedbackModal({ onClose }) {
   )
 }
 
-// ── Floating trigger button ───────────────────────────────────
-export default function FeedbackWidget() {
+// ── Trigger button — used standalone or inside DraggableFABStack ─
+// inline=true → just the button (no fixed wrapper), for use inside DraggableFABStack
+export default function FeedbackWidget({ inline = false }) {
   const [open,    setOpen]    = useState(false)
   const [tooltip, setTooltip] = useState(false)
 
+  const btn = (
+    <div className="relative flex flex-col items-center gap-1">
+      {tooltip && !inline && (
+        <div className="absolute right-14 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none">
+          Share feedback
+        </div>
+      )}
+      <button
+        onClick={() => setOpen(true)}
+        onMouseEnter={() => setTooltip(true)}
+        onMouseLeave={() => setTooltip(false)}
+        title="Share feedback"
+        className="w-11 h-11 rounded-full bg-primary-600 hover:bg-primary-700 active:scale-95 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
+      >
+        <MessageSquare className="w-5 h-5" />
+      </button>
+    </div>
+  )
+
   return (
     <>
-      {/* FAB — bottom-right, above the + quick-add FAB */}
-      <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-1.5 md:bottom-28 md:right-8">
-        {tooltip && (
-          <div className="px-2.5 py-1 bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none">
-            Share feedback
-          </div>
-        )}
-        <button
-          onClick={() => setOpen(true)}
-          onMouseEnter={() => setTooltip(true)}
-          onMouseLeave={() => setTooltip(false)}
-          title="Share feedback"
-          className="w-11 h-11 rounded-full bg-primary-600 hover:bg-primary-700 active:scale-95 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
-        >
-          <MessageSquare className="w-5 h-5" />
-        </button>
-      </div>
-
+      {inline ? btn : (
+        <div className="fixed bottom-36 right-4 z-50 md:bottom-28 md:right-8">{btn}</div>
+      )}
       {open && <FeedbackModal onClose={() => setOpen(false)} />}
     </>
   )
