@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { standupApi } from '../services/api'
+import { standupApi, groupsApi } from '../services/api'
 import { useWorkspace } from '../context/WorkspaceContext'
+import { useAuth } from '../context/AuthContext'
 import {
   Copy, RefreshCw, Loader2, ChevronDown,
   ChevronUp, CheckCheck, AlertCircle, FolderOpen,
-  Calendar, Hash, Clock,
+  Calendar, Hash, Clock, UserCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -337,17 +338,30 @@ function GeneratingState() {
 // ── Main ──────────────────────────────────────────────────────
 export default function Standup() {
   const { activeGroupId } = useWorkspace()
-  const [standup, setStandup]   = useState(null)
-  const [loading, setLoading]   = useState(true)   // start loading immediately
-  const [failed,  setFailed]    = useState(false)
-  const [copied, setCopied]     = useState(false)
-  const [projects, setProjects] = useState([])
+  const { user }          = useAuth()
+  const [standup,       setStandup]       = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [failed,        setFailed]        = useState(false)
+  const [copied,        setCopied]        = useState(false)
+  const [projects,      setProjects]      = useState([])
+  const [groupMembers,  setGroupMembers]  = useState([])
+  const [filterAssignee, setFilterAssignee] = useState('')  // '' | 'unassigned' | <userId>
+
+  // Load group members when workspace changes
+  useEffect(() => {
+    if (!activeGroupId) { setGroupMembers([]); return }
+    groupsApi.get(activeGroupId)
+      .then(res => setGroupMembers(res.data.data?.members || []))
+      .catch(() => {})
+  }, [activeGroupId])
 
   async function generate() {
     setLoading(true)
     setFailed(false)
     try {
-      const res = await standupApi.generate({ group_id: activeGroupId || 'personal' })
+      const payload = { group_id: activeGroupId || 'personal' }
+      if (filterAssignee) payload.assigned_to = filterAssignee
+      const res  = await standupApi.generate(payload)
       const data = res.data.data
       setStandup(data)
       setProjects(data.projects || [])
@@ -362,8 +376,8 @@ export default function Standup() {
     }
   }
 
-  // Auto-generate on mount and when workspace changes
-  useEffect(() => { generate() }, [activeGroupId]) // eslint-disable-line
+  // Auto-generate on mount and when workspace or assignee filter changes
+  useEffect(() => { generate() }, [activeGroupId, filterAssignee]) // eslint-disable-line
 
   async function copyToClipboard() {
     const text = formatAsText(projects, standup?.summary)
@@ -394,14 +408,40 @@ export default function Standup() {
           <h1 className="text-lg font-semibold text-warm-900">Daily Standup</h1>
           <span className="badge badge-purple">AI</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 text-sm text-warm-400">
             <Calendar className="w-3.5 h-3.5" />
             <span>{format(new Date(), 'EEEE, MMMM d')}</span>
           </div>
+
+          {/* Assignee filter — visible only in group workspace */}
+          {groupMembers.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <UserCircle className="w-3.5 h-3.5 text-warm-400" />
+              <select
+                value={filterAssignee}
+                onChange={e => setFilterAssignee(e.target.value)}
+                className="select-inline text-xs min-w-[140px]"
+              >
+                <option value="">All Assignees</option>
+                <option value="unassigned">Unassigned</option>
+                {user && (
+                  <option value={user.id}>Assigned to me</option>
+                )}
+                {groupMembers
+                  .map(m => m.users || m)
+                  .filter(u => u.id !== user?.id)
+                  .map(u => (
+                    <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                  ))
+                }
+              </select>
+            </div>
+          )}
+
           {!loading && (
             <button onClick={generate} className="btn-ghost btn-sm flex items-center gap-1.5">
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Regenerate
+              <RefreshCw className="w-3.5 h-3.5" /> Regenerate
             </button>
           )}
         </div>

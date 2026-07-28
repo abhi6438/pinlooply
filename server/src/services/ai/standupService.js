@@ -3,7 +3,8 @@ import { callGroq } from './groqService.js'
 import { callClaude } from './claudeService.js'
 
 // ── Fetch data needed for standup ─────────────────────────────
-async function fetchStandupData(userId, groupId = null) {
+// assignedTo: null = all, 'unassigned' = no assignee, <uuid> = specific user
+async function fetchStandupData(userId, groupId = null, assignedTo = null) {
   // 1. User's projects (owned + member + group)
   const [{ data: ownedProjects }, { data: memberedProjects }, { data: groupMemberships }] = await Promise.all([
     supabaseAdmin.from('projects').select('id, name, color').eq('user_id', userId),
@@ -43,7 +44,7 @@ async function fetchStandupData(userId, groupId = null) {
 
   // 2. Tasks completed in the last 48h (cast wider net for weekends/gaps)
   const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
-  const { data: recentDone } = await supabaseAdmin
+  let doneQuery = supabaseAdmin
     .from('tasks')
     .select('id, title, type, priority, updated_at, project_id, projects(name)')
     .in('project_id', projectIds)
@@ -51,14 +52,24 @@ async function fetchStandupData(userId, groupId = null) {
     .gte('updated_at', since)
     .order('updated_at', { ascending: false })
 
-  // 3. Pending tasks (not done, assigned to user or unassigned in their projects)
-  const { data: pending } = await supabaseAdmin
+  if (assignedTo === 'unassigned') doneQuery = doneQuery.is('assigned_to', null)
+  else if (assignedTo)             doneQuery = doneQuery.eq('assigned_to', assignedTo)
+
+  const { data: recentDone } = await doneQuery
+
+  // 3. Pending tasks filtered by assignee
+  let pendingQuery = supabaseAdmin
     .from('tasks')
     .select('id, title, type, priority, due_date, project_id, projects(name), assigned_user:assigned_to(name)')
     .in('project_id', projectIds)
     .neq('status', 'done')
     .order('priority', { ascending: true })
     .limit(50)
+
+  if (assignedTo === 'unassigned') pendingQuery = pendingQuery.is('assigned_to', null)
+  else if (assignedTo)             pendingQuery = pendingQuery.eq('assigned_to', assignedTo)
+
+  const { data: pending } = await pendingQuery
 
   return { projects, recentDone: recentDone || [], pending: pending || [] }
 }
@@ -131,7 +142,7 @@ Return ONLY valid JSON (no markdown, no extra text):
 }
 
 // ── Main: generate standup ────────────────────────────────────
-export async function generateStandup(userId, userName, groupId = null) {
+export async function generateStandup(userId, userName, groupId = null, assignedTo = null) {
   // 1. Get AI config + workspace context
   const { data: userData } = await supabaseAdmin
     .from('users')
@@ -152,7 +163,7 @@ export async function generateStandup(userId, userName, groupId = null) {
   const model = aiConfig?.model_name
 
   // 2. Fetch data
-  const { projects, recentDone, pending } = await fetchStandupData(userId, groupId)
+  const { projects, recentDone, pending } = await fetchStandupData(userId, groupId, assignedTo)
 
   // 3. Build prompt + call AI
   const prompt = buildPrompt(projects, recentDone, pending, userName, workspaceCtx)

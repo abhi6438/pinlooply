@@ -9,7 +9,7 @@ const router = Router()
 router.post('/generate', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id
-    const { group_id } = req.body
+    const { group_id, assigned_to } = req.body
 
     // Get user name
     const { data: profile } = await supabaseAdmin
@@ -20,7 +20,7 @@ router.post('/generate', requireAuth, async (req, res) => {
 
     const userName = profile?.name || req.user.email || 'Developer'
 
-    const result = await generateStandup(userId, userName, group_id || null)
+    const result = await generateStandup(userId, userName, group_id || null, assigned_to || null)
     return res.json({ success: true, data: result })
   } catch (err) {
     console.error('Standup generate error:', err)
