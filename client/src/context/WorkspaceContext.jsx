@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from './AuthContext'
 import { workspaceApi, adminApi, groupsApi } from '../services/api'
 import { resolveVocabulary, DEFAULT_VOCABULARY, DEFAULT_MODULES, getProfession } from '../config/professions'
@@ -48,6 +48,7 @@ export function WorkspaceProvider({ children }) {
   const [accentColor,     setAccentColor]     = useState(null)
   const [loading,         setLoading]         = useState(true)
   const [rawVocab,        setRawVocab]        = useState({})
+  const hasLoadedOnce = useRef(false)
 
   // ── DB-driven effective menus (migration 021+) ────────────────
   // When non-null, this is the authoritative list from the server.
@@ -85,7 +86,9 @@ export function WorkspaceProvider({ children }) {
 
   const load = useCallback(async (groupId = null) => {
     if (!user) { setLoading(false); return }
-    setLoading(true)  // always show skeleton while fetching — prevents flash of all-modules
+    // Only show the skeleton on the very first load.
+    // Subsequent silent refreshes keep the existing menu visible.
+    if (!hasLoadedOnce.current) setLoading(true)
     try {
       const res = await workspaceApi.get(groupId)
       const d   = res.data.data || {}
@@ -112,11 +115,16 @@ export function WorkspaceProvider({ children }) {
     } catch {
       // Non-fatal — keep defaults
     } finally {
+      hasLoadedOnce.current = true
       setLoading(false)
     }
   }, [user])
 
-  useEffect(() => { load(activeGroupId) }, [load, activeGroupId])
+  useEffect(() => {
+    // Reset "has loaded" flag when workspace switches so the skeleton shows once for the new workspace
+    hasLoadedOnce.current = false
+    load(activeGroupId)
+  }, [load, activeGroupId])
 
   // ── Save full workspace settings ─────────────────────────────
   // NOTE: we do NOT touch serverEffectiveMenus here — group/global restrictions
