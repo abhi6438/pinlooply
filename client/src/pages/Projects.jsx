@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { projectsApi, tasksApi, publishApi, collectionsApi } from '../services/api'
@@ -552,9 +552,27 @@ function ProjectModal({ project, template, onClose, onSave, onBack }) {
 
 // ── Project Card ──────────────────────────────────────────────
 function ProjectCard({ project, onEdit, onArchive, onShare, publishedSlug }) {
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
-  const health = HEALTH[project.health] ?? HEALTH.good
+  const [menuPos,  setMenuPos]  = useState({ top: 0, right: 0 })
+  const btnRef    = useRef(null)
+  const health    = HEALTH[project.health] ?? HEALTH.good
+
+  // Close menu on outside click
+  const handleOutsideClick = useCallback((e) => {
+    if (btnRef.current && !btnRef.current.contains(e.target)) setMenuOpen(false)
+  }, [])
+  useEffect(() => {
+    if (menuOpen) document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [menuOpen, handleOutsideClick])
+
+  function openMenu(e) {
+    e.stopPropagation()
+    const rect = btnRef.current.getBoundingClientRect()
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    setMenuOpen(o => !o)
+  }
 
   return (
     <div
@@ -576,20 +594,25 @@ function ProjectCard({ project, onEdit, onArchive, onShare, publishedSlug }) {
               )}
             </div>
           </div>
-          <div className="relative flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+          <div className="flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
             {publishedSlug && (
               <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
                 <Globe className="w-2.5 h-2.5" /> Live
               </span>
             )}
             <button
-              onClick={() => setMenuOpen(o => !o)}
+              ref={btnRef}
+              onClick={openMenu}
               className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-warm-400 hover:text-warm-600 hover:bg-warm-100 transition-opacity"
             >
               <MoreVertical className="w-4 h-4" />
             </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-7 w-40 bg-white border border-warm-200 rounded-xl shadow-lg z-10 py-1">
+            {menuOpen && createPortal(
+              <div
+                style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
+                className="w-44 bg-white border border-warm-200 rounded-xl shadow-xl py-1"
+                onMouseDown={e => e.stopPropagation()}
+              >
                 <button
                   onClick={() => { setMenuOpen(false); onShare(project) }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-indigo-600 hover:bg-indigo-50"
@@ -609,7 +632,8 @@ function ProjectCard({ project, onEdit, onArchive, onShare, publishedSlug }) {
                 >
                   <Archive className="w-3.5 h-3.5" /> Archive
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>
