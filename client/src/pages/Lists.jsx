@@ -1233,9 +1233,10 @@ export default function Lists() {
   const [groupMembers, setGroupMembers] = useState([])
 
   // Filters
-  const [filterProject, setFilterProject]   = useState('')
-  const [filterStatus, setFilterStatus]     = useState([])   // list view multi-status
+  const [filterProject,  setFilterProject]  = useState('')
+  const [filterStatus,   setFilterStatus]   = useState([])   // list view multi-status
   const [filterPriority, setFilterPriority] = useState('')
+  const [filterAssignee, setFilterAssignee] = useState('')   // '' = all, 'unassigned' = no assignee, else user id
   const [search, setSearch]                 = useState('')
 
   // UI state
@@ -1432,16 +1433,23 @@ export default function Lists() {
         const normalized = normalizeToWorkflow(t.status, workflow)
         if (!filterStatus.includes(normalized)) return false
       }
+      if (filterAssignee === 'unassigned') {
+        if (t.assigned_to || t.assigned_user) return false
+      } else if (filterAssignee) {
+        const assignedId = t.assigned_user?.id || t.assigned_to
+        if (assignedId !== filterAssignee) return false
+      }
       if (search) {
         const q = search.toLowerCase()
         return (
           t.title.toLowerCase().includes(q) ||
-          (t.projects?.name || '').toLowerCase().includes(q)
+          (t.projects?.name || '').toLowerCase().includes(q) ||
+          (t.assigned_user?.name || '').toLowerCase().includes(q)
         )
       }
       return true
     })
-  }, [tasks, filterProject, filterPriority, filterStatus, search, workflow])
+  }, [tasks, filterProject, filterPriority, filterStatus, filterAssignee, search, workflow])
 
   // Group tasks by status for board view
   const tasksByStatus = useMemo(() => {
@@ -1535,6 +1543,25 @@ export default function Lists() {
             <option value="">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          {/* Assignee filter — only shown when group members exist */}
+          {groupMembers.length > 0 && (
+            <select
+              value={filterAssignee}
+              onChange={e => setFilterAssignee(e.target.value)}
+              className="select-inline min-w-[120px] max-w-[160px]"
+            >
+              <option value="">All Assignees</option>
+              <option value="unassigned">Unassigned</option>
+              {user && <option value={user.id}>Assigned to me</option>}
+              {groupMembers
+                .map(m => m.users || m)
+                .filter(u => u.id !== user?.id)
+                .map(u => (
+                  <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                ))
+              }
+            </select>
+          )}
           {/* Search */}
           <div className="relative flex-1 min-w-[160px] max-w-xs">
             <input
