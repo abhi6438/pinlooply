@@ -492,6 +492,7 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   const [updateInput,      setUpdateInput]      = useState('')
   const [updateType,       setUpdateType]       = useState('update')
   const [submittingUpdate, setSubmittingUpdate] = useState(false)
+  const [loadingUpdates,     setLoadingUpdates]     = useState(true)
   const [aiGenerating,       setAiGenerating]       = useState(false)
   const [confirmDeleteId,    setConfirmDeleteId]    = useState(null)
   const [editingUpdateId,    setEditingUpdateId]    = useState(null)
@@ -512,9 +513,11 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
     timeEntriesApi.list({ task_id: task.id })
       .then(r => setTimeEntries(r.data.data || []))
       .catch(() => {})
+    setLoadingUpdates(true)
     taskUpdatesApi.list(task.id)
       .then(r => setTaskUpdates(r.data.data || []))
       .catch(() => {})
+      .finally(() => setLoadingUpdates(false))
   }, [task.id])
 
   // Timer tick
@@ -1101,7 +1104,25 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
 
             {/* Feed */}
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-              {taskUpdates.length === 0 ? (
+              {loadingUpdates ? (
+                <div className="space-y-3 pt-1">
+                  {[1,2].map(i => (
+                    <div key={i} className="rounded-2xl border border-warm-100 p-4 bg-warm-50 animate-pulse">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-warm-200 flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <div className="flex gap-2 items-center">
+                            <div className="h-3 w-24 bg-warm-200 rounded-full" />
+                            <div className="h-3 w-14 bg-warm-200 rounded-full" />
+                          </div>
+                          <div className="h-3 w-full bg-warm-200 rounded-full" />
+                          <div className="h-3 w-4/5 bg-warm-200 rounded-full" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : taskUpdates.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center py-10">
                   <MessageSquare className="w-8 h-8 text-warm-200 mb-3" />
                   <p className="text-sm font-medium text-warm-400">No updates yet</p>
