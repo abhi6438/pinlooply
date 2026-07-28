@@ -91,8 +91,8 @@ export const tasksApi = {
   assign: (taskId, assignedTo) =>
     api.patch(`/api/tasks/${taskId}/assign`, { assigned_to: assignedTo }),
 
-  suggestUpdate: (taskId) =>
-    api.post(`/api/tasks/${taskId}/suggest-update`),
+  suggestUpdate: (taskId, existingText) =>
+    api.post(`/api/tasks/${taskId}/suggest-update`, existingText ? { existing_text: existingText } : {}),
 }
 
 export const topicsApi = {
@@ -253,9 +253,10 @@ export const timeEntriesApi = {
 }
 
 export const taskUpdatesApi = {
-  list:   (taskId)                      => api.get(`/api/tasks/${taskId}/updates`),
-  create: (taskId, content, updateType) => api.post(`/api/tasks/${taskId}/updates`, { content, update_type: updateType }),
-  delete: (taskId, updateId)            => api.delete(`/api/tasks/${taskId}/updates/${updateId}`),
+  list:   (taskId)                              => api.get(`/api/tasks/${taskId}/updates`),
+  create: (taskId, content, updateType)         => api.post(`/api/tasks/${taskId}/updates`, { content, update_type: updateType }),
+  update: (taskId, updateId, content, type)     => api.patch(`/api/tasks/${taskId}/updates/${updateId}`, { content, update_type: type }),
+  delete: (taskId, updateId)                    => api.delete(`/api/tasks/${taskId}/updates/${updateId}`),
 }
 
 export const searchApi = {

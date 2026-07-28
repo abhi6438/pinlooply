@@ -421,7 +421,21 @@ router.post('/:taskId/suggest-update', requireAuth, async (req, res) => {
       `- ${e.duration_mins}min${e.notes ? ': ' + e.notes : ''}`
     ).join('\n') || 'None'
 
-    const prompt = `You are a helpful assistant writing a task status update for a software/product team.
+    const existingText = req.body?.existing_text?.trim()
+
+    const prompt = existingText
+      ? `You are a professional writing assistant. Improve the following task update message written by a team member. Fix grammar, spelling, and clarity. Keep the original meaning and all technical details intact. Make it professional but natural — not overly formal.
+
+Original message:
+"${existingText}"
+
+Task context:
+- Task: "${taskData?.title}"
+- Status: ${taskData?.status}, Priority: ${taskData?.priority}
+
+Return ONLY valid JSON (no markdown):
+{"suggestion": "improved message here"}`
+      : `You are a helpful assistant writing a task status update for a software/product team.
 
 Task: "${taskData?.title}"
 Project: ${taskData?.projects?.name || 'Unknown'}
@@ -517,6 +531,33 @@ router.post('/:taskId/updates', requireAuth, async (req, res) => {
     return res.json({ success: true, data })
   } catch (err) {
     console.error('Add task update error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// ── PATCH /api/tasks/:taskId/updates/:updateId ────────────────────
+router.patch('/:taskId/updates/:updateId', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { taskId, updateId } = req.params
+    const { content, update_type } = req.body
+
+    if (!content?.trim()) return res.status(400).json({ error: 'Content required' })
+
+    const { data, error } = await supabaseAdmin
+      .from('task_updates')
+      .update({ content: content.trim(), ...(update_type ? { update_type } : {}) })
+      .eq('id', updateId)
+      .eq('task_id', taskId)
+      .eq('user_id', userId)
+      .select('id, update_type, content, created_at, users(id, name, avatar_url)')
+      .single()
+
+    if (error) throw error
+    if (!data) return res.status(403).json({ error: 'Not allowed or not found' })
+    return res.json({ success: true, data })
+  } catch (err) {
+    console.error('Edit task update error:', err)
     return res.status(500).json({ error: err.message })
   }
 })

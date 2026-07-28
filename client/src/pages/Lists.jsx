@@ -492,7 +492,12 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   const [updateInput,      setUpdateInput]      = useState('')
   const [updateType,       setUpdateType]       = useState('update')
   const [submittingUpdate, setSubmittingUpdate] = useState(false)
-  const [aiGenerating,     setAiGenerating]     = useState(false)
+  const [aiGenerating,       setAiGenerating]       = useState(false)
+  const [confirmDeleteId,    setConfirmDeleteId]    = useState(null)
+  const [editingUpdateId,    setEditingUpdateId]    = useState(null)
+  const [editContent,        setEditContent]        = useState('')
+  const [editType,           setEditType]           = useState('update')
+  const [savingEdit,         setSavingEdit]         = useState(false)
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -625,16 +630,50 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   }
 
   async function generateAiUpdate() {
+    if (!updateInput.trim()) return
     setAiGenerating(true)
     try {
-      const r = await tasksApi.suggestUpdate(task.id)
-      setUpdateInput(r.data.suggestion || '')
-      setUpdateType('update')
+      const r = await tasksApi.suggestUpdate(task.id, updateInput.trim())
+      setUpdateInput(r.data.suggestion || updateInput)
     } catch {
-      toast.error('AI could not generate a suggestion')
+      toast.error('AI could not improve the text')
     } finally {
       setAiGenerating(false)
     }
+  }
+
+  function startEdit(upd) {
+    setEditingUpdateId(upd.id)
+    setEditContent(upd.content)
+    setEditType(upd.update_type)
+  }
+
+  function cancelEdit() {
+    setEditingUpdateId(null)
+    setEditContent('')
+  }
+
+  async function saveEditedUpdate() {
+    if (!editContent.trim()) return
+    setSavingEdit(true)
+    try {
+      const r = await taskUpdatesApi.update(task.id, editingUpdateId, editContent.trim(), editType)
+      setTaskUpdates(prev => prev.map(u => u.id === editingUpdateId ? r.data.data : u))
+      setEditingUpdateId(null)
+      setEditContent('')
+      toast.success('Update saved')
+    } catch {
+      toast.error('Failed to save edit')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  async function confirmDeleteUpdate() {
+    if (!confirmDeleteId) return
+    await taskUpdatesApi.delete(task.id, confirmDeleteId).catch(() => {})
+    setTaskUpdates(prev => prev.filter(u => u.id !== confirmDeleteId))
+    setConfirmDeleteId(null)
   }
 
   const UPDATE_TYPES = [
@@ -1001,20 +1040,22 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
                 className="input w-full resize-none text-sm leading-relaxed"
               />
 
-              {/* AI assist + Post row */}
-              <div className="flex items-center gap-2">
-                {/* AI Suggest button */}
-                <button
-                  onClick={generateAiUpdate}
-                  disabled={aiGenerating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 text-xs font-semibold transition-all disabled:opacity-60"
-                >
-                  {aiGenerating
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Sparkles className="w-3.5 h-3.5" />
-                  }
-                  {aiGenerating ? 'Generating...' : 'AI Draft'}
-                </button>
+              {/* Action row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {updateInput.trim() && (
+                  <button
+                    onClick={generateAiUpdate}
+                    disabled={aiGenerating}
+                    title="Improve grammar, spelling and clarity with AI"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 text-xs font-semibold transition-all disabled:opacity-60"
+                  >
+                    {aiGenerating
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Sparkles className="w-3.5 h-3.5" />
+                    }
+                    {aiGenerating ? 'Improving...' : 'Improve with AI'}
+                  </button>
+                )}
                 {updateInput && (
                   <button
                     onClick={() => { setUpdateInput(''); setUpdateType('update') }}
@@ -1036,6 +1077,28 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
               </div>
             </div>
 
+            {/* Confirm delete dialog */}
+            {confirmDeleteId && (
+              <div className="mx-5 my-2 p-4 bg-red-50 border border-red-200 rounded-2xl flex-shrink-0">
+                <p className="text-sm font-semibold text-red-700 mb-1">Delete this update?</p>
+                <p className="text-xs text-red-500 mb-3">This cannot be undone.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={confirmDeleteUpdate}
+                    className="flex-1 py-1.5 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                  >
+                    Yes, Delete
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="flex-1 py-1.5 rounded-xl bg-warm-100 text-warm-700 text-xs font-semibold hover:bg-warm-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Feed */}
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
               {taskUpdates.length === 0 ? (
@@ -1049,6 +1112,8 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
                 const name = upd.users?.name || 'Team member'
                 const initials = name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
                 const isOwn = upd.users?.id === user?.id
+                const isEditing = editingUpdateId === upd.id
+
                 return (
                   <div key={upd.id} className={`rounded-2xl border p-4 ${st.bg}`}>
                     <div className="flex items-start gap-3">
@@ -1057,6 +1122,7 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
                         : <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">{initials}</div>
                       }
                       <div className="flex-1 min-w-0">
+                        {/* Header row */}
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <span className="text-sm font-semibold text-warm-900">{name}</span>
                           <span className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${st.badge}`}>
@@ -1066,17 +1132,72 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
                           <span className="ml-auto text-xs text-warm-400 flex-shrink-0">
                             {new Date(upd.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                           </span>
-                          {isOwn && (
-                            <button
-                              onClick={() => deleteUpdate(upd.id)}
-                              className="text-warm-300 hover:text-red-500 transition-colors"
-                              title="Delete"
-                            >
+                          {isOwn && !isEditing && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => startEdit(upd)}
+                                className="text-warm-300 hover:text-primary-500 transition-colors"
+                                title="Edit"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(upd.id)}
+                                className="text-warm-300 hover:text-red-500 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                          {isEditing && (
+                            <button onClick={cancelEdit} className="text-warm-300 hover:text-warm-600 transition-colors" title="Cancel edit">
                               <X className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>
-                        <p className="text-sm text-warm-800 leading-relaxed whitespace-pre-line">{upd.content}</p>
+
+                        {/* Content or edit form */}
+                        {isEditing ? (
+                          <div className="space-y-2 mt-1">
+                            {/* Edit type pills */}
+                            <div className="flex gap-1 flex-wrap">
+                              {UPDATE_TYPES.map(t => (
+                                <button
+                                  key={t.key}
+                                  onClick={() => setEditType(t.key)}
+                                  className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-all ${
+                                    editType === t.key ? t.activePill : 'bg-white text-warm-400 border-warm-200 hover:bg-warm-50'
+                                  }`}
+                                >
+                                  {t.icon}{t.label}
+                                </button>
+                              ))}
+                            </div>
+                            <textarea
+                              value={editContent}
+                              onChange={e => setEditContent(e.target.value)}
+                              rows={3}
+                              className="input w-full resize-none text-sm"
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={saveEditedUpdate}
+                                disabled={savingEdit || !editContent.trim()}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-600 text-white text-xs font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                              >
+                                {savingEdit ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                Save
+                              </button>
+                              <button onClick={cancelEdit} className="px-3 py-1.5 rounded-xl bg-warm-100 text-warm-600 text-xs font-semibold hover:bg-warm-200 transition-colors">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-warm-800 leading-relaxed whitespace-pre-line">{upd.content}</p>
+                        )}
                       </div>
                     </div>
                   </div>
