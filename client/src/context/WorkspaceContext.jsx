@@ -118,13 +118,23 @@ export function WorkspaceProvider({ children }) {
       hasLoadedOnce.current = true
       setLoading(false)
     }
-  }, [user])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])  // ← user?.id is a stable string; using the full user object causes re-runs on every render
 
+  // Separate effect: reset hasLoadedOnce only when the workspace (group) actually changes
+  const prevGroupId = useRef(activeGroupId)
   useEffect(() => {
-    // Reset "has loaded" flag when workspace switches so the skeleton shows once for the new workspace
-    hasLoadedOnce.current = false
+    if (prevGroupId.current !== activeGroupId) {
+      hasLoadedOnce.current = false
+      prevGroupId.current = activeGroupId
+    }
+  }, [activeGroupId])
+
+  // Main load effect: runs when user or active workspace changes
+  useEffect(() => {
     load(activeGroupId)
-  }, [load, activeGroupId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, activeGroupId])
 
   // ── Save full workspace settings ─────────────────────────────
   // NOTE: we do NOT touch serverEffectiveMenus here — group/global restrictions
