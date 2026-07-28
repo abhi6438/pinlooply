@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { supabaseAdmin } from '../config/supabase.js'
 import { onStatusChange, spawnRecurringTask } from '../services/automationEngine.js'
+import { callGroq } from '../services/ai/groqService.js'
+import { callClaude } from '../services/ai/claudeService.js'
 
 const router = Router()
 
@@ -380,6 +382,90 @@ router.delete('/:taskId', requireAuth, async (req, res) => {
     return res.json({ success: true })
   } catch (err) {
     console.error('Delete task error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// ── POST /api/tasks/:taskId/suggest-update ───────────────────────
+router.post('/:taskId/suggest-update', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { taskId } = req.params
+
+    const task = await canAccessTask(taskId, userId)
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+
+    // Fetch full task details + recent updates + time entries
+    const [{ data: taskData }, { data: recentUpdates }, { data: timeEntries }] = await Promise.all([
+      supabaseAdmin.from('tasks')
+        .select('title, description, status, priority, due_date, projects(name), assigned_user:assigned_to(name)')
+        .eq('id', taskId).single(),
+      supabaseAdmin.from('task_updates')
+        .select('update_type, content, created_at, users(name)')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabaseAdmin.from('time_entries')
+        .select('duration_mins, notes, logged_at')
+        .eq('task_id', taskId)
+        .order('logged_at', { ascending: false })
+        .limit(5),
+    ])
+
+    // Build prompt
+    const recentUpdatesText = (recentUpdates || []).map(u =>
+      `- [${u.update_type}] ${u.users?.name || 'Someone'}: "${u.content}"`
+    ).join('\n') || 'None'
+
+    const timeText = (timeEntries || []).map(e =>
+      `- ${e.duration_mins}min${e.notes ? ': ' + e.notes : ''}`
+    ).join('\n') || 'None'
+
+    const prompt = `You are a helpful assistant writing a task status update for a software/product team.
+
+Task: "${taskData?.title}"
+Project: ${taskData?.projects?.name || 'Unknown'}
+Status: ${taskData?.status || 'unknown'}
+Priority: ${taskData?.priority || 'medium'}
+Due: ${taskData?.due_date || 'no due date'}
+Description: ${taskData?.description || 'none'}
+Assigned to: ${taskData?.assigned_user?.name || 'unassigned'}
+
+Recent updates from team:
+${recentUpdatesText}
+
+Time logged recently:
+${timeText}
+
+Write a concise, professional status update (3-5 sentences) summarizing current progress, what was recently done, and any next steps or concerns.
+Do NOT make up specific details not mentioned above.
+
+Return ONLY valid JSON (no markdown, no extra text):
+{"suggestion": "your status update text here"}`
+
+    // Get AI config for this user
+    const { data: userData } = await supabaseAdmin.from('users').select('plan').eq('id', userId).single()
+    const plan = userData?.plan || 'free'
+    const { data: aiConfig } = await supabaseAdmin.from('ai_config').select('provider, model_name').eq('plan_type', plan).single()
+    const provider = aiConfig?.provider || 'groq'
+
+    let suggestion
+    try {
+      let r
+      if (provider === 'claude') {
+        r = await callClaude(prompt, aiConfig?.model_name)
+      } else {
+        r = await callGroq(prompt, aiConfig?.model_name || 'llama3-8b-8192')
+      }
+      suggestion = r?.suggestion || (typeof r === 'string' ? r : JSON.stringify(r))
+    } catch {
+      // Fallback: simple rule-based suggestion
+      suggestion = `Working on "${taskData?.title}" (${taskData?.status}, ${taskData?.priority} priority).${taskData?.due_date ? ` Due ${taskData.due_date}.` : ''} ${recentUpdates?.length ? 'Team has posted recent updates above.' : 'No recent activity logged yet.'}`
+    }
+
+    return res.json({ success: true, suggestion: suggestion.trim() })
+  } catch (err) {
+    console.error('AI suggest-update error:', err)
     return res.status(500).json({ error: err.message })
   }
 })

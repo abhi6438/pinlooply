@@ -90,6 +90,9 @@ export const tasksApi = {
 
   assign: (taskId, assignedTo) =>
     api.patch(`/api/tasks/${taskId}/assign`, { assigned_to: assignedTo }),
+
+  suggestUpdate: (taskId) =>
+    api.post(`/api/tasks/${taskId}/suggest-update`),
 }
 
 export const topicsApi = {

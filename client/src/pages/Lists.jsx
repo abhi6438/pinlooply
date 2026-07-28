@@ -10,7 +10,7 @@ import {
   LayoutGrid, List, Plus, ChevronDown, X, Loader2,
   RefreshCw, Calendar, Tag, UserCircle, Trash2, Check,
   AlertTriangle, Clock, UserPlus, Play, Square, Timer, Pencil,
-  MessageSquare, ShieldAlert, Lightbulb, CheckCheck, Send,
+  MessageSquare, ShieldAlert, Lightbulb, CheckCheck, Send, Sparkles,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -492,6 +492,7 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   const [updateInput,      setUpdateInput]      = useState('')
   const [updateType,       setUpdateType]       = useState('update')
   const [submittingUpdate, setSubmittingUpdate] = useState(false)
+  const [aiGenerating,     setAiGenerating]     = useState(false)
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -623,29 +624,61 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
     setTaskUpdates(prev => prev.filter(u => u.id !== updateId))
   }
 
+  async function generateAiUpdate() {
+    setAiGenerating(true)
+    try {
+      const r = await tasksApi.suggestUpdate(task.id)
+      setUpdateInput(r.data.suggestion || '')
+      setUpdateType('update')
+    } catch {
+      toast.error('AI could not generate a suggestion')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
+  const UPDATE_TYPES = [
+    { key: 'update',   label: 'Update',   icon: <MessageSquare className="w-3.5 h-3.5" />, pill: 'bg-blue-50 text-blue-600 border-blue-200',   activePill: 'bg-blue-600 text-white border-blue-600' },
+    { key: 'blocker',  label: 'Blocker',  icon: <ShieldAlert className="w-3.5 h-3.5" />,   pill: 'bg-red-50 text-red-600 border-red-200',     activePill: 'bg-red-600 text-white border-red-600' },
+    { key: 'opinion',  label: 'Opinion',  icon: <Lightbulb className="w-3.5 h-3.5" />,     pill: 'bg-amber-50 text-amber-600 border-amber-200', activePill: 'bg-amber-500 text-white border-amber-500' },
+    { key: 'resolved', label: 'Resolved', icon: <CheckCheck className="w-3.5 h-3.5" />,    pill: 'bg-green-50 text-green-600 border-green-200', activePill: 'bg-green-600 text-white border-green-600' },
+  ]
+  const typeStyleMap = {
+    update:   { bg: 'bg-blue-50 border-blue-100',   badge: 'bg-blue-100 text-blue-600',    icon: <MessageSquare className="w-3 h-3" /> },
+    blocker:  { bg: 'bg-red-50 border-red-100',     badge: 'bg-red-100 text-red-600',      icon: <ShieldAlert className="w-3 h-3" /> },
+    opinion:  { bg: 'bg-amber-50 border-amber-100', badge: 'bg-amber-100 text-amber-600',  icon: <Lightbulb className="w-3 h-3" /> },
+    resolved: { bg: 'bg-green-50 border-green-100', badge: 'bg-green-100 text-green-700',  icon: <CheckCheck className="w-3 h-3" /> },
+  }
+
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-warm-200 shadow-2xl z-50 flex flex-col">
-      {/* Panel header */}
-      <div className={`px-5 py-4 border-b border-warm-200 ${wf.headerBg}`}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${wf.dotColor}`} />
-            <span className={`text-xs font-semibold uppercase tracking-wide ${wf.textColor}`}>{wf.label}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-warm-200">
+
+        {/* ── Modal header ── */}
+        <div className={`px-6 py-4 border-b border-warm-200 ${wf.headerBg} flex items-center justify-between gap-4 flex-shrink-0`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <span className={`w-3 h-3 rounded-full flex-shrink-0 ${wf.dotColor}`} />
+            <StatusBadge
+              status={task.status}
+              onChange={newStatus => onStatusChange(task.id, newStatus)}
+              workflow={workflow}
+            />
+            {task.projects && (
+              <span className="text-xs text-warm-400 truncate hidden sm:block">
+                {task.projects.name}
+              </span>
+            )}
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/10 text-warm-500 hover:text-warm-900">
-            <X className="w-4 h-4" />
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/10 text-warm-500 hover:text-warm-900 flex-shrink-0">
+            <X className="w-5 h-5" />
           </button>
         </div>
-        {/* Status dropdown */}
-        <StatusBadge
-          status={task.status}
-          onChange={newStatus => onStatusChange(task.id, newStatus)}
-          workflow={workflow}
-        />
-      </div>
 
-      {/* Panel body */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {/* ── Two-column body ── */}
+        <div className="flex-1 overflow-hidden flex min-h-0">
+
+          {/* ── LEFT: task fields ── */}
+          <div className="w-[52%] border-r border-warm-200 overflow-y-auto p-6 space-y-4 flex-shrink-0">
         {/* Title */}
         <div>
           <label className="label">Title</label>
@@ -917,137 +950,166 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
             ))}
           </div>
         )}
-        {/* ── Task Updates / Activity Feed ─── */}
-        <div className="border-t border-warm-100 pt-3 space-y-3">
-          <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide flex items-center gap-1.5">
-            <MessageSquare className="w-3.5 h-3.5" />
-            Updates
-            {taskUpdates.length > 0 && (
-              <span className="ml-1 bg-primary-100 text-primary-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {taskUpdates.length}
-              </span>
-            )}
-          </p>
+        </div>{/* end left column */}
 
-          {/* Update type selector + input */}
-          <div className="space-y-2">
-            {/* Type pills */}
-            <div className="flex gap-1.5 flex-wrap">
-              {[
-                { key: 'update',   label: 'Update',   icon: <MessageSquare className="w-3 h-3" />,  cls: 'bg-blue-50 text-blue-600 border-blue-200' },
-                { key: 'blocker',  label: 'Blocker',  icon: <ShieldAlert className="w-3 h-3" />,    cls: 'bg-red-50 text-red-600 border-red-200' },
-                { key: 'opinion',  label: 'Opinion',  icon: <Lightbulb className="w-3 h-3" />,      cls: 'bg-amber-50 text-amber-600 border-amber-200' },
-                { key: 'resolved', label: 'Resolved', icon: <CheckCheck className="w-3 h-3" />,     cls: 'bg-green-50 text-green-600 border-green-200' },
-              ].map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setUpdateType(t.key)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-all ${
-                    updateType === t.key ? t.cls + ' ring-1 ring-offset-0 ring-current' : 'bg-warm-50 text-warm-400 border-warm-200 hover:bg-warm-100'
-                  }`}
-                >
-                  {t.icon}{t.label}
-                </button>
-              ))}
+          {/* ── RIGHT: Updates panel ── */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Right header */}
+            <div className="px-5 py-3 border-b border-warm-200 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-warm-700 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-primary-500" />
+                  Updates
+                  {taskUpdates.length > 0 && (
+                    <span className="bg-primary-100 text-primary-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {taskUpdates.length}
+                    </span>
+                  )}
+                </h3>
+              </div>
             </div>
 
-            {/* Textarea + submit */}
-            <div className="flex gap-2 items-end">
+            {/* Compose area */}
+            <div className="px-5 py-4 border-b border-warm-100 flex-shrink-0 space-y-3">
+              {/* Type selector */}
+              <div className="flex gap-1.5 flex-wrap">
+                {UPDATE_TYPES.map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => setUpdateType(t.key)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                      updateType === t.key ? t.activePill : 'bg-warm-50 text-warm-500 border-warm-200 hover:bg-warm-100'
+                    }`}
+                  >
+                    {t.icon}{t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Textarea */}
               <textarea
                 value={updateInput}
                 onChange={e => setUpdateInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submitUpdate() }}
-                rows={2}
+                rows={4}
                 placeholder={
-                  updateType === 'blocker'  ? 'Describe the blocker...' :
-                  updateType === 'opinion'  ? 'Share your opinion...' :
-                  updateType === 'resolved' ? 'What was resolved?' :
-                                              'Latest update? Ctrl+Enter to post'
+                  updateType === 'blocker'  ? 'Describe what is blocking progress...' :
+                  updateType === 'opinion'  ? 'Share your opinion or suggestion...' :
+                  updateType === 'resolved' ? 'What was resolved and how?' :
+                                              'What is the latest status? What got done, what is next?'
                 }
-                className="input flex-1 resize-none text-sm"
+                className="input w-full resize-none text-sm leading-relaxed"
               />
-              <button
-                onClick={submitUpdate}
-                disabled={submittingUpdate || !updateInput.trim()}
-                className="btn btn-primary btn-sm flex-shrink-0 mb-0.5"
-              >
-                {submittingUpdate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          </div>
 
-          {/* Updates list */}
-          {taskUpdates.length > 0 && (
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {taskUpdates.map(upd => {
-                const typeStyles = {
-                  blocker:  { bg: 'bg-red-50 border-red-100',    badge: 'bg-red-100 text-red-600',    icon: <ShieldAlert className="w-3 h-3" /> },
-                  opinion:  { bg: 'bg-amber-50 border-amber-100', badge: 'bg-amber-100 text-amber-600', icon: <Lightbulb className="w-3 h-3" /> },
-                  resolved: { bg: 'bg-green-50 border-green-100', badge: 'bg-green-100 text-green-700', icon: <CheckCheck className="w-3 h-3" /> },
-                  update:   { bg: 'bg-blue-50 border-blue-100',   badge: 'bg-blue-100 text-blue-600',   icon: <MessageSquare className="w-3 h-3" /> },
-                }
-                const st = typeStyles[upd.update_type] || typeStyles.update
+              {/* AI assist + Post row */}
+              <div className="flex items-center gap-2">
+                {/* AI Suggest button */}
+                <button
+                  onClick={generateAiUpdate}
+                  disabled={aiGenerating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 text-xs font-semibold transition-all disabled:opacity-60"
+                >
+                  {aiGenerating
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Sparkles className="w-3.5 h-3.5" />
+                  }
+                  {aiGenerating ? 'Generating...' : 'AI Draft'}
+                </button>
+                {updateInput && (
+                  <button
+                    onClick={() => { setUpdateInput(''); setUpdateType('update') }}
+                    className="text-xs text-warm-400 hover:text-warm-600 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+                <div className="flex-1" />
+                <span className="text-[10px] text-warm-400 hidden sm:block">Ctrl+Enter to post</span>
+                <button
+                  onClick={submitUpdate}
+                  disabled={submittingUpdate || !updateInput.trim()}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-all disabled:opacity-50"
+                >
+                  {submittingUpdate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Post
+                </button>
+              </div>
+            </div>
+
+            {/* Feed */}
+            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+              {taskUpdates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center py-10">
+                  <MessageSquare className="w-8 h-8 text-warm-200 mb-3" />
+                  <p className="text-sm font-medium text-warm-400">No updates yet</p>
+                  <p className="text-xs text-warm-300 mt-1">Post a status update, flag a blocker, or share your opinion above.</p>
+                </div>
+              ) : taskUpdates.map(upd => {
+                const st = typeStyleMap[upd.update_type] || typeStyleMap.update
                 const name = upd.users?.name || 'Team member'
                 const initials = name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
                 const isOwn = upd.users?.id === user?.id
                 return (
-                  <div key={upd.id} className={`rounded-xl border p-3 ${st.bg}`}>
-                    <div className="flex items-start gap-2">
-                      {/* Avatar */}
+                  <div key={upd.id} className={`rounded-2xl border p-4 ${st.bg}`}>
+                    <div className="flex items-start gap-3">
                       {upd.users?.avatar_url
-                        ? <img src={upd.users.avatar_url} alt={name} className="w-6 h-6 rounded-full object-cover flex-shrink-0 mt-0.5" />
-                        : <div className="w-6 h-6 rounded-full bg-primary-500 text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{initials}</div>
+                        ? <img src={upd.users.avatar_url} alt={name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                        : <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">{initials}</div>
                       }
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-xs font-semibold text-warm-800">{name}</span>
-                          <span className={`flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${st.badge}`}>
-                            {st.icon}{upd.update_type.charAt(0).toUpperCase() + upd.update_type.slice(1)}
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span className="text-sm font-semibold text-warm-900">{name}</span>
+                          <span className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${st.badge}`}>
+                            {st.icon}
+                            {upd.update_type.charAt(0).toUpperCase() + upd.update_type.slice(1)}
                           </span>
-                          <span className="ml-auto text-[10px] text-warm-400">
+                          <span className="ml-auto text-xs text-warm-400 flex-shrink-0">
                             {new Date(upd.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                           </span>
                           {isOwn && (
                             <button
                               onClick={() => deleteUpdate(upd.id)}
-                              className="text-warm-300 hover:text-red-500 transition-colors ml-0.5"
+                              className="text-warm-300 hover:text-red-500 transition-colors"
+                              title="Delete"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>
-                        <p className="text-xs text-warm-700 leading-relaxed whitespace-pre-line">{upd.content}</p>
+                        <p className="text-sm text-warm-800 leading-relaxed whitespace-pre-line">{upd.content}</p>
                       </div>
                     </div>
                   </div>
                 )
               })}
             </div>
-          )}
-        </div>
-      </div>
+          </div>{/* end right column */}
 
-      {/* Panel footer */}
-      <div className="px-5 py-4 border-t border-warm-200 flex items-center gap-2">
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className="btn btn-sm text-red-600 hover:bg-red-50 border border-red-200"
-        >
-          {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-          Delete
-        </button>
-        <div className="flex-1" />
-        <button onClick={onClose} className="btn btn-secondary btn-sm">Cancel</button>
-        <button
-          onClick={save}
-          disabled={!title.trim() || saving}
-          className="btn btn-primary btn-sm"
-        >
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          Save
-        </button>
-      </div>
+        </div>{/* end two-column body */}
+
+        {/* ── Modal footer ── */}
+        <div className="px-6 py-4 border-t border-warm-200 flex items-center gap-2 flex-shrink-0 bg-warm-50">
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="btn btn-sm text-red-600 hover:bg-red-50 border border-red-200"
+          >
+            {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            Delete
+          </button>
+          <div className="flex-1" />
+          <button onClick={onClose} className="btn btn-secondary btn-sm">Cancel</button>
+          <button
+            onClick={save}
+            disabled={!title.trim() || saving}
+            className="btn btn-primary btn-sm"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            Save Changes
+          </button>
+        </div>
+
+      </div>{/* end modal card */}
     </div>
   )
 }
