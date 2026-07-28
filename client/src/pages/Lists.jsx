@@ -4,12 +4,13 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useWorkspace } from '../context/WorkspaceContext'
 import { useProjectStore } from '../stores/useProjectStore'
-import { tasksApi, groupsApi, customFieldsApi, timeEntriesApi } from '../services/api'
+import { tasksApi, groupsApi, customFieldsApi, timeEntriesApi, taskUpdatesApi } from '../services/api'
 import { STATUS_COLORS } from '../config/statuses'
 import {
   LayoutGrid, List, Plus, ChevronDown, X, Loader2,
   RefreshCw, Calendar, Tag, UserCircle, Trash2, Check,
   AlertTriangle, Clock, UserPlus, Play, Square, Timer, Pencil,
+  MessageSquare, ShieldAlert, Lightbulb, CheckCheck, Send,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -486,7 +487,13 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   // Custom fields
   const [customFields,  setCustomFields]  = useState([])
   const [fieldValues,   setFieldValues]   = useState({})
+  // Task updates / activity feed
+  const [taskUpdates,      setTaskUpdates]      = useState([])
+  const [updateInput,      setUpdateInput]      = useState('')
+  const [updateType,       setUpdateType]       = useState('update')
+  const [submittingUpdate, setSubmittingUpdate] = useState(false)
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   // Load custom field definitions + task values + time entries on mount
   useEffect(() => {
@@ -498,6 +505,9 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
       .catch(() => {})
     timeEntriesApi.list({ task_id: task.id })
       .then(r => setTimeEntries(r.data.data || []))
+      .catch(() => {})
+    taskUpdatesApi.list(task.id)
+      .then(r => setTaskUpdates(r.data.data || []))
       .catch(() => {})
   }, [task.id])
 
@@ -590,6 +600,27 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   function handleDelete() {
     // Calls requestDelete in parent which shows the custom modal
     onDelete(task.id, task.title)
+  }
+
+  async function submitUpdate() {
+    if (!updateInput.trim()) return
+    setSubmittingUpdate(true)
+    try {
+      const r = await taskUpdatesApi.create(task.id, updateInput.trim(), updateType)
+      setTaskUpdates(prev => [r.data.data, ...prev])
+      setUpdateInput('')
+      setUpdateType('update')
+      toast.success('Update posted')
+    } catch {
+      toast.error('Failed to post update')
+    } finally {
+      setSubmittingUpdate(false)
+    }
+  }
+
+  async function deleteUpdate(updateId) {
+    await taskUpdatesApi.delete(task.id, updateId).catch(() => {})
+    setTaskUpdates(prev => prev.filter(u => u.id !== updateId))
   }
 
   return (
@@ -886,6 +917,114 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
             ))}
           </div>
         )}
+        {/* ── Task Updates / Activity Feed ─── */}
+        <div className="border-t border-warm-100 pt-3 space-y-3">
+          <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5" />
+            Updates
+            {taskUpdates.length > 0 && (
+              <span className="ml-1 bg-primary-100 text-primary-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {taskUpdates.length}
+              </span>
+            )}
+          </p>
+
+          {/* Update type selector + input */}
+          <div className="space-y-2">
+            {/* Type pills */}
+            <div className="flex gap-1.5 flex-wrap">
+              {[
+                { key: 'update',   label: 'Update',   icon: <MessageSquare className="w-3 h-3" />,  cls: 'bg-blue-50 text-blue-600 border-blue-200' },
+                { key: 'blocker',  label: 'Blocker',  icon: <ShieldAlert className="w-3 h-3" />,    cls: 'bg-red-50 text-red-600 border-red-200' },
+                { key: 'opinion',  label: 'Opinion',  icon: <Lightbulb className="w-3 h-3" />,      cls: 'bg-amber-50 text-amber-600 border-amber-200' },
+                { key: 'resolved', label: 'Resolved', icon: <CheckCheck className="w-3 h-3" />,     cls: 'bg-green-50 text-green-600 border-green-200' },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setUpdateType(t.key)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-all ${
+                    updateType === t.key ? t.cls + ' ring-1 ring-offset-0 ring-current' : 'bg-warm-50 text-warm-400 border-warm-200 hover:bg-warm-100'
+                  }`}
+                >
+                  {t.icon}{t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Textarea + submit */}
+            <div className="flex gap-2 items-end">
+              <textarea
+                value={updateInput}
+                onChange={e => setUpdateInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submitUpdate() }}
+                rows={2}
+                placeholder={
+                  updateType === 'blocker'  ? 'Describe the blocker…' :
+                  updateType === 'opinion'  ? 'Share your opinion…' :
+                  updateType === 'resolved' ? 'What was resolved?' :
+                                              'What's the latest? (Ctrl+Enter to post)'
+                }
+                className="input flex-1 resize-none text-sm"
+              />
+              <button
+                onClick={submitUpdate}
+                disabled={submittingUpdate || !updateInput.trim()}
+                className="btn btn-primary btn-sm flex-shrink-0 mb-0.5"
+              >
+                {submittingUpdate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Updates list */}
+          {taskUpdates.length > 0 && (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {taskUpdates.map(upd => {
+                const typeStyles = {
+                  blocker:  { bg: 'bg-red-50 border-red-100',    badge: 'bg-red-100 text-red-600',    icon: <ShieldAlert className="w-3 h-3" /> },
+                  opinion:  { bg: 'bg-amber-50 border-amber-100', badge: 'bg-amber-100 text-amber-600', icon: <Lightbulb className="w-3 h-3" /> },
+                  resolved: { bg: 'bg-green-50 border-green-100', badge: 'bg-green-100 text-green-700', icon: <CheckCheck className="w-3 h-3" /> },
+                  update:   { bg: 'bg-blue-50 border-blue-100',   badge: 'bg-blue-100 text-blue-600',   icon: <MessageSquare className="w-3 h-3" /> },
+                }
+                const st = typeStyles[upd.update_type] || typeStyles.update
+                const name = upd.users?.name || 'Team member'
+                const initials = name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+                const isOwn = upd.users?.id === user?.id
+                return (
+                  <div key={upd.id} className={`rounded-xl border p-3 ${st.bg}`}>
+                    <div className="flex items-start gap-2">
+                      {/* Avatar */}
+                      {upd.users?.avatar_url
+                        ? <img src={upd.users.avatar_url} alt={name} className="w-6 h-6 rounded-full object-cover flex-shrink-0 mt-0.5" />
+                        : <div className="w-6 h-6 rounded-full bg-primary-500 text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{initials}</div>
+                      }
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-xs font-semibold text-warm-800">{name}</span>
+                          <span className={`flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${st.badge}`}>
+                            {st.icon}{upd.update_type.charAt(0).toUpperCase() + upd.update_type.slice(1)}
+                          </span>
+                          <span className="ml-auto text-[10px] text-warm-400">
+                            {new Date(upd.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                          {isOwn && (
+                            <button
+                              onClick={() => deleteUpdate(upd.id)}
+                              className="text-warm-300 hover:text-red-500 transition-colors ml-0.5"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-xs text-warm-700 leading-relaxed whitespace-pre-line">{upd.content}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Panel footer */}

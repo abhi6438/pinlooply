@@ -249,6 +249,12 @@ export const timeEntriesApi = {
   delete: (id)             => api.delete(`/api/time-entries/${id}`),
 }
 
+export const taskUpdatesApi = {
+  list:   (taskId)                      => api.get(`/api/tasks/${taskId}/updates`),
+  create: (taskId, content, updateType) => api.post(`/api/tasks/${taskId}/updates`, { content, update_type: updateType }),
+  delete: (taskId, updateId)            => api.delete(`/api/tasks/${taskId}/updates/${updateId}`),
+}
+
 export const searchApi = {
   query: (q, { groupId, limit = 20 } = {}) => api.get('/api/search', {
     params: { q, limit, group_id: groupId || 'personal' },

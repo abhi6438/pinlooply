@@ -384,4 +384,77 @@ router.delete('/:taskId', requireAuth, async (req, res) => {
   }
 })
 
+// ── GET /api/tasks/:taskId/updates ───────────────────────────────
+router.get('/:taskId/updates', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { taskId } = req.params
+    const task = await canAccessTask(taskId, userId)
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+
+    const { data, error } = await supabaseAdmin
+      .from('task_updates')
+      .select('id, update_type, content, created_at, users(id, name, avatar_url)')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return res.json({ success: true, data: data || [] })
+  } catch (err) {
+    console.error('List task updates error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// ── POST /api/tasks/:taskId/updates ──────────────────────────────
+router.post('/:taskId/updates', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { taskId } = req.params
+    const { content, update_type = 'update' } = req.body
+
+    if (!content?.trim()) return res.status(400).json({ error: 'Content required' })
+
+    const VALID_TYPES = ['update', 'blocker', 'opinion', 'resolved']
+    const type = VALID_TYPES.includes(update_type) ? update_type : 'update'
+
+    const task = await canAccessTask(taskId, userId)
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+
+    const { data, error } = await supabaseAdmin
+      .from('task_updates')
+      .insert({ task_id: taskId, user_id: userId, update_type: type, content: content.trim() })
+      .select('id, update_type, content, created_at, users(id, name, avatar_url)')
+      .single()
+
+    if (error) throw error
+    return res.json({ success: true, data })
+  } catch (err) {
+    console.error('Add task update error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// ── DELETE /api/tasks/:taskId/updates/:updateId ───────────────────
+router.delete('/:taskId/updates/:updateId', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { taskId, updateId } = req.params
+
+    // Only the author can delete
+    const { error } = await supabaseAdmin
+      .from('task_updates')
+      .delete()
+      .eq('id', updateId)
+      .eq('task_id', taskId)
+      .eq('user_id', userId)
+
+    if (error) throw error
+    return res.json({ success: true })
+  } catch (err) {
+    console.error('Delete task update error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
 export default router
