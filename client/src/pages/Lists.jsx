@@ -959,10 +959,10 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
                 onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submitUpdate() }}
                 rows={2}
                 placeholder={
-                  updateType === 'blocker'  ? 'Describe the blocker…' :
-                  updateType === 'opinion'  ? 'Share your opinion…' :
-                  updateType === 'resolved' ? 'What was resolved?' :
-                                              "What’s the latest? (Ctrl+Enter to post)"
+                  updateType === ‘blocker’  ? ‘Describe the blocker...’ :
+                  updateType === ‘opinion’  ? ‘Share your opinion...’ :
+                  updateType === ‘resolved’ ? ‘What was resolved?’ :
+                                              ‘Latest update? Ctrl+Enter to post’
                 }
                 className="input flex-1 resize-none text-sm"
               />
