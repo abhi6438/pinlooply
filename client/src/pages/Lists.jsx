@@ -1202,8 +1202,9 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
 
                 {/* Existing links */}
                 {loadingLinks ? (
-                  <div className="space-y-1.5">
-                    {[1,2].map(i => <div key={i} className="h-8 bg-warm-100 rounded-lg animate-pulse" />)}
+                  <div className="flex items-center gap-1.5 py-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-warm-300" />
+                    <span className="text-xs text-warm-400">Loading…</span>
                   </div>
                 ) : taskLinks.length > 0 ? (
                   <div className="space-y-1">
@@ -1263,8 +1264,8 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
               </div>
             </div>
 
-            {/* Compose area — hidden when task has linked tasks */}
-            {!taskLinks.length ? (
+            {/* Compose area — always visible */}
+            {true ? (
             <div className="px-5 py-4 border-b border-warm-100 flex-shrink-0 space-y-3">
               {/* Type selector */}
               <div className="flex gap-1.5 flex-wrap">
@@ -1332,14 +1333,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                 </button>
               </div>
             </div>
-            ) : (
-            <div className="px-5 py-3 border-b border-warm-100 flex-shrink-0">
-              <p className="text-xs text-warm-400 italic flex items-center gap-1.5">
-                <Link2 className="w-3.5 h-3.5 text-warm-300" />
-                Updates are tracked on linked tasks. Click a linked task above to open it.
-              </p>
-            </div>
-            )}
+            ) : null}
 
             {/* Confirm delete dialog */}
             {confirmDeleteId && (
