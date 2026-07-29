@@ -52,22 +52,22 @@ router.get('/', requireAuth, async (req, res) => {
 
     const pattern = `%${q}%`
 
-    // Detect task ID search: "AG-42", "42", "#42"
-    // Strip leading # or a prefix like "UI-" and try to parse a number
-    const taskNumMatch = q.replace(/^#/, '').match(/^(?:[A-Za-z]+-)?(\d+)$/)
-    const taskNumSearch = taskNumMatch ? parseInt(taskNumMatch[1], 10) : null
+    // Extract numeric part from task ID searches like "COS-3", "#39", "3"
+    // Partial match: "COS-3" → numericPart = "3", matches 3, 30, 39, 300…
+    const stripped = q.replace(/^#/, '').replace(/^[A-Za-z]+-/, '')
+    const numericPart = /^\d+$/.test(stripped) ? stripped : null
 
     // Run all searches in parallel
     const [tasksRes, projectsRes, topicsRes, discussionsRes] = await Promise.all([
-      // Tasks — search title, description, or task_number
+      // Tasks — search title, description, or task_number (partial)
       projectIds.length
         ? supabaseAdmin
             .from('tasks')
             .select('id, title, status, priority, due_date, task_number, projects(id, name, color)')
             .in('project_id', projectIds)
             .or(
-              taskNumSearch !== null
-                ? `title.ilike.${pattern},description.ilike.${pattern},task_number.eq.${taskNumSearch}`
+              numericPart !== null
+                ? `title.ilike.${pattern},description.ilike.${pattern},task_number::text.ilike.${numericPart}%`
                 : `title.ilike.${pattern},description.ilike.${pattern}`
             )
             .neq('status', 'done')

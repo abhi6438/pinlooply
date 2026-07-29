@@ -1811,7 +1811,7 @@ export default function Lists() {
           (t.projects?.name || '').toLowerCase().includes(q) ||
           (t.assigned_user?.name || '').toLowerCase().includes(q) ||
           taskId.includes(q) ||
-          taskNumStr === q
+          taskNumStr.includes(q)
         )
       }
       return true
