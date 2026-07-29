@@ -520,6 +520,10 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
   const navigate = useNavigate()
   const { user } = useAuth()
 
+  // Split links by direction (set by server)
+  const outgoingLinks = taskLinks.filter(l => l.direction === 'outgoing') // this task linked to others → no compose
+  const incomingLinks = taskLinks.filter(l => l.direction === 'incoming') // others linked to this task → show in left panel
+
   // Load custom field definitions + task values + time entries on mount
   useEffect(() => {
     customFieldsApi.list()
@@ -892,6 +896,38 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
           />
         </div>
 
+        {/* Incoming linked tasks — shown in left panel when others linked to this task */}
+        {!loadingLinks && incomingLinks.length > 0 && (
+          <div className="border border-warm-200 rounded-xl p-3 space-y-1.5 bg-warm-50/50">
+            <p className="text-xs font-semibold text-warm-600 flex items-center gap-1.5">
+              <Link2 className="w-3.5 h-3.5 text-primary-500" />
+              Linked from
+              <span className="bg-primary-100 text-primary-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{incomingLinks.length}</span>
+            </p>
+            {incomingLinks.map(link => {
+              const meta = LINK_TYPE_META[link.link_type] || LINK_TYPE_META.relates_to
+              const t = link.task
+              if (!t) return null
+              return (
+                <div key={link.id} className="group rounded-lg px-2 py-1.5 hover:bg-white transition-colors space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${meta.color}`}>{meta.label}</span>
+                    <button
+                      onClick={() => onTaskClick && onTaskClick(t)}
+                      className="flex items-center gap-1.5 flex-1 min-w-0 text-left hover:text-primary-600 transition-colors"
+                    >
+                      <TaskIdBadge taskNumber={t.task_number} projectName={t.projects?.name} />
+                      <span className="text-xs text-warm-800 truncate">{t.title}</span>
+                      <ExternalLink className="w-3 h-3 text-warm-300 group-hover:text-primary-400 shrink-0 ml-auto" />
+                    </button>
+                  </div>
+                  {link.note && <p className="text-[11px] text-warm-500 italic pl-1">{link.note}</p>}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         {/* Time tracking */}
         <div className="border-t border-warm-100 pt-3 space-y-3">
           <div className="flex items-center justify-between">
@@ -1100,14 +1136,14 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
               </div>
             </div>
 
-            {/* ── Linked Tasks (in Updates panel) ──────────────── */}
-            <div className="px-5 py-3 border-b border-warm-100 flex-shrink-0">
+            {/* ── Linked Tasks (in Updates panel) — only when this task linked OUT to others ── */}
+            {!loadingLinks && outgoingLinks.length > 0 && <div className="px-5 py-3 border-b border-warm-100 flex-shrink-0">
               <div className="border border-warm-200 rounded-xl p-3 space-y-2 bg-warm-50/50">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-warm-600 flex items-center gap-1.5">
                     <Link2 className="w-3.5 h-3.5 text-primary-500" /> Linked Tasks
-                    {taskLinks.length > 0 && (
-                      <span className="bg-primary-100 text-primary-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{taskLinks.length}</span>
+                    {outgoingLinks.length > 0 && (
+                      <span className="bg-primary-100 text-primary-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{outgoingLinks.length}</span>
                     )}
                   </p>
                   <button
@@ -1206,9 +1242,9 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-warm-300" />
                     <span className="text-xs text-warm-400">Loading…</span>
                   </div>
-                ) : taskLinks.length > 0 ? (
+                ) : outgoingLinks.length > 0 ? (
                   <div className="space-y-1">
-                    {taskLinks.map(link => {
+                    {outgoingLinks.map(link => {
                       const meta = LINK_TYPE_META[link.link_type] || LINK_TYPE_META.relates_to
                       const t = link.task
                       if (!t) return null
@@ -1262,10 +1298,17 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                   <p className="text-xs text-warm-400 italic pl-0.5">No linked tasks</p>
                 )}
               </div>
-            </div>
+            </div>}
 
-            {/* Compose area — always visible */}
-            {true ? (
+            {/* Compose area — hidden when this task has outgoing links (go update the linked task) */}
+            {!loadingLinks && outgoingLinks.length > 0 ? (
+            <div className="px-5 py-4 flex-shrink-0">
+              <p className="text-xs text-warm-400 italic flex items-center gap-1.5">
+                <Link2 className="w-3.5 h-3.5 text-warm-300" />
+                Updates are tracked on the linked task. Click the task above to open it.
+              </p>
+            </div>
+            ) : (
             <div className="px-5 py-4 border-b border-warm-100 flex-shrink-0 space-y-3">
               {/* Type selector */}
               <div className="flex gap-1.5 flex-wrap">
@@ -1333,7 +1376,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                 </button>
               </div>
             </div>
-            ) : null}
+            )}
 
             {/* Confirm delete dialog */}
             {confirmDeleteId && (

@@ -621,8 +621,8 @@ router.get('/:taskId/links', requireAuth, async (req, res) => {
     const REVERSE = { blocks: 'blocked_by', blocked_by: 'blocks', parent: 'child', child: 'parent', relates_to: 'relates_to', duplicates: 'duplicates' }
 
     const links = [
-      ...(asSource || []).map(l => ({ id: l.id, link_type: l.link_type, note: l.note, task: l.target_task, created_at: l.created_at })),
-      ...(asTarget || []).map(l => ({ id: l.id, link_type: REVERSE[l.link_type] || l.link_type, note: l.note, task: l.source_task, created_at: l.created_at })),
+      ...(asSource || []).map(l => ({ id: l.id, link_type: l.link_type, note: l.note, task: l.target_task, created_at: l.created_at, direction: 'outgoing' })),
+      ...(asTarget || []).map(l => ({ id: l.id, link_type: REVERSE[l.link_type] || l.link_type, note: l.note, task: l.source_task, created_at: l.created_at, direction: 'incoming' })),
     ].filter(l => l.task && projectIds.includes(l.task.project_id))
 
     return res.json({ success: true, data: links })
