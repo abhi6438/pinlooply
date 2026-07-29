@@ -229,7 +229,7 @@ body {
 
   /* ── Labels ────────────────────────────────────────────────── */
   .label {
-    @apply block text-xs font-semibold uppercase tracking-wide text-warm-500 mb-1.5;
+    @apply block text-xs font-semibold uppercase tracking-wide text-warm-500 mb-1;
   }
 
   /* ── Badges ────────────────────────────────────────────────── */

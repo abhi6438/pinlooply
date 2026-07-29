@@ -783,7 +783,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-warm-200">
 
         {/* ── Modal header ── */}
-        <div className={`px-6 py-4 border-b border-warm-200 ${wf.headerBg} flex items-center justify-between gap-4 flex-shrink-0`}>
+        <div className={`px-4 py-2 border-b border-warm-200 ${wf.headerBg} flex items-center justify-between gap-4 flex-shrink-0`}>
           <div className="flex items-center gap-3 min-w-0">
             <span className={`w-3 h-3 rounded-full flex-shrink-0 ${wf.dotColor}`} />
             <StatusBadge
@@ -813,7 +813,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
         <div className="flex-1 overflow-hidden flex min-h-0">
 
           {/* ── LEFT: task fields ── */}
-          <div className="w-[52%] border-r border-warm-200 overflow-y-auto p-6 space-y-4 flex-shrink-0">
+          <div className="w-[52%] border-r border-warm-200 overflow-y-auto p-4 space-y-3 flex-shrink-0">
         {/* Title */}
         <div>
           <label className="label">Title</label>
@@ -1123,7 +1123,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
           {/* ── RIGHT: Updates panel ── */}
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {/* Right header */}
-            <div className="px-5 py-3 border-b border-warm-200 flex-shrink-0">
+            <div className="px-4 py-2 border-b border-warm-200 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-warm-700 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-primary-500" />
@@ -1137,8 +1137,16 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
               </div>
             </div>
 
-            {/* ── Linked Tasks (in Updates panel) — only when this task linked OUT to others ── */}
-            {!loadingLinks && outgoingLinks.length > 0 && <div className="px-5 py-3 border-b border-warm-100 flex-shrink-0">
+            {/* ── Right panel: wait for links to load before showing anything ── */}
+            {loadingLinks ? (
+              <div className="px-5 py-4 border-b border-warm-100 flex-shrink-0 flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-warm-300" />
+                <span className="text-xs text-warm-400">Loading…</span>
+              </div>
+            ) : <>
+
+            {/* Linked Tasks (outgoing) — only when this task linked OUT to others */}
+            {outgoingLinks.length > 0 && <div className="px-5 py-3 border-b border-warm-100 flex-shrink-0">
               <div className="border border-warm-200 rounded-xl p-3 space-y-2 bg-warm-50/50">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-warm-600 flex items-center gap-1.5">
@@ -1301,8 +1309,8 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
               </div>
             </div>}
 
-            {/* Compose area — hidden when this task has outgoing links (go update the linked task) */}
-            {!loadingLinks && outgoingLinks.length > 0 ? (
+            {/* Compose area — hidden when this task has outgoing links */}
+            {outgoingLinks.length > 0 ? (
             <div className="px-5 py-4 flex-shrink-0">
               <p className="text-xs text-warm-400 italic flex items-center gap-1.5">
                 <Link2 className="w-3.5 h-3.5 text-warm-300" />
@@ -1310,14 +1318,14 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
               </p>
             </div>
             ) : (
-            <div className="px-5 py-4 border-b border-warm-100 flex-shrink-0 space-y-3">
+            <div className="px-4 py-2.5 border-b border-warm-100 flex-shrink-0 space-y-2">
               {/* Type selector */}
               <div className="flex gap-1.5 flex-wrap">
                 {UPDATE_TYPES.map(t => (
                   <button
                     key={t.key}
                     onClick={() => setUpdateType(t.key)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold transition-all ${
                       updateType === t.key ? t.activePill : 'bg-warm-50 text-warm-500 border-warm-200 hover:bg-warm-100'
                     }`}
                   >
@@ -1331,7 +1339,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                 value={updateInput}
                 onChange={e => setUpdateInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submitUpdate() }}
-                rows={4}
+                rows={3}
                 placeholder={
                   updateType === 'blocker'  ? 'Describe what is blocking progress...' :
                   updateType === 'opinion'  ? 'Share your opinion or suggestion...' :
@@ -1378,6 +1386,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
               </div>
             </div>
             )}
+            </>}
 
             {/* Confirm delete dialog */}
             {confirmDeleteId && (
@@ -1402,7 +1411,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
             )}
 
             {/* Feed */}
-            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+            <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
               {loadingUpdates ? (
                 <div className="space-y-3 pt-1">
                   {[1,2].map(i => (
@@ -1529,7 +1538,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
         </div>{/* end two-column body */}
 
         {/* ── Modal footer ── */}
-        <div className="px-6 py-4 border-t border-warm-200 flex items-center gap-2 flex-shrink-0 bg-warm-50">
+        <div className="px-4 py-2 border-t border-warm-200 flex items-center gap-2 flex-shrink-0 bg-warm-50">
           <button
             onClick={handleDelete}
             disabled={deleting}
