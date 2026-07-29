@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader } from '../components/ui'
+import TaskIdBadge from '../components/shared/TaskIdBadge'
 
 // ── Helpers ───────────────────────────────────────────────────
 function greeting() {
@@ -381,7 +382,10 @@ function PriorityTask({ task, onToggle }) {
         }
       </button>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm text-warm-900 truncate ${done ? 'line-through' : ''}`}>{task.title}</p>
+        <div className="flex items-center gap-2">
+          <TaskIdBadge taskNumber={task.task_number} projectName={task.projects?.name} />
+          <p className={`text-sm text-warm-900 truncate ${done ? 'line-through' : ''}`}>{task.title}</p>
+        </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {task.projects?.name && <span className="text-xs text-warm-400">{task.projects.name}</span>}
           <span className={`badge ${
@@ -1008,7 +1012,10 @@ export default function Dashboard() {
                       {idx + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-warm-900 truncate">{s.title}</p>
+                      <div className="flex items-center gap-2">
+                        <TaskIdBadge taskNumber={s.task_number} projectName={s.project?.name} />
+                        <p className="text-sm font-medium text-warm-900 truncate">{s.title}</p>
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         {s.project && <span className="text-xs text-warm-400 truncate">{s.project.name}</span>}
                         {s.days_until_due !== null && (
@@ -1019,6 +1026,7 @@ export default function Dashboard() {
                       </div>
                       {s.reason && <p className="text-xs text-warm-500 mt-0.5 italic">{s.reason}</p>}
                     </div>
+
                   </div>
                 ))}
               </div>

@@ -38,7 +38,7 @@ async function fetchOpenTasks(userId, { groupId = null, personalOnly = false } =
 
   const { data: tasks } = await supabaseAdmin
     .from('tasks')
-    .select('id, title, description, status, priority, due_date, assigned_to, project_id, created_at, projects(id, name)')
+    .select('id, title, description, status, priority, due_date, assigned_to, project_id, created_at, task_number, projects(id, name)')
     .in('project_id', projectIds)
     .not('status', 'in', '("done","resolved","closed","released")')
     .order('due_date', { ascending: true, nullsFirst: false })

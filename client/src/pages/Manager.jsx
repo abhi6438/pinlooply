@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { PageShell, PageHeader, PageLoader, EmptyState } from '../components/ui'
 import toast from 'react-hot-toast'
+import TaskIdBadge from '../components/shared/TaskIdBadge'
 
 const PRIORITY_DOT = {
   high:   'bg-red-500',
@@ -135,9 +136,12 @@ function MemberCard({ member }) {
                 <div key={task.id} className="px-5 py-2.5 flex items-center gap-3">
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[task.priority] || 'bg-warm-300'}`} />
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs truncate ${task.is_overdue ? 'text-red-700 font-medium' : 'text-warm-800'}`}>
-                      {task.title}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <TaskIdBadge taskNumber={task.task_number} projectName={task.project?.name} />
+                      <p className={`text-xs truncate ${task.is_overdue ? 'text-red-700 font-medium' : 'text-warm-800'}`}>
+                        {task.title}
+                      </p>
+                    </div>
                     {task.project && (
                       <p className="text-[10px] text-warm-400 truncate">{task.project.name}</p>
                     )}

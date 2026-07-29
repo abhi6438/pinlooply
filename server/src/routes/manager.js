@@ -82,7 +82,7 @@ router.get('/overview', async (req, res) => {
 
     let tasksQuery = supabaseAdmin
       .from('tasks')
-      .select('id, title, status, priority, due_date, assigned_to, project_id, projects(id, name, color)')
+      .select('id, title, status, priority, due_date, assigned_to, project_id, task_number, projects(id, name, color)')
     if (groupProjectIds.length) {
       tasksQuery = tasksQuery.in('project_id', groupProjectIds)
     } else {
@@ -200,7 +200,7 @@ router.get('/member/:memberId/tasks', async (req, res) => {
 
     const { data: tasks, error } = await supabaseAdmin
       .from('tasks')
-      .select('id, title, status, priority, due_date, created_at, project_id, projects(id, name, color)')
+      .select('id, title, status, priority, due_date, created_at, project_id, task_number, projects(id, name, color)')
       .eq('assigned_to', memberId)
       .order('due_date', { ascending: true, nullsFirst: false })
 

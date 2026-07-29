@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageShell, PageHeader, PageLoader, EmptyState } from '../components/ui'
+import TaskIdBadge from '../components/shared/TaskIdBadge'
 
 const PRIORITY_META = {
   high:   { label: 'High',   dot: 'bg-red-500',   text: 'text-red-600',   bg: 'bg-red-50'   },
@@ -71,7 +72,10 @@ function TaskRow({ task, onComplete }) {
 
       {/* Title + project */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-warm-900 truncate">{task.title}</p>
+        <div className="flex items-center gap-2">
+          <TaskIdBadge taskNumber={task.task_number} projectName={task.projects?.name} />
+          <p className="text-sm text-warm-900 truncate">{task.title}</p>
+        </div>
         {task.projects && (
           <p className="text-xs text-warm-400 flex items-center gap-1 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: task.projects.color || '#6366f1' }} />
