@@ -621,4 +621,59 @@ router.put('/module-config', async (req, res) => {
   }
 })
 
+// ── POST /api/admin/backfill-task-numbers ─────────────────────
+// Assigns task_number to every task that doesn't have one yet.
+// Safe to run multiple times — only touches NULL rows.
+router.post('/backfill-task-numbers', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    // Ensure sequence exists
+    await supabaseAdmin.rpc('exec_sql', {
+      sql: `CREATE SEQUENCE IF NOT EXISTS tasks_task_number_seq;`
+    }).catch(() => {}) // ignore if rpc not available — sequence likely exists from migration
+
+    // Find tasks with no task_number, ordered by created_at
+    const { data: unNumbered, error } = await supabaseAdmin
+      .from('tasks')
+      .select('id, created_at')
+      .is('task_number', null)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    if (!unNumbered || unNumbered.length === 0) {
+      return res.json({ success: true, updated: 0, message: 'All tasks already have numbers' })
+    }
+
+    // Get current max task_number
+    const { data: maxRow } = await supabaseAdmin
+      .from('tasks')
+      .select('task_number')
+      .not('task_number', 'is', null)
+      .order('task_number', { ascending: false })
+      .limit(1)
+      .single()
+
+    let counter = (maxRow?.task_number || 0) + 1
+
+    // Assign numbers in batches
+    const updates = unNumbered.map(t => ({ id: t.id, task_number: counter++ }))
+
+    // Update in chunks of 100
+    const chunkSize = 100
+    for (let i = 0; i < updates.length; i += chunkSize) {
+      const chunk = updates.slice(i, i + chunkSize)
+      await Promise.all(
+        chunk.map(u =>
+          supabaseAdmin.from('tasks').update({ task_number: u.task_number }).eq('id', u.id)
+        )
+      )
+    }
+
+    return res.json({ success: true, updated: updates.length, message: `Assigned numbers to ${updates.length} task(s)` })
+  } catch (err) {
+    console.error('Backfill task numbers error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
 export default router

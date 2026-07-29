@@ -168,8 +168,9 @@ export const adminApi = {
   getModuleConfig:   ()             => api.get('/api/admin/module-config'),
   saveModuleConfig:  (modules)      => api.put('/api/admin/module-config', { modules }),
   // New DB-driven menu access
-  getMenus:          ()             => api.get('/api/admin/menus'),
-  saveMenus:         (disabledKeys) => api.put('/api/admin/menus', { disabled_keys: disabledKeys }),
+  getMenus:              ()             => api.get('/api/admin/menus'),
+  saveMenus:             (disabledKeys) => api.put('/api/admin/menus', { disabled_keys: disabledKeys }),
+  backfillTaskNumbers:   ()             => api.post('/api/admin/backfill-task-numbers'),
 }
 
 export const feedbackApi = {

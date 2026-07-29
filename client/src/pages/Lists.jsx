@@ -110,6 +110,35 @@ function Avatar({ name, size = 6 }) {
   )
 }
 
+// ── Task ID helpers ───────────────────────────────────────────
+function getProjectPrefix(projectName) {
+  if (!projectName) return 'TSK'
+  const words = projectName.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 1) return words[0].slice(0, 4).toUpperCase()
+  // Multi-word: take first letter of each word, max 4 chars
+  return words.map(w => w[0]).join('').toUpperCase().slice(0, 4)
+}
+
+function TaskIdBadge({ taskNumber, projectName, className = '' }) {
+  if (!taskNumber) return null
+  const prefix = getProjectPrefix(projectName)
+  const id = `${prefix}-${taskNumber}`
+  function copy(e) {
+    e.stopPropagation()
+    navigator.clipboard?.writeText(id).catch(() => {})
+    toast.success(`Copied ${id}`, { duration: 1500 })
+  }
+  return (
+    <button
+      onClick={copy}
+      title={`Task ID: ${id} — click to copy`}
+      className={`inline-flex items-center font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-warm-100 text-warm-500 hover:bg-primary-100 hover:text-primary-600 transition-colors select-none ${className}`}
+    >
+      {id}
+    </button>
+  )
+}
+
 // ── Portal Dropdown — renders above overflow:hidden containers ─
 function PortalDropdown({ anchorRef, open, minWidth = 160, children }) {
   const [pos, setPos] = useState({ top: 0, left: 0 })
@@ -705,6 +734,13 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
               onChange={newStatus => onStatusChange(task.id, newStatus)}
               workflow={workflow}
             />
+            {task.task_number && (
+              <TaskIdBadge
+                taskNumber={task.task_number}
+                projectName={task.projects?.name}
+                className="text-[11px] px-2 py-1 rounded-lg bg-white/60 border border-warm-200"
+              />
+            )}
             {task.projects && (
               <span className="text-xs text-warm-400 truncate hidden sm:block">
                 {task.projects.name}
@@ -1275,8 +1311,11 @@ function BoardCard({ task, onClick, onDragStart }) {
       onClick={() => onClick(task)}
       className={`bg-white rounded-xl border border-warm-200 p-3 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-all ${borderAccent}`}
     >
-      {/* Title */}
-      <p className="text-sm font-medium text-warm-900 line-clamp-2 mb-2 leading-snug">{task.title}</p>
+      {/* Title row with ID */}
+      <div className="flex items-start justify-between gap-1 mb-2">
+        <p className="text-sm font-medium text-warm-900 line-clamp-2 leading-snug flex-1">{task.title}</p>
+        <TaskIdBadge taskNumber={task.task_number} projectName={task.projects?.name} className="flex-shrink-0 mt-0.5" />
+      </div>
 
       {/* Tags row */}
       <div className="flex flex-wrap items-center gap-1 mb-2">
@@ -1485,12 +1524,15 @@ function ListView({ tasks, groupMembers, filterProject, setFilterProject, filter
                       </button>
                     </td>
                     <td className="px-3 py-3">
-                      <button
-                        onClick={() => onCardClick(task)}
-                        className="text-sm text-warm-900 hover:text-primary-600 font-medium text-left line-clamp-1 max-w-[280px]"
-                      >
-                        {task.title}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <TaskIdBadge taskNumber={task.task_number} projectName={task.projects?.name} />
+                        <button
+                          onClick={() => onCardClick(task)}
+                          className="text-sm text-warm-900 hover:text-primary-600 font-medium text-left line-clamp-1 max-w-[260px]"
+                        >
+                          {task.title}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-3 py-3 w-36">
                       <StatusBadge

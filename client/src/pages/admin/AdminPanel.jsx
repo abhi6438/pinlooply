@@ -26,6 +26,7 @@ const TABS = [
   { id: 'donate',   label: 'Support My Work',  icon: Heart        },
   { id: 'feedback', label: 'Feedback',        icon: Star         },
   { id: 'donors',   label: 'Supporters',       icon: HandCoins    },
+  { id: 'maintenance', label: 'Maintenance',  icon: RefreshCw    },
 ]
 
 // ── All configurable module definitions ──────────────────────────
@@ -1554,6 +1555,70 @@ function DonateConfigTab() {
   )
 }
 
+// ── Maintenance Tab ───────────────────────────────────────────
+function MaintenanceTab() {
+  const [running,  setRunning]  = useState(false)
+  const [result,   setResult]   = useState(null)
+
+  async function runBackfill() {
+    setRunning(true)
+    setResult(null)
+    try {
+      const res = await adminApi.backfillTaskNumbers()
+      const d = res.data
+      setResult({ ok: true, message: d.message || `Done. Updated: ${d.updated ?? '?'}` })
+      toast.success('Task numbers backfilled')
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Backfill failed'
+      setResult({ ok: false, message: msg })
+      toast.error(msg)
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div className="p-6 max-w-xl">
+      <h2 className="text-base font-semibold text-warm-900 mb-1">Maintenance</h2>
+      <p className="text-sm text-warm-500 mb-6">One-off data migrations and fixes.</p>
+
+      {/* Backfill task numbers */}
+      <div className="rounded-2xl border border-warm-200 bg-white p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+            <CheckSquare2 className="w-4.5 h-4.5 text-primary-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-warm-900">Backfill Task Numbers</p>
+            <p className="text-xs text-warm-500 mt-0.5">
+              Assigns sequential task numbers (e.g. #42) to any tasks created before the task-number migration.
+              Safe to run multiple times — only processes tasks with no number yet.
+            </p>
+          </div>
+        </div>
+
+        {result && (
+          <div className={`rounded-xl px-4 py-2.5 text-sm ${result.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+            {result.message}
+          </div>
+        )}
+
+        <button
+          onClick={runBackfill}
+          disabled={running}
+          className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+        >
+          {running
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : <RefreshCw className="w-4 h-4" />
+          }
+          {running ? 'Running...' : 'Run Backfill'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────
 export default function AdminPanel() {
   const { user } = useAuth()
@@ -1635,7 +1700,8 @@ export default function AdminPanel() {
         {tab === 'menus'    && <MenuConfigTab />}
         {tab === 'donate'   && <DonateConfigTab />}
         {tab === 'feedback' && <FeedbackTab />}
-        {tab === 'donors'   && <DonorsTab />}
+        {tab === 'donors'      && <DonorsTab />}
+        {tab === 'maintenance' && <MaintenanceTab />}
       </div>
     </div>
   )
