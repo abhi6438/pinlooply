@@ -13,7 +13,7 @@ import {
   MessageSquare, ShieldAlert, Lightbulb, CheckCheck, Send, Sparkles,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import TaskIdBadge from '../components/shared/TaskIdBadge'
+import TaskIdBadge, { getProjectPrefix } from '../components/shared/TaskIdBadge'
 
 // ── Workflow statuses ─────────────────────────────────────────
 const WORKFLOW = [
@@ -1799,11 +1799,19 @@ export default function Lists() {
         if (assignedId !== filterAssignee) return false
       }
       if (search) {
-        const q = search.toLowerCase()
+        const q = search.toLowerCase().replace(/^#/, '')
+        // Build the task's full ID (e.g. "COS-39") for comparison
+        const taskId = t.task_number
+          ? `${getProjectPrefix(t.projects?.name)}-${t.task_number}`.toLowerCase()
+          : ''
+        // Also match just the number ("39") or the full ID ("cos-39")
+        const taskNumStr = t.task_number ? String(t.task_number) : ''
         return (
           t.title.toLowerCase().includes(q) ||
           (t.projects?.name || '').toLowerCase().includes(q) ||
-          (t.assigned_user?.name || '').toLowerCase().includes(q)
+          (t.assigned_user?.name || '').toLowerCase().includes(q) ||
+          taskId.includes(q) ||
+          taskNumStr === q
         )
       }
       return true
