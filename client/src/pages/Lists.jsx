@@ -1921,9 +1921,9 @@ export default function Lists() {
     loadGroupMembers()
   }, [user, activeGroupId]) // eslint-disable-line
 
-  async function loadTasks() {
-    // Only show full loader on first load; subsequent refreshes are silent
-    if (!_tasksCache.has(cacheKey)) setLoading(true)
+  async function loadTasks({ force = false } = {}) {
+    // Show spinner on first load or when manually forced (Refresh button)
+    if (force || !_tasksCache.has(cacheKey)) setLoading(true)
     try {
       // show_done=true: include tasks with status='done' so the DONE/PROD column is visible
       const params = { excludeTestCases: true, show_done: true }
@@ -2162,7 +2162,7 @@ export default function Lists() {
             </div>
             {/* Refresh */}
             <button
-              onClick={loadTasks}
+              onClick={() => loadTasks({ force: true })}
               disabled={loading}
               className="btn btn-secondary btn-sm"
             >
