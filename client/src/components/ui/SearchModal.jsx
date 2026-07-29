@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { searchApi } from '../../services/api'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { Search, Loader2, ListChecks, FolderOpen, Tag, MessageSquare, X } from 'lucide-react'
+import TaskIdBadge from '../shared/TaskIdBadge'
 
 // ── Highlight matching text ───────────────────────────────────
 function Highlight({ text = '', query = '' }) {
@@ -134,7 +135,7 @@ export default function SearchModal({ open, onClose }) {
             type="text"
             value={query}
             onChange={handleChange}
-            placeholder="Search tasks, projects, topics, discussions…"
+            placeholder="Search tasks, #42, UI-42, projects, topics…"
             className="flex-1 bg-transparent text-sm text-warm-900 placeholder-warm-400 outline-none"
           />
           {query && (
@@ -164,15 +165,24 @@ export default function SearchModal({ open, onClose }) {
           {results?.tasks?.length > 0 && (
             <Section title="Tasks">
               {results.tasks.map(t => (
-                <ResultRow
+                <button
                   key={t.id}
-                  icon={ListChecks}
-                  iconColor="bg-blue-50 text-blue-600"
-                  label={t.title}
-                  sub={t.projects?.name}
-                  query={query}
                   onClick={() => go('/lists')}
-                />
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-warm-50 transition-colors text-left rounded-lg"
+                >
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-blue-50 text-blue-600">
+                    <ListChecks className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <TaskIdBadge taskNumber={t.task_number} projectName={t.projects?.name} />
+                      <p className="text-sm font-medium text-warm-900 truncate">
+                        <Highlight text={t.title} query={query} />
+                      </p>
+                    </div>
+                    {t.projects?.name && <p className="text-xs text-warm-400 truncate">{t.projects.name}</p>}
+                  </div>
+                </button>
               ))}
             </Section>
           )}

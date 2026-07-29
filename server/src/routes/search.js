@@ -52,15 +52,24 @@ router.get('/', requireAuth, async (req, res) => {
 
     const pattern = `%${q}%`
 
+    // Detect task ID search: "AG-42", "42", "#42"
+    // Strip leading # or a prefix like "UI-" and try to parse a number
+    const taskNumMatch = q.replace(/^#/, '').match(/^(?:[A-Za-z]+-)?(\d+)$/)
+    const taskNumSearch = taskNumMatch ? parseInt(taskNumMatch[1], 10) : null
+
     // Run all searches in parallel
     const [tasksRes, projectsRes, topicsRes, discussionsRes] = await Promise.all([
-      // Tasks — search title + description
+      // Tasks — search title, description, or task_number
       projectIds.length
         ? supabaseAdmin
             .from('tasks')
-            .select('id, title, status, priority, due_date, projects(id, name, color)')
+            .select('id, title, status, priority, due_date, task_number, projects(id, name, color)')
             .in('project_id', projectIds)
-            .or(`title.ilike.${pattern},description.ilike.${pattern}`)
+            .or(
+              taskNumSearch !== null
+                ? `title.ilike.${pattern},description.ilike.${pattern},task_number.eq.${taskNumSearch}`
+                : `title.ilike.${pattern},description.ilike.${pattern}`
+            )
             .neq('status', 'done')
             .limit(limit)
         : Promise.resolve({ data: [] }),
