@@ -15,6 +15,12 @@ CREATE INDEX IF NOT EXISTS idx_task_updates_created ON task_updates(task_id, cre
 -- RLS
 ALTER TABLE task_updates ENABLE ROW LEVEL SECURITY;
 
+-- Drop policies first so this script is safe to re-run
+DROP POLICY IF EXISTS "task_updates_read"   ON task_updates;
+DROP POLICY IF EXISTS "task_updates_insert" ON task_updates;
+DROP POLICY IF EXISTS "task_updates_delete" ON task_updates;
+DROP POLICY IF EXISTS "task_updates_update" ON task_updates;
+
 -- Allow task-project members to read updates
 CREATE POLICY "task_updates_read" ON task_updates
   FOR SELECT USING (
