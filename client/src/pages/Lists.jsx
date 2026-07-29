@@ -824,18 +824,19 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
           />
         </div>
 
-        {/* Priority */}
-        <div>
-          <label className="label">Priority</label>
-          <select value={priority} onChange={e => setPriority(e.target.value)} className="input w-full">
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
+        {/* Priority / Assignee / Due Date / Project — 2 columns */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Priority */}
+          <div>
+            <label className="label">Priority</label>
+            <select value={priority} onChange={e => setPriority(e.target.value)} className="input w-full">
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
 
-        {/* Assignee */}
-        {groupMembers.length > 0 && (
+          {/* Assignee */}
           <div>
             <label className="label">Assignee</label>
             <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="input w-full">
@@ -846,29 +847,29 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
               })}
             </select>
           </div>
-        )}
 
-        {/* Due date */}
-        <div>
-          <label className="label">Due Date</label>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={e => setDueDate(e.target.value)}
-            onClick={e => e.target.showPicker?.()}
-            className="input w-full cursor-pointer"
-          />
-        </div>
-
-        {/* Project */}
-        {task.projects && (
+          {/* Due date */}
           <div>
-            <label className="label">Project</label>
-            <div className="text-sm text-warm-700 px-2 py-1.5 bg-warm-50 border border-warm-200 rounded-lg">
-              {task.projects.name}
-            </div>
+            <label className="label">Due Date</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              onClick={e => e.target.showPicker?.()}
+              className="input w-full cursor-pointer"
+            />
           </div>
-        )}
+
+          {/* Project */}
+          {task.projects && (
+            <div>
+              <label className="label">Project</label>
+              <div className="text-sm text-warm-700 px-2 py-1.5 bg-warm-50 border border-warm-200 rounded-lg truncate">
+                {task.projects.name}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Topic link */}
         {task.topics && (
