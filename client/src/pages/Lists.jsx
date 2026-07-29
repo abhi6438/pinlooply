@@ -1452,38 +1452,32 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                       }
                       <div className="flex-1 min-w-0">
                         {/* Header row */}
-                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                          <span className="text-sm font-semibold text-warm-900">{name}</span>
+                        <div className="flex items-center gap-2 mb-1.5 min-w-0">
+                          <span className="text-sm font-semibold text-warm-900 truncate">{name}</span>
                           <span className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${st.badge}`}>
                             {st.icon}
                             {upd.update_type.charAt(0).toUpperCase() + upd.update_type.slice(1)}
                           </span>
-                          <span className="ml-auto text-xs text-warm-400 flex-shrink-0">
-                            {new Date(upd.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                          </span>
-                          {isOwn && !isEditing && (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => startEdit(upd)}
-                                className="text-warm-300 hover:text-primary-500 transition-colors"
-                                title="Edit"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
+                          <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-xs text-warm-400">
+                              {new Date(upd.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                            {isOwn && !isEditing && (
+                              <>
+                                <button onClick={() => startEdit(upd)} className="text-warm-300 hover:text-primary-500 transition-colors" title="Edit">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => setConfirmDeleteId(upd.id)} className="text-warm-300 hover:text-red-500 transition-colors" title="Delete">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                            {isEditing && (
+                              <button onClick={cancelEdit} className="text-warm-300 hover:text-warm-600 transition-colors" title="Cancel edit">
+                                <X className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(upd.id)}
-                                className="text-warm-300 hover:text-red-500 transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                          {isEditing && (
-                            <button onClick={cancelEdit} className="text-warm-300 hover:text-warm-600 transition-colors" title="Cancel edit">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                            )}
+                          </div>
                         </div>
 
                         {/* Content or edit form */}
