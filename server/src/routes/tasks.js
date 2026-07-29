@@ -584,4 +584,126 @@ router.delete('/:taskId/updates/:updateId', requireAuth, async (req, res) => {
   }
 })
 
+// ── Task Links ────────────────────────────────────────────────
+const LINK_TYPES = ['relates_to', 'blocks', 'blocked_by', 'duplicates', 'parent', 'child']
+
+// GET /api/tasks/:taskId/links
+// Returns all links where this task is the source OR target, with full task details
+router.get('/:taskId/links', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { taskId } = req.params
+
+    const projectIds = await getUserProjectIds(userId)
+    if (!projectIds.length) return res.json({ success: true, data: [] })
+
+    // Links where this task is source
+    const { data: asSource, error: e1 } = await supabaseAdmin
+      .from('task_links')
+      .select(`
+        id, link_type, created_at,
+        target_task:target_task_id(id, title, status, priority, task_number, project_id, projects(id, name, color))
+      `)
+      .eq('source_task_id', taskId)
+
+    // Links where this task is target (so user sees the reverse relationship)
+    const { data: asTarget, error: e2 } = await supabaseAdmin
+      .from('task_links')
+      .select(`
+        id, link_type, created_at,
+        source_task:source_task_id(id, title, status, priority, task_number, project_id, projects(id, name, color))
+      `)
+      .eq('target_task_id', taskId)
+
+    if (e1 || e2) throw e1 || e2
+
+    // Normalise to a flat list: { id, link_type, direction, task }
+    const REVERSE = { blocks: 'blocked_by', blocked_by: 'blocks', parent: 'child', child: 'parent', relates_to: 'relates_to', duplicates: 'duplicates' }
+
+    const links = [
+      ...(asSource || []).map(l => ({ id: l.id, link_type: l.link_type, task: l.target_task, created_at: l.created_at })),
+      ...(asTarget || []).map(l => ({ id: l.id, link_type: REVERSE[l.link_type] || l.link_type, task: l.source_task, created_at: l.created_at })),
+    ].filter(l => l.task && projectIds.includes(l.task.project_id))
+
+    return res.json({ success: true, data: links })
+  } catch (err) {
+    console.error('Get task links error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/tasks/:taskId/links
+router.post('/:taskId/links', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { taskId } = req.params
+    const { target_task_id, link_type = 'relates_to' } = req.body
+
+    if (!target_task_id) return res.status(400).json({ error: 'target_task_id is required' })
+    if (!LINK_TYPES.includes(link_type)) return res.status(400).json({ error: 'Invalid link_type' })
+    if (target_task_id === taskId) return res.status(400).json({ error: 'Cannot link a task to itself' })
+
+    const projectIds = await getUserProjectIds(userId)
+
+    // Verify both tasks are accessible
+    const { data: both } = await supabaseAdmin
+      .from('tasks')
+      .select('id, project_id')
+      .in('id', [taskId, target_task_id])
+      .in('project_id', projectIds)
+
+    if (!both || both.length < 2) return res.status(403).json({ error: 'Task not found or access denied' })
+
+    const { data, error } = await supabaseAdmin
+      .from('task_links')
+      .insert({ source_task_id: taskId, target_task_id, link_type, created_by: userId })
+      .select(`
+        id, link_type, created_at,
+        target_task:target_task_id(id, title, status, priority, task_number, project_id, projects(id, name, color))
+      `)
+      .single()
+
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ error: 'This link already exists' })
+      throw error
+    }
+
+    return res.status(201).json({ success: true, data: { id: data.id, link_type: data.link_type, task: data.target_task, created_at: data.created_at } })
+  } catch (err) {
+    console.error('Create task link error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// DELETE /api/tasks/:taskId/links/:linkId
+router.delete('/:taskId/links/:linkId', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { taskId, linkId } = req.params
+
+    // Find the link — it may be stored with this task as source OR target
+    const { data: link } = await supabaseAdmin
+      .from('task_links')
+      .select('id, source_task_id, target_task_id, created_by')
+      .eq('id', linkId)
+      .single()
+
+    if (!link) return res.status(404).json({ error: 'Link not found' })
+    if (link.source_task_id !== taskId && link.target_task_id !== taskId) {
+      return res.status(403).json({ error: 'Access denied' })
+    }
+
+    const { error } = await supabaseAdmin
+      .from('task_links')
+      .delete()
+      .eq('id', linkId)
+
+    if (error) throw error
+    return res.json({ success: true })
+  } catch (err) {
+    console.error('Delete task link error:', err)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
 export default router

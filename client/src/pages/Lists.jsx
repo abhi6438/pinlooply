@@ -4,13 +4,14 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useWorkspace } from '../context/WorkspaceContext'
 import { useProjectStore } from '../stores/useProjectStore'
-import { tasksApi, groupsApi, customFieldsApi, timeEntriesApi, taskUpdatesApi } from '../services/api'
+import { tasksApi, groupsApi, customFieldsApi, timeEntriesApi, taskUpdatesApi, taskLinksApi } from '../services/api'
 import { STATUS_COLORS } from '../config/statuses'
 import {
   LayoutGrid, List, Plus, ChevronDown, X, Loader2,
   RefreshCw, Calendar, Tag, UserCircle, Trash2, Check,
   AlertTriangle, Clock, UserPlus, Play, Square, Timer, Pencil,
   MessageSquare, ShieldAlert, Lightbulb, CheckCheck, Send, Sparkles,
+  Link2, Unlink, ExternalLink,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TaskIdBadge, { getProjectPrefix } from '../components/shared/TaskIdBadge'
@@ -467,7 +468,7 @@ function DeleteConfirmModal({ title, onConfirm, onCancel }) {
 }
 
 // ── Detail Panel ──────────────────────────────────────────────
-function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete, onStatusChange, workflow = WORKFLOW }) {
+function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onUpdate, onDelete, onStatusChange, onTaskClick, workflow = WORKFLOW }) {
   const [title, setTitle]       = useState(task.title)
   const [priority, setPriority] = useState(task.priority || 'medium')
   const [dueDate, setDueDate]   = useState(task.due_date ? task.due_date.slice(0, 10) : '')
@@ -502,6 +503,18 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
   const [editContent,        setEditContent]        = useState('')
   const [editType,           setEditType]           = useState('update')
   const [savingEdit,         setSavingEdit]         = useState(false)
+  // Task links
+  const [taskLinks,          setTaskLinks]          = useState([])
+  const [loadingLinks,       setLoadingLinks]       = useState(true)
+  const [showAddLink,        setShowAddLink]        = useState(false)
+  const [linkSearch,         setLinkSearch]         = useState('')
+  const [linkSearchResults,  setLinkSearchResults]  = useState([])
+  const [linkSearchLoading,  setLinkSearchLoading]  = useState(false)
+  const [selectedLinkTarget, setSelectedLinkTarget] = useState(null)
+  const [selectedLinkType,   setSelectedLinkType]   = useState('relates_to')
+  const [savingLink,         setSavingLink]         = useState(false)
+  const linkSearchRef = useRef(null)
+  const linkDebounceRef = useRef(null)
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -521,6 +534,11 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
       .then(r => setTaskUpdates(r.data.data || []))
       .catch(() => {})
       .finally(() => setLoadingUpdates(false))
+    setLoadingLinks(true)
+    taskLinksApi.list(task.id)
+      .then(r => setTaskLinks(r.data.data || []))
+      .catch(() => {})
+      .finally(() => setLoadingLinks(false))
   }, [task.id])
 
   // Timer tick
@@ -680,6 +698,64 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
     await taskUpdatesApi.delete(task.id, confirmDeleteId).catch(() => {})
     setTaskUpdates(prev => prev.filter(u => u.id !== confirmDeleteId))
     setConfirmDeleteId(null)
+  }
+
+  // ── Link helpers ─────────────────────────────────────────────
+  const LINK_TYPE_META = {
+    relates_to:  { label: 'Relates to',   color: 'bg-warm-100 text-warm-600 border-warm-200' },
+    blocks:      { label: 'Blocks',        color: 'bg-red-50 text-red-600 border-red-200' },
+    blocked_by:  { label: 'Blocked by',   color: 'bg-orange-50 text-orange-600 border-orange-200' },
+    duplicates:  { label: 'Duplicates',   color: 'bg-violet-50 text-violet-600 border-violet-200' },
+    parent:      { label: 'Parent of',    color: 'bg-blue-50 text-blue-600 border-blue-200' },
+    child:       { label: 'Sub-task of',  color: 'bg-teal-50 text-teal-600 border-teal-200' },
+  }
+
+  function searchLinkedTasks(q) {
+    if (!q || q.length < 2) { setLinkSearchResults([]); return }
+    setLinkSearchLoading(true)
+    // Search from already-loaded tasks first (fast, client-side)
+    const qLow = q.toLowerCase().replace(/^#/, '')
+    const results = (allTasks || [])
+      .filter(t => t.id !== task.id)
+      .filter(t => {
+        const taskId = t.task_number ? `${getProjectPrefix(t.projects?.name)}-${t.task_number}`.toLowerCase() : ''
+        return (
+          t.title.toLowerCase().includes(qLow) ||
+          taskId.includes(qLow) ||
+          (t.task_number ? String(t.task_number).includes(qLow) : false)
+        )
+      })
+      .slice(0, 8)
+    setLinkSearchResults(results)
+    setLinkSearchLoading(false)
+  }
+
+  async function addLink() {
+    if (!selectedLinkTarget) return
+    setSavingLink(true)
+    try {
+      const r = await taskLinksApi.create(task.id, selectedLinkTarget.id, selectedLinkType)
+      setTaskLinks(prev => [...prev, r.data.data])
+      setShowAddLink(false)
+      setLinkSearch('')
+      setSelectedLinkTarget(null)
+      setSelectedLinkType('relates_to')
+      toast.success('Link added')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to add link')
+    } finally {
+      setSavingLink(false)
+    }
+  }
+
+  async function removeLink(linkId) {
+    try {
+      await taskLinksApi.delete(task.id, linkId)
+      setTaskLinks(prev => prev.filter(l => l.id !== linkId))
+      toast.success('Link removed')
+    } catch {
+      toast.error('Failed to remove link')
+    }
   }
 
   const UPDATE_TYPES = [
@@ -1002,6 +1078,141 @@ function DetailPanel({ task, groupMembers, projects, onClose, onUpdate, onDelete
             ))}
           </div>
         )}
+        {/* ── Linked Tasks ─────────────────────────────────── */}
+        <div className="border-t border-warm-100 pt-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-warm-500 uppercase tracking-wide flex items-center gap-1.5">
+              <Link2 className="w-3.5 h-3.5" /> Linked Tasks
+              {taskLinks.length > 0 && (
+                <span className="bg-warm-100 text-warm-500 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{taskLinks.length}</span>
+              )}
+            </p>
+            <button
+              onClick={() => { setShowAddLink(v => !v); setLinkSearch(''); setLinkSearchResults([]); setSelectedLinkTarget(null) }}
+              className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add link
+            </button>
+          </div>
+
+          {/* Add link form */}
+          {showAddLink && (
+            <div className="rounded-xl border border-warm-200 bg-warm-50 p-3 space-y-2">
+              {/* Link type selector */}
+              <select
+                value={selectedLinkType}
+                onChange={e => setSelectedLinkType(e.target.value)}
+                className="input w-full text-xs"
+              >
+                {Object.entries(LINK_TYPE_META).map(([key, meta]) => (
+                  <option key={key} value={key}>{meta.label}</option>
+                ))}
+              </select>
+
+              {/* Task search */}
+              <div className="relative">
+                <input
+                  ref={linkSearchRef}
+                  type="text"
+                  value={selectedLinkTarget ? `${getProjectPrefix(selectedLinkTarget.projects?.name)}-${selectedLinkTarget.task_number || ''} ${selectedLinkTarget.title}` : linkSearch}
+                  onChange={e => {
+                    setSelectedLinkTarget(null)
+                    setLinkSearch(e.target.value)
+                    clearTimeout(linkDebounceRef.current)
+                    linkDebounceRef.current = setTimeout(() => searchLinkedTasks(e.target.value), 200)
+                  }}
+                  placeholder="Search task by title or ID..."
+                  className="input w-full text-xs pr-8"
+                />
+                {selectedLinkTarget && (
+                  <button onClick={() => { setSelectedLinkTarget(null); setLinkSearch('') }} className="absolute right-2 top-1/2 -translate-y-1/2 text-warm-400 hover:text-warm-600">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Search results dropdown */}
+              {!selectedLinkTarget && linkSearch.length >= 2 && (
+                <div className="rounded-lg border border-warm-200 bg-white shadow-sm max-h-40 overflow-y-auto">
+                  {linkSearchLoading && (
+                    <div className="flex items-center justify-center py-3">
+                      <Loader2 className="w-4 h-4 animate-spin text-warm-400" />
+                    </div>
+                  )}
+                  {!linkSearchLoading && linkSearchResults.length === 0 && (
+                    <p className="text-xs text-warm-400 text-center py-3">No tasks found</p>
+                  )}
+                  {linkSearchResults.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => { setSelectedLinkTarget(t); setLinkSearchResults([]) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-warm-50 text-left"
+                    >
+                      <TaskIdBadge taskNumber={t.task_number} projectName={t.projects?.name} />
+                      <span className="text-xs text-warm-800 truncate flex-1">{t.title}</span>
+                      <span className="text-[10px] text-warm-400 shrink-0">{t.projects?.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Confirm button */}
+              <div className="flex gap-2">
+                <button
+                  onClick={addLink}
+                  disabled={!selectedLinkTarget || savingLink}
+                  className="btn-primary btn-sm text-xs flex items-center gap-1.5 flex-1 justify-center"
+                >
+                  {savingLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+                  Link Task
+                </button>
+                <button onClick={() => setShowAddLink(false)} className="btn-ghost btn-sm text-xs text-warm-500">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Existing links */}
+          {loadingLinks ? (
+            <div className="space-y-1.5">
+              {[1,2].map(i => <div key={i} className="h-8 bg-warm-100 rounded-lg animate-pulse" />)}
+            </div>
+          ) : taskLinks.length > 0 ? (
+            <div className="space-y-1.5">
+              {taskLinks.map(link => {
+                const meta = LINK_TYPE_META[link.link_type] || LINK_TYPE_META.relates_to
+                const t = link.task
+                if (!t) return null
+                return (
+                  <div key={link.id} className="flex items-center gap-2 group rounded-lg px-2 py-1.5 hover:bg-warm-50 transition-colors">
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${meta.color}`}>
+                      {meta.label}
+                    </span>
+                    <button
+                      onClick={() => onTaskClick && onTaskClick(t)}
+                      className="flex items-center gap-1.5 flex-1 min-w-0 text-left hover:text-primary-600 transition-colors"
+                    >
+                      <TaskIdBadge taskNumber={t.task_number} projectName={t.projects?.name} />
+                      <span className="text-xs text-warm-800 truncate">{t.title}</span>
+                      <ExternalLink className="w-3 h-3 text-warm-300 group-hover:text-primary-400 shrink-0 ml-auto" />
+                    </button>
+                    <button
+                      onClick={() => removeLink(link.id)}
+                      className="opacity-0 group-hover:opacity-100 text-warm-300 hover:text-red-500 transition-all shrink-0"
+                      title="Remove link"
+                    >
+                      <Unlink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-warm-400 italic">No linked tasks yet</p>
+          )}
+        </div>
+
         </div>{/* end left column */}
 
           {/* ── RIGHT: Updates panel ── */}
@@ -2040,10 +2251,12 @@ export default function Lists() {
             task={selectedTask}
             groupMembers={groupMembers}
             projects={projects}
+            allTasks={tasks}
             onClose={() => setSelectedTask(null)}
             onUpdate={handleUpdate}
             onDelete={requestDelete}
             onStatusChange={handleStatusChange}
+            onTaskClick={t => setSelectedTask(t)}
             workflow={workflow}
           />
         </>
