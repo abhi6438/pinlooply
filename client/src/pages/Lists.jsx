@@ -1872,15 +1872,20 @@ function ListView({ tasks, groupMembers, filterProject, setFilterProject, filter
   )
 }
 
+// ── Module-level task cache (persists across route changes) ───
+const _tasksCache = new Map() // key: groupId string → task[]
+
 // ── Main Component ────────────────────────────────────────────
 export default function Lists() {
   const { user } = useAuth()
   const { getEffectiveStatuses, activeGroupId } = useWorkspace()
   const { projects, loading: projectsLoading, fetchProjects } = useProjectStore()
 
+  const cacheKey = activeGroupId || 'personal'
+
   const [view, setView]           = useState('board') // 'board' | 'list'
-  const [tasks, setTasks]         = useState([])
-  const [loading, setLoading]     = useState(false)
+  const [tasks, setTasks]         = useState(() => _tasksCache.get(cacheKey) || [])
+  const [loading, setLoading]     = useState(!_tasksCache.has(cacheKey))
   const [groupMembers, setGroupMembers] = useState([])
 
   // Filters
@@ -1917,16 +1922,17 @@ export default function Lists() {
   }, [user, activeGroupId]) // eslint-disable-line
 
   async function loadTasks() {
-    setLoading(true)
+    // Only show full loader on first load; subsequent refreshes are silent
+    if (!_tasksCache.has(cacheKey)) setLoading(true)
     try {
       // show_done=true: include tasks with status='done' so the DONE/PROD column is visible
       const params = { excludeTestCases: true, show_done: true }
       if (activeGroupId) params.group_id = activeGroupId
       else params.group_id = 'personal'
       const res = await tasksApi.list(params)
-      const all = res.data.data || []
-      // Filter out test_case on frontend
-      setTasks(all.filter(t => t.type !== 'test_case'))
+      const all = (res.data.data || []).filter(t => t.type !== 'test_case')
+      _tasksCache.set(cacheKey, all)
+      setTasks(all)
     } catch {
       toast.error('Failed to load tasks')
     } finally {
@@ -1999,7 +2005,7 @@ export default function Lists() {
     setDeleteTarget(null)
     try {
       await tasksApi.delete(id)
-      setTasks(ts => ts.filter(t => t.id !== id))
+      setTasks(ts => { const next = ts.filter(t => t.id !== id); _tasksCache.set(cacheKey, next); return next })
       setSelectedIds(s => { const n = new Set(s); n.delete(id); return n })
       toast.success('Task deleted')
     } catch {
@@ -2031,7 +2037,7 @@ export default function Lists() {
       const status = toDbStatus(payload.status || addModalStatus)
       const res = await tasksApi.create({ ...payload, status })
       const created = res.data.data
-      if (created) setTasks(ts => [created, ...ts])
+      if (created) setTasks(ts => { const next = [created, ...ts]; _tasksCache.set(cacheKey, next); return next })
       toast.success('Task created!')
     } catch {
       toast.error('Failed to create task')
