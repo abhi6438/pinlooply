@@ -626,10 +626,10 @@ router.put('/module-config', async (req, res) => {
 // Safe to run multiple times — only touches NULL rows.
 router.post('/backfill-task-numbers', requireAuth, requireAdmin, async (req, res) => {
   try {
-    // Ensure sequence exists
-    await supabaseAdmin.rpc('exec_sql', {
-      sql: `CREATE SEQUENCE IF NOT EXISTS tasks_task_number_seq;`
-    }).catch(() => {}) // ignore if rpc not available — sequence likely exists from migration
+    // Ensure sequence exists (ignore errors — it likely already exists from the migration)
+    try {
+      await supabaseAdmin.rpc('exec_sql', { sql: `CREATE SEQUENCE IF NOT EXISTS tasks_task_number_seq;` })
+    } catch (_) { /* non-fatal */ }
 
     // Find tasks with no task_number, ordered by created_at
     const { data: unNumbered, error } = await supabaseAdmin

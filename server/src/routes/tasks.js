@@ -67,7 +67,7 @@ async function createNotification({ userId, type, title, body, relatedTaskId }) 
 const TASK_SELECT = `
   id, title, description, type, status, priority,
   due_date, created_at, updated_at, assigned_to_name,
-  project_id, topic_id, discussion_id,
+  project_id, topic_id, discussion_id, task_number,
   projects(id, name, color),
   topics(id, title),
   assigned_user:assigned_to(id, name, avatar_url),
