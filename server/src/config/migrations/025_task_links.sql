@@ -13,11 +13,15 @@ CREATE TABLE IF NOT EXISTS task_links (
   target_task_id  uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   link_type       text NOT NULL DEFAULT 'relates_to'
                        CHECK (link_type IN ('relates_to','blocks','blocked_by','duplicates','parent','child')),
+  note            text,          -- optional context about why these tasks are linked
   created_by      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at      timestamptz NOT NULL DEFAULT now(),
   -- Prevent duplicate links of the same type between the same two tasks
   UNIQUE (source_task_id, target_task_id, link_type)
 );
+
+-- If the table already exists (re-running migration), add the note column safely
+ALTER TABLE task_links ADD COLUMN IF NOT EXISTS note text;
 
 CREATE INDEX IF NOT EXISTS idx_task_links_source ON task_links(source_task_id);
 CREATE INDEX IF NOT EXISTS idx_task_links_target ON task_links(target_task_id);

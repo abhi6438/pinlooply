@@ -601,7 +601,7 @@ router.get('/:taskId/links', requireAuth, async (req, res) => {
     const { data: asSource, error: e1 } = await supabaseAdmin
       .from('task_links')
       .select(`
-        id, link_type, created_at,
+        id, link_type, note, created_at,
         target_task:target_task_id(id, title, status, priority, task_number, project_id, projects(id, name, color))
       `)
       .eq('source_task_id', taskId)
@@ -610,19 +610,19 @@ router.get('/:taskId/links', requireAuth, async (req, res) => {
     const { data: asTarget, error: e2 } = await supabaseAdmin
       .from('task_links')
       .select(`
-        id, link_type, created_at,
+        id, link_type, note, created_at,
         source_task:source_task_id(id, title, status, priority, task_number, project_id, projects(id, name, color))
       `)
       .eq('target_task_id', taskId)
 
     if (e1 || e2) throw e1 || e2
 
-    // Normalise to a flat list: { id, link_type, direction, task }
+    // Normalise to a flat list: { id, link_type, note, task }
     const REVERSE = { blocks: 'blocked_by', blocked_by: 'blocks', parent: 'child', child: 'parent', relates_to: 'relates_to', duplicates: 'duplicates' }
 
     const links = [
-      ...(asSource || []).map(l => ({ id: l.id, link_type: l.link_type, task: l.target_task, created_at: l.created_at })),
-      ...(asTarget || []).map(l => ({ id: l.id, link_type: REVERSE[l.link_type] || l.link_type, task: l.source_task, created_at: l.created_at })),
+      ...(asSource || []).map(l => ({ id: l.id, link_type: l.link_type, note: l.note, task: l.target_task, created_at: l.created_at })),
+      ...(asTarget || []).map(l => ({ id: l.id, link_type: REVERSE[l.link_type] || l.link_type, note: l.note, task: l.source_task, created_at: l.created_at })),
     ].filter(l => l.task && projectIds.includes(l.task.project_id))
 
     return res.json({ success: true, data: links })
@@ -637,7 +637,7 @@ router.post('/:taskId/links', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id
     const { taskId } = req.params
-    const { target_task_id, link_type = 'relates_to' } = req.body
+    const { target_task_id, link_type = 'relates_to', note } = req.body
 
     if (!target_task_id) return res.status(400).json({ error: 'target_task_id is required' })
     if (!LINK_TYPES.includes(link_type)) return res.status(400).json({ error: 'Invalid link_type' })
@@ -656,9 +656,9 @@ router.post('/:taskId/links', requireAuth, async (req, res) => {
 
     const { data, error } = await supabaseAdmin
       .from('task_links')
-      .insert({ source_task_id: taskId, target_task_id, link_type, created_by: userId })
+      .insert({ source_task_id: taskId, target_task_id, link_type, note: note?.trim() || null, created_by: userId })
       .select(`
-        id, link_type, created_at,
+        id, link_type, note, created_at,
         target_task:target_task_id(id, title, status, priority, task_number, project_id, projects(id, name, color))
       `)
       .single()
@@ -668,7 +668,7 @@ router.post('/:taskId/links', requireAuth, async (req, res) => {
       throw error
     }
 
-    return res.status(201).json({ success: true, data: { id: data.id, link_type: data.link_type, task: data.target_task, created_at: data.created_at } })
+    return res.status(201).json({ success: true, data: { id: data.id, link_type: data.link_type, note: data.note, task: data.target_task, created_at: data.created_at } })
   } catch (err) {
     console.error('Create task link error:', err)
     return res.status(500).json({ error: err.message })

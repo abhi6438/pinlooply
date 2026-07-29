@@ -261,9 +261,9 @@ export const taskUpdatesApi = {
 }
 
 export const taskLinksApi = {
-  list:   (taskId)                            => api.get(`/api/tasks/${taskId}/links`),
-  create: (taskId, targetTaskId, linkType)    => api.post(`/api/tasks/${taskId}/links`, { target_task_id: targetTaskId, link_type: linkType }),
-  delete: (taskId, linkId)                    => api.delete(`/api/tasks/${taskId}/links/${linkId}`),
+  list:   (taskId)                                  => api.get(`/api/tasks/${taskId}/links`),
+  create: (taskId, targetTaskId, linkType, note)    => api.post(`/api/tasks/${taskId}/links`, { target_task_id: targetTaskId, link_type: linkType, note }),
+  delete: (taskId, linkId)                          => api.delete(`/api/tasks/${taskId}/links/${linkId}`),
 }
 
 export const searchApi = {

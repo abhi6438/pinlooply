@@ -512,6 +512,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
   const [linkSearchLoading,  setLinkSearchLoading]  = useState(false)
   const [selectedLinkTarget, setSelectedLinkTarget] = useState(null)
   const [selectedLinkType,   setSelectedLinkType]   = useState('relates_to')
+  const [linkNote,           setLinkNote]           = useState('')
   const [savingLink,         setSavingLink]         = useState(false)
   const linkSearchRef = useRef(null)
   const linkDebounceRef = useRef(null)
@@ -734,10 +735,11 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
     if (!selectedLinkTarget) return
     setSavingLink(true)
     try {
-      const r = await taskLinksApi.create(task.id, selectedLinkTarget.id, selectedLinkType)
+      const r = await taskLinksApi.create(task.id, selectedLinkTarget.id, selectedLinkType, linkNote.trim() || null)
       setTaskLinks(prev => [...prev, r.data.data])
       setShowAddLink(false)
       setLinkSearch('')
+      setLinkNote('')
       setSelectedLinkTarget(null)
       setSelectedLinkType('relates_to')
       toast.success('Link added')
@@ -1088,7 +1090,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
               )}
             </p>
             <button
-              onClick={() => { setShowAddLink(v => !v); setLinkSearch(''); setLinkSearchResults([]); setSelectedLinkTarget(null) }}
+              onClick={() => { setShowAddLink(v => !v); setLinkSearch(''); setLinkNote(''); setLinkSearchResults([]); setSelectedLinkTarget(null) }}
               className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
             >
               <Plus className="w-3.5 h-3.5" /> Add link
@@ -1156,6 +1158,15 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                 </div>
               )}
 
+              {/* Optional note */}
+              <textarea
+                value={linkNote}
+                onChange={e => setLinkNote(e.target.value)}
+                placeholder="Add a note about this link (optional)..."
+                rows={2}
+                className="input w-full text-xs resize-none"
+              />
+
               {/* Confirm button */}
               <div className="flex gap-2">
                 <button
@@ -1166,7 +1177,7 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                   {savingLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
                   Link Task
                 </button>
-                <button onClick={() => setShowAddLink(false)} className="btn-ghost btn-sm text-xs text-warm-500">
+                <button onClick={() => { setShowAddLink(false); setLinkNote('') }} className="btn-ghost btn-sm text-xs text-warm-500">
                   Cancel
                 </button>
               </div>
@@ -1185,25 +1196,30 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                 const t = link.task
                 if (!t) return null
                 return (
-                  <div key={link.id} className="flex items-center gap-2 group rounded-lg px-2 py-1.5 hover:bg-warm-50 transition-colors">
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${meta.color}`}>
-                      {meta.label}
-                    </span>
-                    <button
-                      onClick={() => onTaskClick && onTaskClick(t)}
-                      className="flex items-center gap-1.5 flex-1 min-w-0 text-left hover:text-primary-600 transition-colors"
-                    >
-                      <TaskIdBadge taskNumber={t.task_number} projectName={t.projects?.name} />
-                      <span className="text-xs text-warm-800 truncate">{t.title}</span>
-                      <ExternalLink className="w-3 h-3 text-warm-300 group-hover:text-primary-400 shrink-0 ml-auto" />
-                    </button>
-                    <button
-                      onClick={() => removeLink(link.id)}
-                      className="opacity-0 group-hover:opacity-100 text-warm-300 hover:text-red-500 transition-all shrink-0"
-                      title="Remove link"
-                    >
-                      <Unlink className="w-3.5 h-3.5" />
-                    </button>
+                  <div key={link.id} className="group rounded-lg px-2 py-2 hover:bg-warm-50 transition-colors space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${meta.color}`}>
+                        {meta.label}
+                      </span>
+                      <button
+                        onClick={() => onTaskClick && onTaskClick(t)}
+                        className="flex items-center gap-1.5 flex-1 min-w-0 text-left hover:text-primary-600 transition-colors"
+                      >
+                        <TaskIdBadge taskNumber={t.task_number} projectName={t.projects?.name} />
+                        <span className="text-xs text-warm-800 truncate">{t.title}</span>
+                        <ExternalLink className="w-3 h-3 text-warm-300 group-hover:text-primary-400 shrink-0 ml-auto" />
+                      </button>
+                      <button
+                        onClick={() => removeLink(link.id)}
+                        className="opacity-0 group-hover:opacity-100 text-warm-300 hover:text-red-500 transition-all shrink-0"
+                        title="Remove link"
+                      >
+                        <Unlink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {link.note && (
+                      <p className="text-[11px] text-warm-500 italic pl-1 leading-relaxed">{link.note}</p>
+                    )}
                   </div>
                 )
               })}
