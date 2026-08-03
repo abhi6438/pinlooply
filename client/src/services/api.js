@@ -255,10 +255,11 @@ export const timeEntriesApi = {
 }
 
 export const taskUpdatesApi = {
-  list:   (taskId)                              => api.get(`/api/tasks/${taskId}/updates`),
-  create: (taskId, content, updateType)         => api.post(`/api/tasks/${taskId}/updates`, { content, update_type: updateType }),
-  update: (taskId, updateId, content, type)     => api.patch(`/api/tasks/${taskId}/updates/${updateId}`, { content, update_type: type }),
-  delete: (taskId, updateId)                    => api.delete(`/api/tasks/${taskId}/updates/${updateId}`),
+  list:          (taskId)                              => api.get(`/api/tasks/${taskId}/updates`),
+  create:        (taskId, content, updateType)         => api.post(`/api/tasks/${taskId}/updates`, { content, update_type: updateType }),
+  update:        (taskId, updateId, content, type)     => api.patch(`/api/tasks/${taskId}/updates/${updateId}`, { content, update_type: type }),
+  delete:        (taskId, updateId)                    => api.delete(`/api/tasks/${taskId}/updates/${updateId}`),
+  suggestImprove: (taskId, existing_text)              => api.post(`/api/tasks/${taskId}/suggest-update`, { existing_text }),
 }
 
 export const taskLinksApi = {
