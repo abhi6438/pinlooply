@@ -131,6 +131,7 @@ function PortalDropdown({ anchorRef, open, minWidth = 160, children }) {
   if (!open) return null
   return createPortal(
     <div
+      data-portal-dropdown
       style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth, zIndex: 9999 }}
       className="bg-white border border-warm-200 rounded-xl shadow-xl py-1"
     >
@@ -145,7 +146,10 @@ function useDropdown() {
   const ref = useRef()
   useEffect(() => {
     function handler(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      // Don't close if click is inside the anchor OR inside any portal dropdown
+      if (ref.current && ref.current.contains(e.target)) return
+      if (e.target.closest('[data-portal-dropdown]')) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -1134,7 +1138,63 @@ function DetailPanel({ task, groupMembers, projects, allTasks = [], onClose, onU
                     </span>
                   )}
                 </h3>
+                <button
+                  onClick={() => { setShowAddLink(v => !v); setLinkSearch(''); setLinkNote(''); setLinkSearchResults([]); setSelectedLinkTarget(null) }}
+                  className="flex items-center gap-1 text-xs text-warm-400 hover:text-primary-600 font-medium transition-colors"
+                  title="Link to another task"
+                >
+                  <Link2 className="w-3.5 h-3.5" /> Link task
+                </button>
               </div>
+              {/* Inline add-link form — shown when triggered from header */}
+              {showAddLink && outgoingLinks.length === 0 && (
+                <div className="mt-2 rounded-xl border border-warm-200 bg-warm-50 p-3 space-y-2">
+                  <select value={selectedLinkType} onChange={e => setSelectedLinkType(e.target.value)} className="input w-full text-xs">
+                    {Object.entries(LINK_TYPE_META).map(([key, meta]) => (
+                      <option key={key} value={key}>{meta.label}</option>
+                    ))}
+                  </select>
+                  <div className="relative">
+                    <input
+                      ref={linkSearchRef}
+                      type="text"
+                      value={selectedLinkTarget ? `${getProjectPrefix(selectedLinkTarget.projects?.name)}-${selectedLinkTarget.task_number || ''} ${selectedLinkTarget.title}` : linkSearch}
+                      onChange={e => {
+                        setSelectedLinkTarget(null)
+                        setLinkSearch(e.target.value)
+                        clearTimeout(linkDebounceRef.current)
+                        linkDebounceRef.current = setTimeout(() => searchLinkedTasks(e.target.value), 200)
+                      }}
+                      placeholder="Search task by title or ID..."
+                      className="input w-full text-xs pr-8"
+                    />
+                    {selectedLinkTarget && (
+                      <button onClick={() => { setSelectedLinkTarget(null); setLinkSearch('') }} className="absolute right-2 top-1/2 -translate-y-1/2 text-warm-400 hover:text-warm-600">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {!selectedLinkTarget && linkSearch.length >= 2 && (
+                    <div className="rounded-lg border border-warm-200 bg-white shadow-sm max-h-36 overflow-y-auto">
+                      {linkSearchLoading && <div className="flex items-center justify-center py-3"><Loader2 className="w-4 h-4 animate-spin text-warm-400" /></div>}
+                      {!linkSearchLoading && linkSearchResults.length === 0 && <p className="text-xs text-warm-400 text-center py-3">No tasks found</p>}
+                      {linkSearchResults.map(t => (
+                        <button key={t.id} onClick={() => { setSelectedLinkTarget(t); setLinkSearchResults([]) }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-warm-50 text-left">
+                          <TaskIdBadge taskNumber={t.task_number} projectName={t.projects?.name} />
+                          <span className="text-xs text-warm-800 truncate flex-1">{t.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <textarea value={linkNote} onChange={e => setLinkNote(e.target.value)} placeholder="Add a note (optional)..." rows={2} className="input w-full text-xs resize-none" />
+                  <div className="flex gap-2">
+                    <button onClick={addLink} disabled={!selectedLinkTarget || savingLink} className="btn-primary btn-sm text-xs flex items-center gap-1.5 flex-1 justify-center">
+                      {savingLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />} Link Task
+                    </button>
+                    <button onClick={() => { setShowAddLink(false); setLinkNote('') }} className="btn-ghost btn-sm text-xs text-warm-500">Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── Right panel: wait for links to load before showing anything ── */}
