@@ -223,6 +223,7 @@ export function WorkspaceProvider({ children }) {
       rawVocab,
       enabledModules,           // user's raw DB pref (use for settings UI)
       effectiveModules,         // authoritative for nav — use this everywhere
+      effectiveMenuKeys: serverEffectiveMenus, // full set of enabled menu keys (null = not loaded yet)
       globalModules,
       groupModules,
       customStatuses,

@@ -46,35 +46,36 @@ function BottomNavSkeleton() {
 }
 
 // ── Nav groups — grouped by purpose ───────────────────────────
-function getNavGroups(mode, vocabulary = {}, enabledModules = null) {
-  const allow = (key) => key === null || enabledModules === null || enabledModules.includes(key)
+function getNavGroups(mode, vocabulary = {}, enabledModules = null, effectiveMenuKeys = null) {
+  // allow(menuKey): true if the menu key is enabled (or we don't have the list yet → show all)
+  const allow = (menuKey) => menuKey === null || effectiveMenuKeys === null || effectiveMenuKeys.includes(menuKey)
 
   const groups = [
     {
       label: 'Work',
       items: [
-        { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard',                        moduleKey: null       },
-        { to: '/projects',       icon: FolderOpen,      label: vocabulary.projects  || 'Projects', moduleKey: 'projects' },
-        { to: '/lists',          icon: ListChecks,      label: vocabulary.tasks     || 'Tasks',    moduleKey: 'tasks'    },
-        { to: '/timeline',       icon: CalendarDays,    label: vocabulary.timeline  || 'Timeline', moduleKey: 'timeline' },
-      ].filter(i => allow(i.moduleKey)),
+        { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard',                        menuKey: 'dashboard'  },
+        { to: '/projects',       icon: FolderOpen,      label: vocabulary.projects  || 'Projects', menuKey: 'projects'   },
+        { to: '/lists',          icon: ListChecks,      label: vocabulary.tasks     || 'Tasks',    menuKey: 'tasks'      },
+        { to: '/timeline',       icon: CalendarDays,    label: vocabulary.timeline  || 'Timeline', menuKey: 'timeline'   },
+      ].filter(i => allow(i.menuKey)),
     },
     {
       label: 'Capture',
       items: [
-        { to: '/log',            icon: Send,            label: 'Log Discussion',                   moduleKey: null       },
-        { to: '/topics',         icon: Tag,             label: vocabulary.topics    || 'Topics',   moduleKey: 'topics'   },
-        { to: '/standup',        icon: ClipboardList,   label: vocabulary.standup   || 'Standup',  moduleKey: 'standup'  },
-        { to: '/weekly-summary', icon: BarChart3,       label: vocabulary.summary   || 'Summary',  moduleKey: 'summary'  },
-        { to: '/test-cases',     icon: FlaskConical,    label: vocabulary.testcases || 'Test Cases', moduleKey: 'testcases' },
-      ].filter(i => allow(i.moduleKey)),
+        { to: '/log',            icon: Send,            label: 'Log Discussion',                     menuKey: 'log'        },
+        { to: '/topics',         icon: Tag,             label: vocabulary.topics    || 'Topics',     menuKey: 'topics'     },
+        { to: '/standup',        icon: ClipboardList,   label: vocabulary.standup   || 'Standup',    menuKey: 'standup'    },
+        { to: '/weekly-summary', icon: BarChart3,       label: vocabulary.summary   || 'Summary',    menuKey: 'summary'    },
+        { to: '/test-cases',     icon: FlaskConical,    label: vocabulary.testcases || 'Test Cases', menuKey: 'testcases'  },
+      ].filter(i => allow(i.menuKey)),
     },
     {
       label: 'Personal',
       items: [
-        { to: '/my-tasks',     icon: UserCheck, label: 'My Tasks',     moduleKey: null },
-        { to: '/time-reports', icon: Timer,     label: 'Time Reports', moduleKey: null },
-      ],
+        { to: '/my-tasks',     icon: UserCheck, label: 'My Tasks',     menuKey: 'mytasks'     },
+        { to: '/time-reports', icon: Timer,     label: 'Time Reports', menuKey: 'timereports' },
+      ].filter(i => allow(i.menuKey)),
     },
   ]
 
@@ -82,23 +83,24 @@ function getNavGroups(mode, vocabulary = {}, enabledModules = null) {
     groups.push({
       label: 'Team',
       items: [
-        { to: '/team',    icon: Users,    label: 'Team',    moduleKey: null },
-        { to: '/manager', icon: BarChart2, label: 'Manager', moduleKey: null },
-      ],
+        { to: '/team',    icon: Users,     label: 'Team',    menuKey: 'team'    },
+        { to: '/manager', icon: BarChart2, label: 'Manager', menuKey: 'manager' },
+      ].filter(i => allow(i.menuKey)),
     })
   }
 
-  // Bottom utilities — always shown
+  // Bottom utilities
   groups.push({
-    label: null, // no label = just a divider
+    label: null,
     items: [
-      { to: '/help',          icon: HelpCircle, label: 'Help',            moduleKey: null },
-      { to: '/settings',      icon: Settings,   label: 'Settings',        moduleKey: null },
-      { to: '/settings/data', icon: Database,   label: 'Data Management', moduleKey: null },
-    ],
+      { to: '/help',          icon: HelpCircle, label: 'Help',            menuKey: 'help'            },
+      { to: '/settings',      icon: Settings,   label: 'Settings',        menuKey: 'settings'        },
+      { to: '/settings/data', icon: Database,   label: 'Data Management', menuKey: 'datamanagement'  },
+    ].filter(i => allow(i.menuKey)),
   })
 
-  return groups
+  // Drop empty groups (e.g. if all items in a group are disabled)
+  return groups.filter(g => g.items.length > 0)
 }
 
 // ── Avatar ─────────────────────────────────────────────────────
@@ -217,13 +219,13 @@ function SideNavLink({ to, icon: Icon, label, collapsed }) {
 // ── Sidebar ───────────────────────────────────────────────────
 function Sidebar({ user, userProfile, bellProps, onLogout, onSearchOpen }) {
   const { sidebarOpen, toggleSidebar } = useUIStore()
-  const { vocabulary, effectiveModules, workspaceName, activeMode, activeGroupName, loading } = useWorkspace()
+  const { vocabulary, effectiveModules, effectiveMenuKeys, workspaceName, activeMode, activeGroupName, loading } = useWorkspace()
   const navigate = useNavigate()
   const collapsed = !sidebarOpen
 
   // Active mode: use session choice, fall back to DB mode
   const effectiveMode = activeMode ?? userProfile?.mode ?? 'personal'
-  const navGroups = getNavGroups(effectiveMode, vocabulary, effectiveModules)
+  const navGroups = getNavGroups(effectiveMode, vocabulary, effectiveModules, effectiveMenuKeys)
 
   // Display name: group name when in team mode, else workspace name
   const displayName = (effectiveMode === 'team' && activeGroupName)
@@ -405,9 +407,9 @@ function BottomNav({ mode }) {
 
 // ── Mobile drawer ─────────────────────────────────────────────
 function MobileDrawer({ open, onClose, user, userProfile, bellProps, onLogout }) {
-  const { vocabulary, effectiveModules, workspaceName, activeMode, loading } = useWorkspace()
+  const { vocabulary, effectiveModules, effectiveMenuKeys, workspaceName, activeMode, loading } = useWorkspace()
   const effectiveMode = activeMode ?? userProfile?.mode ?? 'personal'
-  const navGroups = getNavGroups(effectiveMode, vocabulary, effectiveModules)
+  const navGroups = getNavGroups(effectiveMode, vocabulary, effectiveModules, effectiveMenuKeys)
   const displayName = workspaceName || 'Pinlooply'
 
   useEffect(() => { if (open) onClose() }, []) // eslint-disable-line
