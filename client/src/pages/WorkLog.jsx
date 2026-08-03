@@ -589,35 +589,38 @@ export default function WorkLog() {
           </div>
         </div>
 
-        {/* ── Date nav ── */}
-        <div className="bg-white rounded-2xl border border-warm-200 shadow-sm overflow-hidden">
-          <div className="flex items-center border-b border-warm-100 px-3 py-2">
-            <button onClick={() => go(-1)} className="w-8 h-8 flex items-center justify-center rounded-lg text-warm-400 hover:text-warm-700 hover:bg-warm-100 transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="flex-1 text-center">
-              <p className="text-sm font-bold text-warm-900">{dateLabel}</p>
-              <p className="text-[10px] text-warm-400">{date}</p>
-            </div>
-            <button onClick={() => go(1)} disabled={isToday}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-warm-400 hover:text-warm-700 hover:bg-warm-100 disabled:opacity-30 transition-colors">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex px-3 py-2 gap-1.5">
+        {/* ── Date nav — compact single row ── */}
+        <div className="bg-white rounded-xl border border-warm-200 shadow-sm flex items-center gap-2 px-3 py-2">
+          <button onClick={() => go(-1)} className="w-7 h-7 flex items-center justify-center rounded-lg text-warm-400 hover:text-warm-700 hover:bg-warm-100 transition-colors flex-shrink-0">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Day chips */}
+          <div className="flex items-center gap-1 flex-1 min-w-0">
             {chips.map(c => (
               <button key={c.iso} onClick={() => setDate(c.iso)}
-                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${c.iso === date ? 'bg-primary-500 text-white shadow-sm' : 'text-warm-500 hover:bg-warm-100'}`}>
+                className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap ${
+                  c.iso === date
+                    ? 'bg-primary-500 text-white shadow-sm'
+                    : 'text-warm-500 hover:bg-warm-100'
+                }`}>
                 {c.label}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2 px-4 pb-2.5">
-            <span className="text-[11px] text-warm-400">Custom date:</span>
-            <input type="date" max={todayISO()} value={date}
-              onChange={e => { if (e.target.value) setDate(e.target.value) }}
-              className="border border-warm-200 rounded-lg px-2.5 py-1 text-xs text-warm-700 focus:outline-none focus:border-primary-400 bg-warm-50" />
-          </div>
+
+          {/* Divider */}
+          <div className="w-px h-5 bg-warm-200 flex-shrink-0" />
+
+          {/* Custom date picker */}
+          <input type="date" max={todayISO()} value={date}
+            onChange={e => { if (e.target.value) setDate(e.target.value) }}
+            className="border border-warm-200 rounded-lg px-2 py-1 text-xs text-warm-600 focus:outline-none focus:border-primary-400 bg-warm-50 flex-shrink-0 w-32" />
+
+          <button onClick={() => go(1)} disabled={isToday}
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-warm-400 hover:text-warm-700 hover:bg-warm-100 disabled:opacity-30 transition-colors flex-shrink-0">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* ── Content ── */}
