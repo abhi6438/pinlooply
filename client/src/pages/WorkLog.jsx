@@ -55,23 +55,139 @@ function statusMeta(status) {
   return { icon: <Circle className="w-3.5 h-3.5" />, color: 'text-warm-300', bg: 'bg-warm-100 text-warm-500' }
 }
 
-function buildTextExport(data, dateLabel) {
-  const lines = [`Work Log — ${dateLabel}`, '═'.repeat(50), `Total: ${fmtMins(data.total_mins) || '0m'}`, '']
-  for (const p of data.projects) {
-    lines.push(`▸ ${p.project?.name || 'Unknown'}  (${fmtMins(p.total_mins) || '—'})`)
-    lines.push('─'.repeat(48))
-    for (const t of p.tasks) {
-      lines.push(`  ${t.task_number ? '#' + t.task_number + '  ' : ''}${t.title}  [${t.status || ''}]  ${fmtMins(t.total_mins) || '—'}`)
-      for (const e of t.entries) lines.push(`    ⏱  ${fmtMins(e.duration_mins)}${e.notes ? ' — ' + e.notes : ''}`)
-      for (const u of t.updates) lines.push(`    ✎  ${fmtTime(u.created_at)}  ${u.content}`)
-    }
-    lines.push('')
+function buildHTMLExport(data, dateLabel, date) {
+  const totalTime = fmtMins(data.total_mins) || '0m'
+  const totalUpdates = data.projects.reduce((s, p) => s + p.tasks.reduce((ts, t) => ts + t.updates.length, 0), 0)
+  const totalTasks = data.projects.reduce((s, p) => s + p.tasks.length, 0)
+
+  const statusBg = (status) => {
+    const s = (status || '').toLowerCase()
+    if (s.includes('done') || s.includes('complete') || s.includes('closed')) return '#dcfce7;color:#166534'
+    if (s.includes('progress')) return '#dbeafe;color:#1e40af'
+    if (s.includes('review')) return '#fef9c3;color:#92400e'
+    return '#f3f4f6;color:#6b7280'
   }
-  return lines.join('\n')
+
+  const rows = data.projects.flatMap(p =>
+    p.tasks.map(t => {
+      const timeMins = t.entries.reduce((s, e) => s + e.duration_mins, 0)
+      const color = p.project?.color || '#6366f1'
+      const sbg = statusBg(t.status)
+      const activityRows = [
+        ...t.entries.map(e => `<tr style="background:#f9f9ff">
+          <td colspan="5" style="padding:4px 16px 4px 56px;font-size:11px;color:#555">
+            <span style="color:#6366f1;font-weight:700;margin-right:6px">⏱ ${fmtMins(e.duration_mins)}</span>
+            ${e.notes ? `<span style="color:#888">${e.notes}</span>` : '<span style="color:#bbb;font-style:italic">no note</span>'}
+          </td></tr>`),
+        ...t.updates.map(u => `<tr style="background:#f9f9ff">
+          <td colspan="5" style="padding:4px 16px 4px 56px;font-size:11px;color:#555">
+            <span style="color:#9ca3af;margin-right:6px">${fmtTime(u.created_at)}</span>
+            ${u.content}
+          </td></tr>`),
+      ].join('')
+      return `
+        <tr style="border-bottom:1px solid #f0ece8">
+          <td style="padding:12px 12px 12px 16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              ${t.task_number ? `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${color}20;color:${color}">#${t.task_number}</span>` : ''}
+              <span style="font-size:13px;font-weight:500;color:#1a1a2e">${t.title}</span>
+            </div>
+          </td>
+          <td style="padding:12px;white-space:nowrap">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block"></span>
+              <span style="font-size:12px;color:#555;font-weight:500">${p.project?.name || 'Unknown'}</span>
+            </div>
+          </td>
+          <td style="padding:12px;white-space:nowrap">
+            <span style="font-size:11px;font-weight:500;padding:3px 8px;border-radius:20px;background:${sbg.split(';')[0].replace('background:','')};color:${sbg.split('color:')[1]}">${(t.status || 'No status').replace(/_/g,' ')}</span>
+          </td>
+          <td style="padding:12px;white-space:nowrap">
+            ${timeMins > 0
+              ? `<span style="font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;background:${color}18;color:${color}">⏱ ${fmtMins(timeMins)}</span>`
+              : `<span style="color:#ccc;font-style:italic;font-size:12px">—</span>`}
+          </td>
+          <td style="padding:12px;font-size:11px;color:#9ca3af">
+            ${t.updates.length > 0 ? `📝 ${t.updates.length}` : ''} ${t.entries.length > 0 ? `⏱ ${t.entries.length}` : ''}
+          </td>
+        </tr>
+        ${activityRows}`
+    })
+  ).join('')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Work Log — ${dateLabel}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f6f4; padding: 32px; color: #1a1a2e; }
+  .container { max-width: 960px; margin: 0 auto; }
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .icon { width: 40px; height: 40px; border-radius: 12px; background: #6366f1; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; }
+  h1 { font-size: 22px; font-weight: 800; color: #1a1a2e; }
+  .sub { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: white; border: 1px solid #e8e4df; border-radius: 12px; padding: 14px 18px; }
+  .stat-card.primary { background: #6366f1; border-color: #6366f1; }
+  .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; margin-bottom: 4px; }
+  .stat-card.primary .stat-label { color: rgba(255,255,255,0.6); }
+  .stat-value { font-size: 24px; font-weight: 800; color: #1a1a2e; }
+  .stat-card.primary .stat-value { color: white; }
+  .table-card { background: white; border: 1px solid #e8e4df; border-radius: 16px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #f7f6f4; border-bottom: 1px solid #e8e4df; }
+  th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; padding: 10px 12px; }
+  th:first-child { padding-left: 16px; }
+  @media print { body { padding: 16px; background: white; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="icon">🕐</div>
+    <div>
+      <h1>Work Log</h1>
+      <div class="sub">${dateLabel} &nbsp;·&nbsp; ${date}</div>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat-card primary">
+      <div class="stat-label">Total Time</div>
+      <div class="stat-value">${totalTime}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Updates</div>
+      <div class="stat-value">${totalUpdates}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Tasks</div>
+      <div class="stat-value">${totalTasks}</div>
+    </div>
+  </div>
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>Task</th>
+          <th>Project</th>
+          <th>Status</th>
+          <th>Time</th>
+          <th>Activity</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>`
 }
 
-function downloadText(text, filename) {
-  const blob = new Blob([text], { type: 'text/plain' })
+function downloadHTML(html, filename) {
+  const blob = new Blob([html], { type: 'text/html' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
   URL.revokeObjectURL(url)
@@ -446,7 +562,7 @@ export default function WorkLog() {
 
   return (
     <div className="min-h-screen bg-warm-50/30">
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+      <div className="px-6 py-6 space-y-4">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
@@ -465,7 +581,7 @@ export default function WorkLog() {
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
-              onClick={() => { if (data?.projects?.length) downloadText(buildTextExport(data, dateLabel), `worklog-${date}.txt`) }}
+              onClick={() => { if (data?.projects?.length) downloadHTML(buildHTMLExport(data, dateLabel, date), `worklog-${date}.html`) }}
               disabled={!data?.projects?.length}
               className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-warm-200 bg-white text-xs font-medium text-warm-600 hover:bg-warm-50 disabled:opacity-40 shadow-sm transition-colors">
               <Download className="w-3.5 h-3.5" /> Export
