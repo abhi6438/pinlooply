@@ -246,11 +246,12 @@ export const automationsApi = {
 }
 
 export const timeEntriesApi = {
-  list:   (params = {})    => api.get('/api/time-entries',       { params }),
-  report: (params = {})    => api.get('/api/time-entries/report', { params }),
-  create: (payload)        => api.post('/api/time-entries', payload),
-  update: (id, payload)    => api.patch(`/api/time-entries/${id}`, payload),
-  delete: (id)             => api.delete(`/api/time-entries/${id}`),
+  list:    (params = {})   => api.get('/api/time-entries',        { params }),
+  report:  (params = {})   => api.get('/api/time-entries/report', { params }),
+  worklog: (params = {})   => api.get('/api/time-entries/worklog', { params }),
+  create:  (payload)       => api.post('/api/time-entries', payload),
+  update:  (id, payload)   => api.patch(`/api/time-entries/${id}`, payload),
+  delete:  (id)            => api.delete(`/api/time-entries/${id}`),
 }
 
 export const taskUpdatesApi = {

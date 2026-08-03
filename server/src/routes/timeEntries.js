@@ -150,6 +150,113 @@ router.get('/report', async (req, res) => {
   }
 })
 
+// GET /api/time-entries/worklog — daily work log: time entries + updates grouped by project
+router.get('/worklog', async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { date, group_id } = req.query
+
+    // Default to today
+    const day = date || new Date().toISOString().slice(0, 10)
+
+    // Get scoped project IDs
+    const projectIds = await getScopedProjectIds(userId, group_id)
+    if (!projectIds.length) return res.json({ data: { date: day, total_mins: 0, projects: [] } })
+
+    // Fetch tasks in scope
+    const { data: tasks, error: tasksErr } = await supabaseAdmin
+      .from('tasks')
+      .select('id, title, task_number, status, priority, project_id, projects(id, name, color)')
+      .in('project_id', projectIds)
+    if (tasksErr) throw tasksErr
+
+    const taskIds = (tasks || []).map(t => t.id)
+    if (!taskIds.length) return res.json({ data: { date: day, total_mins: 0, projects: [] } })
+
+    const taskMap = Object.fromEntries((tasks || []).map(t => [t.id, t]))
+
+    // Fetch time entries for this day (user's entries only)
+    const [entriesRes, updatesRes] = await Promise.all([
+      supabaseAdmin
+        .from('time_entries')
+        .select('id, task_id, duration_mins, notes, logged_at')
+        .eq('user_id', userId)
+        .eq('logged_at', day)
+        .in('task_id', taskIds),
+      supabaseAdmin
+        .from('task_updates')
+        .select('id, task_id, content, update_type, created_at')
+        .eq('user_id', userId)
+        .gte('created_at', `${day}T00:00:00Z`)
+        .lte('created_at', `${day}T23:59:59Z`)
+        .in('task_id', taskIds)
+        .order('created_at', { ascending: true }),
+    ])
+
+    if (entriesRes.error) throw entriesRes.error
+    if (updatesRes.error) throw updatesRes.error
+
+    // Group by project
+    const projectMap = {}
+
+    // Populate from time entries
+    for (const e of (entriesRes.data || [])) {
+      const task = taskMap[e.task_id]
+      if (!task) continue
+      const pid = task.project_id
+      if (!projectMap[pid]) projectMap[pid] = { project: task.projects, total_mins: 0, tasks: {} }
+      projectMap[pid].total_mins += e.duration_mins
+      if (!projectMap[pid].tasks[e.task_id]) {
+        projectMap[pid].tasks[e.task_id] = {
+          id: e.task_id,
+          title: task.title,
+          task_number: task.task_number,
+          status: task.status,
+          priority: task.priority,
+          total_mins: 0,
+          entries: [],
+          updates: [],
+        }
+      }
+      projectMap[pid].tasks[e.task_id].total_mins += e.duration_mins
+      projectMap[pid].tasks[e.task_id].entries.push(e)
+    }
+
+    // Populate from task updates (may add tasks not in time entries)
+    for (const u of (updatesRes.data || [])) {
+      const task = taskMap[u.task_id]
+      if (!task) continue
+      const pid = task.project_id
+      if (!projectMap[pid]) projectMap[pid] = { project: task.projects, total_mins: 0, tasks: {} }
+      if (!projectMap[pid].tasks[u.task_id]) {
+        projectMap[pid].tasks[u.task_id] = {
+          id: u.task_id,
+          title: task.title,
+          task_number: task.task_number,
+          status: task.status,
+          priority: task.priority,
+          total_mins: 0,
+          entries: [],
+          updates: [],
+        }
+      }
+      projectMap[pid].tasks[u.task_id].updates.push(u)
+    }
+
+    // Serialize
+    const projects = Object.values(projectMap).map(p => ({
+      ...p,
+      tasks: Object.values(p.tasks).sort((a, b) => b.total_mins - a.total_mins),
+    })).sort((a, b) => b.total_mins - a.total_mins)
+
+    const total_mins = projects.reduce((s, p) => s + p.total_mins, 0)
+
+    res.json({ data: { date: day, total_mins, projects } })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // POST /api/time-entries — log time
 router.post('/', async (req, res) => {
   try {

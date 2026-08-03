@@ -37,6 +37,7 @@ import TestCaseGenerator from './pages/TestCaseGenerator'
 import Manager from './pages/Manager'
 import MyTasks from './pages/MyTasks'
 import TimeReports from './pages/TimeReports'
+import WorkLog from './pages/WorkLog'
 import Help from './pages/Help'
 
 // Placeholder pages (will be built in future prompts)
@@ -196,6 +197,11 @@ function AppRoutes() {
       <Route path="/time-reports" element={
         <ProtectedRoute>
           <AppLayout><TimeReports /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/work-log" element={
+        <ProtectedRoute>
+          <AppLayout><WorkLog /></AppLayout>
         </ProtectedRoute>
       } />
       <Route path="/help" element={

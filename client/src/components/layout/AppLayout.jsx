@@ -15,7 +15,7 @@ import {
   CalendarDays, Users, Settings, LogOut, Menu, ChevronLeft, Tag,
   Bell, CheckCheck, ClipboardList, BarChart3, Shield, FlaskConical,
   UserCheck, BarChart2, Timer, Search, HelpCircle, Send,
-  Plus, X, Database, ChevronsUpDown,
+  Plus, X, Database, ChevronsUpDown, Clock,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -74,6 +74,7 @@ function getNavGroups(mode, vocabulary = {}, enabledModules = null, effectiveMen
       label: 'Personal',
       items: [
         { to: '/my-tasks',     icon: UserCheck, label: 'My Tasks',     menuKey: 'mytasks'     },
+        { to: '/work-log',     icon: Clock,     label: 'Work Log',     menuKey: 'worklog'     },
         { to: '/time-reports', icon: Timer,     label: 'Time Reports', menuKey: 'timereports' },
       ].filter(i => allow(i.menuKey)),
     },
